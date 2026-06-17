@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文字雲</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/wordcloud@1.2.2/src/wordcloud2.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans TC', sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: #f8fafc;
+    letter-spacing: 0.05em;
+  }
+
+  .input-area {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    max-width: 520px;
+    margin-bottom: 16px;
+  }
+
+  #wordInput {
+    flex: 1;
+    padding: 12px 16px;
+    font-size: 1.1rem;
+    border-radius: 12px;
+    border: 2px solid #334155;
+    background: #1e293b;
+    color: #f1f5f9;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  #wordInput:focus { border-color: #6366f1; }
+  #wordInput::placeholder { color: #64748b; }
+
+  button {
+    padding: 12px 20px;
+    border-radius: 12px;
+    border: none;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  #submitBtn {
+    background: #6366f1;
+    color: white;
+  }
+  #submitBtn:hover { background: #4f46e5; transform: translateY(-1px); }
+  #submitBtn:active { transform: none; }
+
+  .controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  #toggleBtn {
+    background: #1e293b;
+    color: #94a3b8;
+    border: 2px solid #334155;
+    font-size: 0.9rem;
+  }
+  #toggleBtn:hover { border-color: #6366f1; color: #e2e8f0; }
+
+  #clearBtn {
+    background: #1e293b;
+    color: #94a3b8;
+    border: 2px solid #334155;
+    font-size: 0.9rem;
+  }
+  #clearBtn:hover { border-color: #ef4444; color: #fca5a5; }
+
+  .cloud-container {
+    width: 100%;
+    max-width: 800px;
+    aspect-ratio: 16/9;
+    background: #1e293b;
+    border-radius: 20px;
+    border: 1px solid #334155;
+    overflow: hidden;
+    position: relative;
+    transition: opacity 0.4s;
+  }
+  .cloud-container.hidden { opacity: 0; pointer-events: none; }
+
+  #canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  .empty-msg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+    font-size: 1rem;
+    pointer-events: none;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #4ade80;
+    color: #052e16;
+    padding: 10px 24px;
+    border-radius: 999px;
+    font-weight: 600;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { background: #f87171; color: #450a0a; }
+
+  .url-section {
+    margin-top: 24px;
+    background: #1e293b;
+    border-radius: 16px;
+    border: 1px solid #334155;
+    padding: 20px;
+    width: 100%;
+    max-width: 520px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .url-text {
+    flex: 1;
+  }
+  .url-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .url-value {
+    font-size: 0.85rem;
+    color: #a5b4fc;
+    word-break: break-all;
+    font-family: monospace;
+  }
+
+  #qrcode img, #qrcode canvas {
+    border-radius: 8px;
+    background: white;
+    padding: 4px;
+  }
+
+  .word-count {
+    margin-top: 12px;
+    font-size: 0.8rem;
+    color: #64748b;
+  }
+</style>
+</head>
+<body>
+
+<h1>📝 文字雲</h1>
+
+<div class="input-area">
+  <input id="wordInput" type="text" placeholder="輸入詞彙，按 Enter 送出" maxlength="30" autofocus>
+  <button id="submitBtn">送出</button>
+</div>
+
+<div class="controls">
+  <button id="toggleBtn">👁 隱藏文字雲</button>
+  <button id="clearBtn">🗑 清除全部</button>
+</div>
+
+<div class="cloud-container" id="cloudContainer">
+  <canvas id="canvas"></canvas>
+  <div class="empty-msg" id="emptyMsg">等待詞彙輸入中...</div>
+</div>
+
+<p class="word-count" id="wordCount"></p>
+
+<div class="url-section">
+  <div class="url-text">
+    <div class="url-label">掃描 QR Code 加入</div>
+    <div class="url-value" id="urlDisplay"></div>
+  </div>
+  <div id="qrcode"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://wifekdftslzsdcqygnis.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndpZmVrZGZ0c2x6c2RjcXlnbmlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTQ5OTAsImV4cCI6MjA5NzI3MDk5MH0.Q6REdEi5BxclCOqJn2I0_CDmy8HHdZVVJwtCccTF-QM';
+
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let allWords = [];
+let cloudVisible = true;
+
+const canvas = document.getElementById('canvas');
+const emptyMsg = document.getElementById('emptyMsg');
+const wordCount = document.getElementById('wordCount');
+const toggleBtn = document.getElementById('toggleBtn');
+const cloudContainer = document.getElementById('cloudContainer');
+
+// QR Code + URL
+const pageUrl = window.location.href.split('?')[0];
+document.getElementById('urlDisplay').textContent = pageUrl;
+new QRCode(document.getElementById('qrcode'), {
+  text: pageUrl,
+  width: 80,
+  height: 80,
+  colorDark: '#0f172a',
+  colorLight: '#ffffff',
+});
+
+// Toast
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => { t.className = 'toast'; }, 2500);
+}
+
+// Draw word cloud
+function drawCloud() {
+  if (allWords.length === 0) {
+    emptyMsg.style.display = 'flex';
+    wordCount.textContent = '';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+
+  const maxCount = Math.max(...allWords.map(w => w.count));
+  const list = allWords.map(w => [w.word, Math.round(16 + (w.count / maxCount) * 64)]);
+
+  const colors = ['#818cf8','#a78bfa','#f472b6','#34d399','#60a5fa','#fbbf24','#f87171','#38bdf8'];
+
+  const w = canvas.offsetWidth || 800;
+  const h = canvas.offsetHeight || 450;
+  canvas.width = w;
+  canvas.height = h;
+
+  WordCloud(canvas, {
+    list,
+    gridSize: Math.round(8 * w / 1024),
+    weightFactor: 1,
+    fontFamily: 'Noto Sans TC, sans-serif',
+    color: () => colors[Math.floor(Math.random() * colors.length)],
+    rotateRatio: 0.3,
+    rotationSteps: 2,
+    backgroundColor: '#1e293b',
+    shuffle: false,
+  });
+
+  wordCount.textContent = `共 ${allWords.length} 個詞彙`;
+}
+
+// Load words from Supabase
+async function loadWords() {
+  const { data, error } = await db
+    .from('word_cloud')
+    .select('word, count')
+    .order('count', { ascending: false });
+
+  if (error) { showToast('載入失敗', true); return; }
+  allWords = data || [];
+  drawCloud();
+}
+
+// Submit word
+async function submitWord() {
+  const input = document.getElementById('wordInput');
+  const word = input.value.trim();
+  if (!word) return;
+  input.value = '';
+
+  const { error } = await db.rpc('upsert_word', { p_word: word });
+
+  if (error) {
+    // fallback: direct upsert
+    const { error: e2 } = await db
+      .from('word_cloud')
+      .upsert({ word: word, count: 1 }, { onConflict: 'word', ignoreDuplicates: false });
+
+    if (e2) { showToast('送出失敗 😢', true); return; }
+  }
+
+  showToast(`「${word}」已加入！`);
+  await loadWords();
+}
+
+// Toggle
+toggleBtn.addEventListener('click', () => {
+  cloudVisible = !cloudVisible;
+  cloudContainer.classList.toggle('hidden', !cloudVisible);
+  toggleBtn.textContent = cloudVisible ? '👁 隱藏文字雲' : '👁 顯示文字雲';
+});
+
+// Clear
+clearBtn.addEventListener('click', async () => {
+  if (!confirm('確定要清除所有詞彙嗎？')) return;
+  const { error } = await db.from('word_cloud').delete().neq('id', 0);
+  if (error) { showToast('清除失敗', true); return; }
+  allWords = [];
+  drawCloud();
+  showToast('已清除');
+});
+
+// Input events
+document.getElementById('wordInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitWord();
+});
+document.getElementById('submitBtn').addEventListener('click', submitWord);
+
+// Realtime subscription
+db.channel('word_cloud_changes')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'word_cloud' }, () => loadWords())
+  .subscribe();
+
+// Init
+loadWords();
+</script>
+</body>
+</html>
