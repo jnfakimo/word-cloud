@@ -251,6 +251,8 @@ function drawCloud() {
   if (allWords.length === 0) {
     emptyMsg.style.display = 'flex';
     wordCount.textContent = '';
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     return;
   }
   emptyMsg.style.display = 'none';
