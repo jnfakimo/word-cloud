@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登入 — 設備巡檢維修系統</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans TC',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{background:#1e293b;border:1px solid #334155;border-radius:20px;padding:40px 36px;width:100%;max-width:400px;box-shadow:0 25px 50px rgba(0,0,0,.5)}
+h1{font-size:1.5rem;font-weight:700;color:#f8fafc;margin-bottom:6px;text-align:center}
+.subtitle{font-size:.85rem;color:#64748b;text-align:center;margin-bottom:32px}
+.field{margin-bottom:18px}
+label{display:block;font-size:.82rem;color:#94a3b8;margin-bottom:6px;font-weight:500}
+input{width:100%;padding:12px 16px;background:#0f172a;border:2px solid #334155;border-radius:10px;color:#f1f5f9;font-size:1rem;outline:none;transition:border-color .2s}
+input:focus{border-color:#6366f1}
+.btn{width:100%;padding:13px;background:#6366f1;color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;transition:background .2s;margin-top:8px}
+.btn:hover{background:#4f46e5}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.err{color:#f87171;font-size:.83rem;margin-top:10px;text-align:center;min-height:20px}
+.logo{text-align:center;font-size:2.5rem;margin-bottom:16px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">🔧</div>
+  <h1>設備巡檢維修系統</h1>
+  <div class="subtitle">請使用帳號登入</div>
+  <div class="field">
+    <label>電子郵件</label>
+    <input id="email" type="email" placeholder="user@example.com" autocomplete="username">
+  </div>
+  <div class="field">
+    <label>密碼</label>
+    <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
+  </div>
+  <button class="btn" id="loginBtn">登入</button>
+  <div class="err" id="errMsg"></div>
+</div>
+<script>
+const SUPABASE_URL = 'https://wifekdftslzsdcqygnis.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndpZmVrZGZ0c2x6c2RjcXlnbmlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTQ5OTAsImV4cCI6MjA5NzI3MDk5MH0.Q6REdEi5BxclCOqJn2I0_CDmy8HHdZVVJwtCccTF-QM';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const ROLE_ROUTES = {
+  admin:       '../system/admin.html',
+  supervisor:  '../system/admin.html',
+  inspector:   '../system/app.html',
+  maintenance: '../system/maintenance.html',
+};
+
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const btn = document.getElementById('loginBtn');
+  const err = document.getElementById('errMsg');
+  err.textContent = '';
+  if (!email || !password) { err.textContent = '請填寫帳號與密碼'; return; }
+  btn.disabled = true; btn.textContent = '登入中…';
+
+  const { data, error } = await db.auth.signInWithPassword({ email, password });
+  if (error) {
+    err.textContent = '帳號或密碼錯誤';
+    btn.disabled = false; btn.textContent = '登入';
+    return;
+  }
+
+  const { data: profile } = await db.from('users').select('role,name').eq('auth_id', data.user.id).single();
+  if (!profile) {
+    err.textContent = '找不到使用者資料，請聯絡管理員';
+    btn.disabled = false; btn.textContent = '登入';
+    await db.auth.signOut();
+    return;
+  }
+
+  sessionStorage.setItem('user_role', profile.role);
+  sessionStorage.setItem('user_name', profile.name);
+  const dest = ROLE_ROUTES[profile.role] || '../system/app.html';
+  window.location.href = dest;
+});
+
+document.getElementById('password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('loginBtn').click();
+});
+
+// Already logged in?
+(async () => {
+  const { data: { session } } = await db.auth.getSession();
+  if (session) {
+    const { data: profile } = await db.from('users').select('role').eq('auth_id', session.user.id).single();
+    if (profile) window.location.href = ROLE_ROUTES[profile.role] || '../system/app.html';
+  }
+})();
+</script>
+</body>
+</html>
