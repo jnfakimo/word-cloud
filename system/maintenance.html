@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>維修管理</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans TC',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+.navbar{background:#1e293b;border-bottom:1px solid #334155;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.nav-title{font-size:1rem;font-weight:700;color:#f8fafc}
+.nav-right{display:flex;align-items:center;gap:12px}
+.nav-user{font-size:.78rem;color:#64748b}
+.logout-btn{font-size:.75rem;color:#94a3b8;background:none;border:1px solid #334155;padding:4px 10px;border-radius:6px;cursor:pointer}
+.tabs{display:flex;background:#1e293b;border-bottom:1px solid #334155}
+.tab{flex:1;padding:12px;text-align:center;font-size:.85rem;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.tab.active{color:#6366f1;border-bottom-color:#6366f1;font-weight:600}
+.page{display:none;padding:16px}
+.page.active{display:block}
+/* CARDS */
+.order-card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:16px;margin-bottom:10px;cursor:pointer;transition:border-color .2s}
+.order-card:hover{border-color:#6366f1}
+.order-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px}
+.order-title{font-size:.95rem;font-weight:600;color:#f1f5f9}
+.status-badge{font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:600;white-space:nowrap;flex-shrink:0}
+.s-pending{background:#1c1917;color:#a8a29e;border:1px solid #44403c}
+.s-in_progress{background:#1e3a5f;color:#93c5fd;border:1px solid #2563eb}
+.s-pending_review{background:#422006;color:#fbbf24;border:1px solid #d97706}
+.s-completed,.s-closed{background:#052e16;color:#86efac;border:1px solid #16a34a}
+.order-meta{font-size:.78rem;color:#64748b;display:flex;flex-wrap:wrap;gap:8px}
+.order-fault{font-size:.83rem;color:#94a3b8;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* FORM */
+.form-card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:18px}
+.form-title{font-size:1rem;font-weight:700;color:#f8fafc;margin-bottom:16px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:.8rem;color:#94a3b8;margin-bottom:5px;font-weight:500}
+.field input,.field textarea,.field select{width:100%;padding:10px 13px;background:#0f172a;border:2px solid #334155;border-radius:9px;color:#f1f5f9;font-size:.93rem;outline:none;transition:border-color .2s;font-family:inherit}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:#6366f1}
+.field textarea{resize:vertical;min-height:80px}
+.btn-primary{width:100%;padding:13px;background:#6366f1;color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;margin-top:8px;transition:background .2s}
+.btn-primary:hover{background:#4f46e5}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-secondary{padding:10px 20px;background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:9px;font-size:.9rem;cursor:pointer;transition:all .2s;width:100%;margin-top:8px}
+.btn-secondary:hover{border-color:#6366f1;color:#e2e8f0}
+.btn-danger{padding:10px 20px;background:#450a0a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:9px;font-size:.9rem;cursor:pointer;width:100%;margin-top:8px}
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:none;align-items:flex-end;justify-content:center}
+.modal-bg.show{display:flex}
+.modal{background:#1e293b;border-radius:20px 20px 0 0;padding:24px 20px 36px;width:100%;max-width:600px;max-height:92vh;overflow-y:auto}
+.modal-handle{width:40px;height:4px;background:#334155;border-radius:2px;margin:0 auto 20px}
+/* DETAIL */
+.detail-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #1e293b;font-size:.85rem}
+.detail-label{color:#64748b}
+.detail-value{color:#e2e8f0;text-align:right;max-width:60%}
+/* COST TABLE */
+.cost-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:.83rem}
+.cost-table th{text-align:left;padding:8px;color:#64748b;border-bottom:1px solid #334155;font-weight:500}
+.cost-table td{padding:8px;border-bottom:1px solid #1e293b;color:#e2e8f0}
+.cost-total{font-weight:700;color:#a78bfa;text-align:right;padding:10px 8px;font-size:.9rem}
+/* TOAST */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#22c55e;color:#052e16;padding:10px 24px;border-radius:999px;font-weight:600;opacity:0;transition:all .3s;pointer-events:none;z-index:200;font-size:.9rem}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.toast.err{background:#ef4444;color:#fff}
+.empty-state{text-align:center;color:#475569;padding:48px 0;font-size:.9rem}
+.filter-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.filter-chip{font-size:.78rem;padding:5px 12px;border-radius:99px;border:1px solid #334155;color:#94a3b8;cursor:pointer;transition:all .2s;background:#1e293b}
+.filter-chip.active{border-color:#6366f1;color:#a5b4fc;background:#1e1b4b}
+</style>
+</head>
+<body>
+<nav class="navbar">
+  <span class="nav-title">🛠 維修管理</span>
+  <div class="nav-right">
+    <span class="nav-user" id="navUser"></span>
+    <button class="logout-btn" onclick="logout()">登出</button>
+  </div>
+</nav>
+
+<div class="tabs">
+  <div class="tab active" data-tab="orders">維修單</div>
+  <div class="tab" data-tab="costs">費用紀錄</div>
+</div>
+
+<div class="page active" id="page-orders">
+  <div class="filter-bar" id="filterBar">
+    <div class="filter-chip active" data-status="">全部</div>
+    <div class="filter-chip" data-status="pending">待處理</div>
+    <div class="filter-chip" data-status="in_progress">處理中</div>
+    <div class="filter-chip" data-status="pending_review">待驗收</div>
+    <div class="filter-chip" data-status="closed">已結案</div>
+  </div>
+  <div id="ordersList"><div class="empty-state">載入中…</div></div>
+</div>
+
+<div class="page" id="page-costs">
+  <div class="form-card" style="margin-bottom:14px">
+    <div class="form-title">新增費用</div>
+    <div class="field">
+      <label>設備</label>
+      <select id="costEqId"></select>
+    </div>
+    <div class="field">
+      <label>維修單（選填）</label>
+      <select id="costOrderId"><option value="">— 無對應維修單 —</option></select>
+    </div>
+    <div class="field">
+      <label>費用類型</label>
+      <select id="costType">
+        <option value="purchase">購置費</option>
+        <option value="outsource">委外維修</option>
+        <option value="parts">零件費</option>
+        <option value="labor">工時費</option>
+        <option value="other">其他</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>金額（元）</label>
+      <input id="costAmount" type="number" min="0" step="1" placeholder="0">
+    </div>
+    <div class="field">
+      <label>廠商（委外時填）</label>
+      <input id="costVendor" type="text" placeholder="廠商名稱">
+    </div>
+    <div class="field">
+      <label>費用日期</label>
+      <input id="costDate" type="date">
+    </div>
+    <div class="field">
+      <label>說明</label>
+      <input id="costNote" type="text" placeholder="備註說明">
+    </div>
+    <button class="btn-primary" onclick="addCost()">新增費用</button>
+  </div>
+  <div class="form-card">
+    <div class="form-title">費用總覽</div>
+    <div class="field">
+      <label>篩選設備</label>
+      <select id="costFilterEq" onchange="loadCosts()"><option value="">全部設備</option></select>
+    </div>
+    <div id="costsTable"><div class="empty-state">載入中…</div></div>
+  </div>
+</div>
+
+<!-- ORDER DETAIL MODAL -->
+<div class="modal-bg" id="orderModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://wifekdftslzsdcqygnis.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndpZmVrZGZ0c2x6c2RjcXlnbmlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTQ5OTAsImV4cCI6MjA5NzI3MDk5MH0.Q6REdEi5BxclCOqJn2I0_CDmy8HHdZVVJwtCccTF-QM';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+let allOrders = [];
+let equipmentMap = {};
+let userMap = {};
+let currentFilter = '';
+
+const STATUS_LABEL = { pending:'待處理', in_progress:'處理中', pending_review:'待驗收', completed:'已完成', closed:'結案' };
+const STATUS_NEXT = { pending:'in_progress', in_progress:'pending_review', pending_review:'completed', completed:'closed' };
+const STATUS_NEXT_LABEL = { pending:'開始處理', in_progress:'送交驗收', pending_review:'驗收通過', completed:'結案' };
+const COST_TYPE_LABEL = { purchase:'購置費', outsource:'委外維修', parts:'零件費', labor:'工時費', other:'其他' };
+
+(async () => {
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) { window.location.href = 'login.html'; return; }
+  const { data: profile } = await db.from('users').select('*').eq('auth_id', session.user.id).single();
+  if (!profile) { await db.auth.signOut(); window.location.href = 'login.html'; return; }
+  currentUser = profile;
+  document.getElementById('navUser').textContent = profile.name;
+
+  const [{ data: eqs }, { data: users }] = await Promise.all([
+    db.from('equipment').select('*').order('name'),
+    db.from('users').select('*'),
+  ]);
+  (eqs || []).forEach(e => equipmentMap[e.equipment_id] = e);
+  (users || []).forEach(u => userMap[u.user_id] = u);
+
+  populateEqDropdowns(eqs || []);
+  await loadOrders();
+  await loadCosts();
+  setupTabs();
+  setupFilters();
+  document.getElementById('costDate').value = new Date().toISOString().split('T')[0];
+})();
+
+function populateEqDropdowns(eqs) {
+  const opts = eqs.map(e => `<option value="${e.equipment_id}">${e.name}</option>`).join('');
+  document.getElementById('costEqId').innerHTML = opts;
+  document.getElementById('costFilterEq').innerHTML = '<option value="">全部設備</option>' + opts;
+  loadOrdersForCostDropdown();
+}
+
+async function loadOrdersForCostDropdown() {
+  const { data } = await db.from('maintenance_orders').select('order_id,equipment_id').neq('status','closed');
+  const sel = document.getElementById('costOrderId');
+  sel.innerHTML = '<option value="">— 無對應維修單 —</option>' +
+    (data || []).map(o => `<option value="${o.order_id}">${(equipmentMap[o.equipment_id]?.name || '')} — ${o.order_id.substring(0,8)}</option>`).join('');
+}
+
+async function loadOrders() {
+  const { data } = await db.from('maintenance_orders')
+    .select('*,repair_requests(reporter,fault_desc,source),equipment(name,location)')
+    .order('created_at', { ascending: false });
+  allOrders = data || [];
+  renderOrders();
+}
+
+function renderOrders() {
+  const filtered = currentFilter ? allOrders.filter(o => o.status === currentFilter) : allOrders;
+  if (!filtered.length) {
+    document.getElementById('ordersList').innerHTML = '<div class="empty-state">目前無維修單</div>';
+    return;
+  }
+  document.getElementById('ordersList').innerHTML = filtered.map(o => {
+    const eq = o.equipment || {};
+    const req = o.repair_requests || {};
+    return `<div class="order-card" onclick="openOrder('${o.order_id}')">
+      <div class="order-header">
+        <div class="order-title">${eq.name || '設備未知'}</div>
+        <span class="status-badge s-${o.status}">${STATUS_LABEL[o.status] || o.status}</span>
+      </div>
+      <div class="order-meta">
+        <span>📍 ${eq.location || '—'}</span>
+        <span>👤 ${req.reporter || '—'}</span>
+        <span>📅 ${new Date(o.created_at).toLocaleDateString('zh-TW')}</span>
+      </div>
+      <div class="order-fault">${req.fault_desc || '—'}</div>
+    </div>`;
+  }).join('');
+}
+
+function setupTabs() {
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('page-' + tab.dataset.tab).classList.add('active');
+    });
+  });
+}
+
+function setupFilters() {
+  document.getElementById('filterBar').querySelectorAll('.filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentFilter = chip.dataset.status;
+      renderOrders();
+    });
+  });
+}
+
+async function openOrder(orderId) {
+  const order = allOrders.find(o => o.order_id === orderId);
+  if (!order) return;
+  const eq = order.equipment || {};
+  const req = order.repair_requests || {};
+  const assignee = userMap[order.assignee_id];
+
+  const { data: maintUsers } = await db.from('users').select('*').in('role', ['maintenance', 'admin']);
+  const assigneeOpts = (maintUsers || []).map(u => `<option value="${u.user_id}" ${u.user_id === order.assignee_id ? 'selected' : ''}>${u.name}</option>`).join('');
+
+  const nextStatus = STATUS_NEXT[order.status];
+  const nextLabel = STATUS_NEXT_LABEL[order.status];
+
+  document.getElementById('modalContent').innerHTML = `
+    <div class="form-title">${eq.name || '維修單'}</div>
+    <div style="margin-bottom:16px">
+      <span class="status-badge s-${order.status}">${STATUS_LABEL[order.status]}</span>
+    </div>
+    <div class="detail-row"><span class="detail-label">設備位置</span><span class="detail-value">${eq.location || '—'}</span></div>
+    <div class="detail-row"><span class="detail-label">故障說明</span><span class="detail-value">${req.fault_desc || '—'}</span></div>
+    <div class="detail-row"><span class="detail-label">報修人</span><span class="detail-value">${req.reporter || '—'}</span></div>
+    <div class="detail-row"><span class="detail-label">負責維修員</span><span class="detail-value">${assignee?.name || '未指派'}</span></div>
+    <div class="detail-row"><span class="detail-label">建立時間</span><span class="detail-value">${new Date(order.created_at).toLocaleString('zh-TW')}</span></div>
+    ${order.finish_time ? `<div class="detail-row"><span class="detail-label">完成時間</span><span class="detail-value">${new Date(order.finish_time).toLocaleString('zh-TW')}</span></div>` : ''}
+    ${order.result_desc ? `<div class="detail-row"><span class="detail-label">維修結果</span><span class="detail-value">${order.result_desc}</span></div>` : ''}
+
+    ${order.status !== 'closed' ? `
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid #334155">
+      <div class="field">
+        <label>指派維修人員</label>
+        <select id="assigneeSelect">${assigneeOpts}</select>
+      </div>
+      <div class="field">
+        <label>維修結果說明</label>
+        <textarea id="resultDesc" placeholder="填寫維修處理說明…">${order.result_desc || ''}</textarea>
+      </div>
+      <button class="btn-primary" onclick="updateAssignee('${orderId}')">儲存指派</button>
+      ${nextStatus ? `<button class="btn-primary" style="background:#0284c7;margin-top:6px" onclick="advanceStatus('${orderId}','${nextStatus}')">${nextLabel} →</button>` : ''}
+      ${order.status === 'pending_review' ? `<button class="btn-danger" onclick="rejectReview('${orderId}')">✗ 驗收不通過，退回維修</button>` : ''}
+    </div>` : ''}
+    <button class="btn-secondary" onclick="closeOrderModal()">關閉</button>
+  `;
+  document.getElementById('orderModal').classList.add('show');
+}
+
+function closeOrderModal() { document.getElementById('orderModal').classList.remove('show'); }
+
+async function updateAssignee(orderId) {
+  const assigneeId = document.getElementById('assigneeSelect').value;
+  const resultDesc = document.getElementById('resultDesc').value.trim();
+  const before = allOrders.find(o => o.order_id === orderId);
+  const { error } = await db.from('maintenance_orders').update({ assignee_id: assigneeId || null, result_desc: resultDesc }).eq('order_id', orderId);
+  if (error) { showToast('儲存失敗', true); return; }
+  await writeAudit('maintenance_orders', orderId, 'update', { assignee_id: before?.assignee_id }, { assignee_id: assigneeId });
+  showToast('已儲存');
+  closeOrderModal(); await loadOrders();
+}
+
+async function advanceStatus(orderId, newStatus) {
+  const updates = { status: newStatus };
+  if (newStatus === 'in_progress') updates.start_time = new Date().toISOString();
+  if (newStatus === 'completed' || newStatus === 'closed') updates.finish_time = new Date().toISOString();
+  if (document.getElementById('resultDesc')) updates.result_desc = document.getElementById('resultDesc').value.trim();
+
+  const { error } = await db.from('maintenance_orders').update(updates).eq('order_id', orderId);
+  if (error) { showToast('更新失敗', true); return; }
+
+  // Sync back to repair_request
+  const order = allOrders.find(o => o.order_id === orderId);
+  if (order && (newStatus === 'closed' || newStatus === 'completed')) {
+    await db.from('repair_requests').update({ status: 'closed' }).eq('request_id', order.request_id);
+  }
+  await writeAudit('maintenance_orders', orderId, 'status_change', { status: order?.status }, { status: newStatus });
+  showToast('狀態已更新');
+  closeOrderModal(); await loadOrders();
+}
+
+async function rejectReview(orderId) {
+  const { error } = await db.from('maintenance_orders').update({ status: 'in_progress' }).eq('order_id', orderId);
+  if (error) { showToast('操作失敗', true); return; }
+  await writeAudit('maintenance_orders', orderId, 'status_change', { status: 'pending_review' }, { status: 'in_progress' });
+  showToast('已退回維修');
+  closeOrderModal(); await loadOrders();
+}
+
+async function addCost() {
+  const eqId = document.getElementById('costEqId').value;
+  const orderId = document.getElementById('costOrderId').value || null;
+  const costType = document.getElementById('costType').value;
+  const amount = parseFloat(document.getElementById('costAmount').value);
+  const vendor = document.getElementById('costVendor').value.trim();
+  const costDate = document.getElementById('costDate').value;
+  const note = document.getElementById('costNote').value.trim();
+
+  if (!eqId || isNaN(amount) || amount <= 0) { showToast('請選擇設備並填寫金額', true); return; }
+
+  const cost = { equipment_id: eqId, order_id: orderId, cost_type: costType, amount, vendor: vendor || null, cost_date: costDate, note: note || null, created_by: currentUser.user_id };
+  const { error } = await db.from('cost_records').insert(cost);
+  if (error) { showToast('新增失敗', true); return; }
+  await writeAudit('cost_records', 'new', 'insert', null, cost);
+  showToast('費用已新增');
+  document.getElementById('costAmount').value = '';
+  document.getElementById('costVendor').value = '';
+  document.getElementById('costNote').value = '';
+  await loadCosts();
+}
+
+async function loadCosts() {
+  const filterEq = document.getElementById('costFilterEq').value;
+  let query = db.from('cost_records').select('*,equipment(name)').order('cost_date', { ascending: false });
+  if (filterEq) query = query.eq('equipment_id', filterEq);
+  const { data } = await query;
+  const costs = data || [];
+
+  if (!costs.length) {
+    document.getElementById('costsTable').innerHTML = '<div class="empty-state">目前無費用紀錄</div>';
+    return;
+  }
+
+  const total = costs.reduce((s, c) => s + Number(c.amount), 0);
+  document.getElementById('costsTable').innerHTML = `
+    <table class="cost-table">
+      <thead><tr><th>設備</th><th>類型</th><th>日期</th><th style="text-align:right">金額</th></tr></thead>
+      <tbody>${costs.map(c => `<tr>
+        <td>${c.equipment?.name || '—'}</td>
+        <td>${COST_TYPE_LABEL[c.cost_type] || c.cost_type}</td>
+        <td>${c.cost_date || '—'}</td>
+        <td style="text-align:right">${Number(c.amount).toLocaleString()}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <div class="cost-total">生命週期合計：${total.toLocaleString()} 元</div>
+  `;
+}
+
+async function writeAudit(table, recordId, action, before, after) {
+  if (!currentUser) return;
+  await db.from('audit_logs').insert({ table_name: table, record_id: String(recordId), action, changes: { before, after }, operator_id: currentUser.user_id });
+}
+
+async function logout() { await db.auth.signOut(); window.location.href = 'login.html'; }
+
+function showToast(msg, isErr = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (isErr ? ' err' : '');
+  setTimeout(() => { t.className = 'toast'; }, 2500);
+}
+</script>
+</body>
+</html>

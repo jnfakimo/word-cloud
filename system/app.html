@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>巡檢 App</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans TC',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+/* NAV */
+.navbar{background:#1e293b;border-bottom:1px solid #334155;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.nav-title{font-size:1rem;font-weight:700;color:#f8fafc}
+.nav-user{font-size:.78rem;color:#64748b}
+.nav-right{display:flex;align-items:center;gap:12px}
+.logout-btn{font-size:.75rem;color:#94a3b8;background:none;border:1px solid #334155;padding:4px 10px;border-radius:6px;cursor:pointer}
+/* TABS */
+.tabs{display:flex;background:#1e293b;border-bottom:1px solid #334155}
+.tab{flex:1;padding:12px;text-align:center;font-size:.85rem;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.tab.active{color:#6366f1;border-bottom-color:#6366f1;font-weight:600}
+/* PAGES */
+.page{display:none;padding:16px}
+.page.active{display:block}
+/* EQUIPMENT LIST */
+.eq-list{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.eq-card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:border-color .2s}
+.eq-card:hover{border-color:#6366f1}
+.light{width:14px;height:14px;border-radius:50%;flex-shrink:0}
+.light.red{background:#ef4444;box-shadow:0 0 8px #ef4444}
+.light.green{background:#22c55e;box-shadow:0 0 8px #22c55e}
+.eq-info{flex:1;min-width:0}
+.eq-name{font-size:.95rem;font-weight:600;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.eq-loc{font-size:.75rem;color:#64748b;margin-top:2px}
+.eq-badge{font-size:.7rem;padding:2px 8px;border-radius:99px;font-weight:600;flex-shrink:0}
+.badge-done{background:#14532d;color:#86efac}
+.badge-todo{background:#450a0a;color:#fca5a5}
+/* QR SCAN */
+#qr-section{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:16px;margin-bottom:16px}
+#qr-reader{width:100%;border-radius:10px;overflow:hidden}
+.scan-hint{font-size:.83rem;color:#64748b;text-align:center;margin-top:10px}
+/* FORM */
+.form-card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:18px}
+.form-title{font-size:1rem;font-weight:700;color:#f8fafc;margin-bottom:16px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:.8rem;color:#94a3b8;margin-bottom:5px;font-weight:500}
+.field input,.field textarea,.field select{width:100%;padding:10px 13px;background:#0f172a;border:2px solid #334155;border-radius:9px;color:#f1f5f9;font-size:.95rem;outline:none;transition:border-color .2s;font-family:inherit}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:#6366f1}
+.field textarea{resize:vertical;min-height:80px}
+.radio-group{display:flex;gap:10px}
+.radio-btn{flex:1;padding:10px;border:2px solid #334155;border-radius:9px;text-align:center;cursor:pointer;font-size:.9rem;font-weight:600;transition:all .2s;color:#94a3b8}
+.radio-btn.selected-normal{border-color:#22c55e;background:#052e16;color:#86efac}
+.radio-btn.selected-abnormal{border-color:#ef4444;background:#450a0a;color:#fca5a5}
+/* BUTTONS */
+.btn-primary{width:100%;padding:13px;background:#6366f1;color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;margin-top:12px;transition:background .2s}
+.btn-primary:hover{background:#4f46e5}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-scan{width:100%;padding:13px;background:#0284c7;color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;margin-bottom:12px;transition:background .2s}
+.btn-scan:hover{background:#0369a1}
+.btn-secondary{padding:10px 20px;background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:9px;font-size:.9rem;cursor:pointer;transition:all .2s}
+.btn-secondary:hover{border-color:#6366f1;color:#e2e8f0}
+/* OFFLINE BANNER */
+.offline-banner{background:#7c2d12;color:#fed7aa;padding:8px 16px;font-size:.8rem;text-align:center;display:none}
+.offline-banner.show{display:block}
+/* TOAST */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#22c55e;color:#052e16;padding:10px 24px;border-radius:999px;font-weight:600;opacity:0;transition:all .3s;pointer-events:none;z-index:200;font-size:.9rem}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.toast.err{background:#ef4444;color:#fff}
+/* REPAIR FORM */
+.repair-source-info{background:#0c1220;border:1px solid #334155;border-radius:9px;padding:12px;margin-bottom:14px;font-size:.83rem;color:#94a3b8}
+/* SECTION HEADER */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.section-title{font-size:1rem;font-weight:700;color:#f8fafc}
+.badge-count{font-size:.75rem;background:#1e293b;border:1px solid #334155;padding:3px 10px;border-radius:99px;color:#94a3b8}
+.sync-badge{font-size:.72rem;background:#422006;color:#fbbf24;padding:3px 10px;border-radius:99px;cursor:pointer}
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:none;align-items:flex-end}
+.modal-bg.show{display:flex}
+.modal{background:#1e293b;border-radius:20px 20px 0 0;padding:24px 20px;width:100%;max-height:90vh;overflow-y:auto}
+.modal-handle{width:40px;height:4px;background:#334155;border-radius:2px;margin:0 auto 20px}
+</style>
+</head>
+<body>
+<div class="offline-banner" id="offlineBanner">目前離線，資料將暫存於裝置</div>
+
+<nav class="navbar">
+  <span class="nav-title">🔧 巡檢 App</span>
+  <div class="nav-right">
+    <span class="nav-user" id="navUser"></span>
+    <button class="logout-btn" onclick="logout()">登出</button>
+  </div>
+</nav>
+
+<div class="tabs">
+  <div class="tab active" data-tab="inspect">📋 待巡檢</div>
+  <div class="tab" data-tab="scan">📷 掃描</div>
+  <div class="tab" data-tab="repair">🛠 報修</div>
+</div>
+
+<!-- PAGE: INSPECT LIST -->
+<div class="page active" id="page-inspect">
+  <div class="section-header" style="margin-top:12px">
+    <span class="section-title">設備清單</span>
+    <span class="badge-count" id="pendingCount">載入中…</span>
+  </div>
+  <div id="offlineSyncBar" style="display:none;margin-bottom:12px">
+    <span class="sync-badge" onclick="syncOfflineData()">⚠ 有 <span id="offlineCount">0</span> 筆離線資料，點此同步</span>
+  </div>
+  <div class="eq-list" id="eqList">
+    <div style="text-align:center;color:#475569;padding:40px 0">載入中…</div>
+  </div>
+</div>
+
+<!-- PAGE: SCAN -->
+<div class="page" id="page-scan">
+  <div id="qr-section">
+    <div id="qr-reader"></div>
+    <div class="scan-hint">將 QR Code 對準框內，自動識別</div>
+  </div>
+  <div class="form-card" id="scan-result-form" style="display:none">
+    <div class="form-title" id="scan-eq-title">設備名稱</div>
+    <div class="field">
+      <label>運轉狀態</label>
+      <div class="radio-group">
+        <div class="radio-btn" id="btn-normal" onclick="selectStatus('normal')">✓ 正常</div>
+        <div class="radio-btn" id="btn-abnormal" onclick="selectStatus('abnormal')">✗ 異常</div>
+      </div>
+    </div>
+    <div class="field" id="note-field" style="display:none">
+      <label>異常說明</label>
+      <textarea id="abnormalNote" placeholder="請描述異常情形…"></textarea>
+    </div>
+    <button class="btn-primary" id="saveInspectBtn" onclick="saveInspection()">儲存巡檢記錄</button>
+    <button class="btn-secondary" style="width:100%;margin-top:8px" onclick="cancelScan()">取消</button>
+  </div>
+  <div id="scan-prompt" style="text-align:center;color:#475569;padding:24px;font-size:.9rem">
+    掃描設備上的 QR Code 以開始巡檢
+  </div>
+</div>
+
+<!-- PAGE: REPAIR -->
+<div class="page" id="page-repair">
+  <div class="form-card">
+    <div class="form-title">建立報修單</div>
+    <div class="field">
+      <label>報修來源</label>
+      <select id="repairSource">
+        <option value="direct">員工直接通報</option>
+        <option value="inspection">巡檢異常觸發</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>設備</label>
+      <select id="repairEqId"></select>
+    </div>
+    <div class="field">
+      <label>報修人</label>
+      <input id="repairReporter" type="text" placeholder="姓名">
+    </div>
+    <div class="field">
+      <label>聯絡電話</label>
+      <input id="repairPhone" type="tel" placeholder="0912-345-678">
+    </div>
+    <div class="field">
+      <label>部門</label>
+      <input id="repairDept" type="text" placeholder="部門名稱">
+    </div>
+    <div class="field">
+      <label>故障說明</label>
+      <textarea id="repairFault" placeholder="請描述故障情形…"></textarea>
+    </div>
+    <button class="btn-primary" onclick="submitRepair()">送出報修單</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- INSPECTION CONFIRM MODAL -->
+<div class="modal-bg" id="inspectModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="form-title" id="modal-eq-name">確認設備</div>
+    <div style="font-size:.83rem;color:#94a3b8;margin-bottom:16px" id="modal-eq-loc"></div>
+    <div class="field">
+      <label>運轉狀態</label>
+      <div class="radio-group">
+        <div class="radio-btn" id="modal-btn-normal" onclick="selectModalStatus('normal')">✓ 正常</div>
+        <div class="radio-btn" id="modal-btn-abnormal" onclick="selectModalStatus('abnormal')">✗ 異常</div>
+      </div>
+    </div>
+    <div class="field" id="modal-note-field" style="display:none">
+      <label>異常說明</label>
+      <textarea id="modalAbnormalNote" placeholder="請描述異常情形…"></textarea>
+    </div>
+    <button class="btn-primary" onclick="saveModalInspection()">儲存</button>
+    <button class="btn-secondary" style="width:100%;margin-top:8px" onclick="closeModal()">取消</button>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://wifekdftslzsdcqygnis.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndpZmVrZGZ0c2x6c2RjcXlnbmlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTQ5OTAsImV4cCI6MjA5NzI3MDk5MH0.Q6REdEi5BxclCOqJn2I0_CDmy8HHdZVVJwtCccTF-QM';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+let currentCycle = null;
+let equipmentMap = {};
+let scanStatus = null;
+let scannedEquipment = null;
+let modalEquipment = null;
+let modalStatus = null;
+let htmlQrCode = null;
+let isScannerActive = false;
+
+// OFFLINE QUEUE
+const OFFLINE_KEY = 'insp_offline_queue';
+function getOfflineQueue() { try { return JSON.parse(localStorage.getItem(OFFLINE_KEY) || '[]'); } catch { return []; } }
+function saveOfflineQueue(q) { localStorage.setItem(OFFLINE_KEY, JSON.stringify(q)); }
+
+// INIT
+(async () => {
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) { window.location.href = 'login.html'; return; }
+
+  const { data: profile } = await db.from('users').select('*').eq('auth_id', session.user.id).single();
+  if (!profile) { await db.auth.signOut(); window.location.href = 'login.html'; return; }
+  currentUser = profile;
+  document.getElementById('navUser').textContent = profile.name;
+
+  const { data: cycle } = await db.from('inspection_cycles').select('*').is('ended_at', null).order('started_at', { ascending: false }).limit(1).single();
+  currentCycle = cycle;
+
+  await loadEquipment();
+  setupTabs();
+  setupOfflineDetect();
+  checkOfflineQueue();
+})();
+
+function setupOfflineDetect() {
+  const update = () => {
+    document.getElementById('offlineBanner').classList.toggle('show', !navigator.onLine);
+  };
+  window.addEventListener('online', () => { update(); syncOfflineData(); });
+  window.addEventListener('offline', update);
+  update();
+}
+
+function checkOfflineQueue() {
+  const q = getOfflineQueue();
+  const bar = document.getElementById('offlineSyncBar');
+  document.getElementById('offlineCount').textContent = q.length;
+  bar.style.display = q.length ? 'block' : 'none';
+}
+
+async function syncOfflineData() {
+  if (!navigator.onLine) return;
+  const q = getOfflineQueue();
+  if (!q.length) return;
+  let failed = [];
+  for (const item of q) {
+    const { error } = await db.from('inspection_records').insert(item);
+    if (error) failed.push(item);
+  }
+  saveOfflineQueue(failed);
+  checkOfflineQueue();
+  if (!failed.length) { showToast('離線資料已同步！'); await loadEquipment(); }
+  else showToast(`同步失敗 ${failed.length} 筆`, true);
+}
+
+async function loadEquipment() {
+  const { data: eqs } = await db.from('equipment').select('*').eq('status', 'active').order('name');
+  if (!eqs) return;
+  eqs.forEach(e => equipmentMap[e.equipment_id] = e);
+
+  // Load today's inspection records for current cycle
+  let inspectedIds = new Set();
+  if (currentCycle) {
+    const { data: recs } = await db.from('inspection_records').select('equipment_id').eq('cycle_id', currentCycle.cycle_id);
+    (recs || []).forEach(r => inspectedIds.add(r.equipment_id));
+  }
+
+  const done = eqs.filter(e => inspectedIds.has(e.equipment_id));
+  const todo = eqs.filter(e => !inspectedIds.has(e.equipment_id));
+  document.getElementById('pendingCount').textContent = `待巡檢 ${todo.length} / 共 ${eqs.length}`;
+
+  const html = [...todo, ...done].map(eq => {
+    const isDone = inspectedIds.has(eq.equipment_id);
+    return `<div class="eq-card" onclick="openInspectModal('${eq.equipment_id}')">
+      <div class="light ${isDone ? 'green' : 'red'}"></div>
+      <div class="eq-info">
+        <div class="eq-name">${eq.name}</div>
+        <div class="eq-loc">${eq.location || '位置未設定'}</div>
+      </div>
+      <span class="eq-badge ${isDone ? 'badge-done' : 'badge-todo'}">${isDone ? '已巡檢' : '未巡檢'}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('eqList').innerHTML = html || '<div style="text-align:center;color:#475569;padding:40px 0">目前無設備資料</div>';
+
+  // Populate repair dropdown
+  const sel = document.getElementById('repairEqId');
+  sel.innerHTML = eqs.map(e => `<option value="${e.equipment_id}">${e.name}</option>`).join('');
+}
+
+function setupTabs() {
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.dataset.tab;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('page-' + target).classList.add('active');
+      if (target === 'scan') startQrScanner();
+      else stopQrScanner();
+    });
+  });
+}
+
+// QR SCANNER
+function startQrScanner() {
+  if (isScannerActive) return;
+  document.getElementById('scan-result-form').style.display = 'none';
+  document.getElementById('scan-prompt').style.display = 'block';
+
+  htmlQrCode = new Html5Qrcode('qr-reader');
+  htmlQrCode.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 250, height: 250 } },
+    (decodedText) => handleQrResult(decodedText),
+    () => {}
+  ).then(() => { isScannerActive = true; }).catch(err => {
+    document.getElementById('scan-prompt').textContent = '無法存取相機：' + err;
+  });
+}
+
+function stopQrScanner() {
+  if (htmlQrCode && isScannerActive) {
+    htmlQrCode.stop().catch(() => {});
+    isScannerActive = false;
+  }
+}
+
+function handleQrResult(qrText) {
+  const eq = Object.values(equipmentMap).find(e => e.qr_code === qrText || e.equipment_id === qrText);
+  if (!eq) { showToast('QR Code 不符合任何設備', true); return; }
+  stopQrScanner();
+  scannedEquipment = eq;
+  scanStatus = null;
+  document.getElementById('scan-eq-title').textContent = eq.name;
+  document.getElementById('scan-result-form').style.display = 'block';
+  document.getElementById('scan-prompt').style.display = 'none';
+  document.getElementById('btn-normal').className = 'radio-btn';
+  document.getElementById('btn-abnormal').className = 'radio-btn';
+  document.getElementById('note-field').style.display = 'none';
+  document.getElementById('abnormalNote').value = '';
+}
+
+function selectStatus(s) {
+  scanStatus = s;
+  document.getElementById('btn-normal').className = 'radio-btn' + (s === 'normal' ? ' selected-normal' : '');
+  document.getElementById('btn-abnormal').className = 'radio-btn' + (s === 'abnormal' ? ' selected-abnormal' : '');
+  document.getElementById('note-field').style.display = s === 'abnormal' ? 'block' : 'none';
+}
+
+async function saveInspection() {
+  if (!scanStatus) { showToast('請選擇運轉狀態', true); return; }
+  if (scanStatus === 'abnormal' && !document.getElementById('abnormalNote').value.trim()) {
+    showToast('請填寫異常說明', true); return;
+  }
+  const btn = document.getElementById('saveInspectBtn');
+  btn.disabled = true;
+  await doSaveInspection(scannedEquipment, scanStatus, document.getElementById('abnormalNote').value.trim());
+  btn.disabled = false;
+  document.getElementById('scan-result-form').style.display = 'none';
+  document.getElementById('scan-prompt').style.display = 'block';
+  startQrScanner();
+}
+
+function cancelScan() {
+  scannedEquipment = null; scanStatus = null;
+  document.getElementById('scan-result-form').style.display = 'none';
+  document.getElementById('scan-prompt').style.display = 'block';
+  startQrScanner();
+}
+
+// MODAL (from list tap)
+function openInspectModal(eqId) {
+  modalEquipment = equipmentMap[eqId];
+  if (!modalEquipment) return;
+  modalStatus = null;
+  document.getElementById('modal-eq-name').textContent = modalEquipment.name;
+  document.getElementById('modal-eq-loc').textContent = '📍 ' + (modalEquipment.location || '位置未設定');
+  document.getElementById('modal-btn-normal').className = 'radio-btn';
+  document.getElementById('modal-btn-abnormal').className = 'radio-btn';
+  document.getElementById('modal-note-field').style.display = 'none';
+  document.getElementById('modalAbnormalNote').value = '';
+  document.getElementById('inspectModal').classList.add('show');
+}
+
+function selectModalStatus(s) {
+  modalStatus = s;
+  document.getElementById('modal-btn-normal').className = 'radio-btn' + (s === 'normal' ? ' selected-normal' : '');
+  document.getElementById('modal-btn-abnormal').className = 'radio-btn' + (s === 'abnormal' ? ' selected-abnormal' : '');
+  document.getElementById('modal-note-field').style.display = s === 'abnormal' ? 'block' : 'none';
+}
+
+function closeModal() { document.getElementById('inspectModal').classList.remove('show'); }
+
+async function saveModalInspection() {
+  if (!modalStatus) { showToast('請選擇運轉狀態', true); return; }
+  if (modalStatus === 'abnormal' && !document.getElementById('modalAbnormalNote').value.trim()) {
+    showToast('請填寫異常說明', true); return;
+  }
+  closeModal();
+  await doSaveInspection(modalEquipment, modalStatus, document.getElementById('modalAbnormalNote').value.trim());
+}
+
+async function doSaveInspection(eq, status, note) {
+  const record = {
+    equipment_id: eq.equipment_id,
+    inspector_id: currentUser.user_id,
+    cycle_id: currentCycle?.cycle_id || null,
+    inspect_time: new Date().toISOString(),
+    run_status: status,
+    abnormal_note: note || null,
+    light_status: 'green',
+  };
+
+  if (navigator.onLine) {
+    const { error } = await db.from('inspection_records').insert(record);
+    if (error) { showToast('儲存失敗', true); return; }
+    if (status === 'abnormal') await createRepairFromInspection(eq, note);
+    showToast(`${eq.name} 已記錄`);
+    await loadEquipment();
+  } else {
+    const q = getOfflineQueue();
+    q.push(record);
+    saveOfflineQueue(q);
+    checkOfflineQueue();
+    showToast(`${eq.name} 已暫存（離線）`);
+    // Update UI optimistically
+    equipmentMap[eq.equipment_id]._inspected = true;
+    await loadEquipment();
+  }
+  await writeAudit('inspection_records', record.record_id || 'offline', 'insert', null, record);
+}
+
+async function createRepairFromInspection(eq, faultDesc) {
+  const repair = {
+    source: 'inspection',
+    equipment_id: eq.equipment_id,
+    reporter: currentUser.name,
+    phone: currentUser.phone || '',
+    department: currentUser.department || '',
+    fault_desc: faultDesc,
+    status: 'pending',
+    created_by: currentUser.user_id,
+  };
+  const { data: repairData, error } = await db.from('repair_requests').insert(repair).select().single();
+  if (!error && repairData) {
+    await db.from('maintenance_orders').insert({
+      request_id: repairData.request_id,
+      equipment_id: eq.equipment_id,
+      status: 'pending',
+    });
+    await db.from('repair_requests').update({ status: 'transferred' }).eq('request_id', repairData.request_id);
+    await writeAudit('repair_requests', repairData.request_id, 'insert', null, repair);
+  }
+}
+
+async function submitRepair() {
+  const eqId = document.getElementById('repairEqId').value;
+  const reporter = document.getElementById('repairReporter').value.trim();
+  const phone = document.getElementById('repairPhone').value.trim();
+  const dept = document.getElementById('repairDept').value.trim();
+  const fault = document.getElementById('repairFault').value.trim();
+  if (!reporter || !fault) { showToast('請填寫報修人與故障說明', true); return; }
+
+  const repair = {
+    source: document.getElementById('repairSource').value,
+    equipment_id: eqId,
+    reporter, phone, department: dept, fault_desc: fault, status: 'pending',
+    created_by: currentUser.user_id,
+  };
+  const { data, error } = await db.from('repair_requests').insert(repair).select().single();
+  if (error) { showToast('送出失敗', true); return; }
+  await db.from('maintenance_orders').insert({ request_id: data.request_id, equipment_id: eqId, status: 'pending' });
+  await db.from('repair_requests').update({ status: 'transferred' }).eq('request_id', data.request_id);
+  await writeAudit('repair_requests', data.request_id, 'insert', null, repair);
+  showToast('報修單已送出');
+  document.getElementById('repairReporter').value = '';
+  document.getElementById('repairPhone').value = '';
+  document.getElementById('repairDept').value = '';
+  document.getElementById('repairFault').value = '';
+}
+
+async function writeAudit(table, recordId, action, before, after) {
+  if (!currentUser) return;
+  await db.from('audit_logs').insert({
+    table_name: table, record_id: String(recordId), action,
+    changes: { before, after }, operator_id: currentUser.user_id,
+    source: navigator.userAgent.substring(0, 100),
+  });
+}
+
+async function logout() {
+  await db.auth.signOut();
+  window.location.href = 'login.html';
+}
+
+function showToast(msg, isErr = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' err' : '');
+  setTimeout(() => { t.className = 'toast'; }, 2500);
+}
+</script>
+</body>
+</html>
