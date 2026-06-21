@@ -199,6 +199,16 @@ body{
   background:var(--green);
   box-shadow:0 0 10px var(--green),0 0 4px var(--green);
 }
+.light.amber{
+  background:var(--amber);
+  box-shadow:0 0 10px var(--amber),0 0 4px var(--amber);
+  animation:pulse-amber-light 1.8s ease-in-out infinite;
+}
+.light.amber::after{background:var(--amber);animation:pulse-ring-red 1.8s ease-in-out infinite}
+@keyframes pulse-amber-light{
+  0%,100%{box-shadow:0 0 6px var(--amber),0 0 2px var(--amber);opacity:0.8}
+  50%{box-shadow:0 0 16px var(--amber),0 0 6px var(--amber);opacity:1}
+}
 @keyframes pulse-red{
   0%,100%{box-shadow:0 0 6px var(--red),0 0 2px var(--red);opacity:0.8}
   50%{box-shadow:0 0 16px var(--red),0 0 6px var(--red);opacity:1}
@@ -231,6 +241,10 @@ body{
   border:1px solid rgba(0,255,157,0.3);
 }
 .badge-todo{
+  background:rgba(255,179,0,0.08);color:var(--amber);
+  border:1px solid rgba(255,179,0,0.3);
+}
+.badge-abnormal{
   background:rgba(255,59,59,0.08);color:var(--red);
   border:1px solid rgba(255,59,59,0.25);
 }
@@ -477,6 +491,17 @@ body{
       <label>異常說明</label>
       <textarea id="abnormalNote" placeholder="請描述異常情形…"></textarea>
     </div>
+    <div class="field" id="photo-field" style="display:none">
+      <label style="display:flex;align-items:center;gap:6px">
+        📷 異常照片 <span style="color:var(--red);font-size:.72rem">（必填）</span>
+      </label>
+      <label style="display:block;cursor:pointer">
+        <div id="photoPreview" style="width:100%;min-height:100px;border:1px dashed var(--border-hi);border-radius:2px;display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:.78rem;font-family:var(--font-mono);letter-spacing:.06em;overflow:hidden;background:rgba(2,8,20,.6)">
+          點此拍照或選擇圖片
+        </div>
+        <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto('photoInput','photoPreview')">
+      </label>
+    </div>
     <button class="btn-primary" id="saveInspectBtn" onclick="saveInspection()">儲存巡檢記錄</button>
     <div style="margin-top:8px">
       <button class="btn-secondary" style="width:100%" onclick="cancelScan()">取消</button>
@@ -556,6 +581,17 @@ body{
     <div class="field" id="modal-note-field" style="display:none">
       <label>異常說明</label>
       <textarea id="modalAbnormalNote" placeholder="請描述異常情形…"></textarea>
+    </div>
+    <div class="field" id="modal-photo-field" style="display:none">
+      <label style="display:flex;align-items:center;gap:6px">
+        📷 異常照片 <span style="color:var(--red);font-size:.72rem">（必填）</span>
+      </label>
+      <label style="display:block;cursor:pointer">
+        <div id="modalPhotoPreview" style="width:100%;min-height:100px;border:1px dashed var(--border-hi);border-radius:2px;display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:.78rem;font-family:var(--font-mono);letter-spacing:.06em;overflow:hidden;background:rgba(2,8,20,.6)">
+          點此拍照或選擇圖片
+        </div>
+        <input type="file" id="modalPhotoInput" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto('modalPhotoInput','modalPhotoPreview')">
+      </label>
     </div>
     <button class="btn-primary" onclick="saveModalInspection()">儲存</button>
     <div style="margin-top:8px">
@@ -643,8 +679,8 @@ async function loadEquipment() {
 
   _inspectedMap = {};
   if (currentCycle) {
-    const { data: recs } = await db.from('inspection_records').select('equipment_id,inspect_time').eq('cycle_id', currentCycle.cycle_id);
-    (recs || []).forEach(r => _inspectedMap[r.equipment_id] = r.inspect_time);
+    const { data: recs } = await db.from('inspection_records').select('equipment_id,inspect_time,run_status').eq('cycle_id', currentCycle.cycle_id);
+    (recs || []).forEach(r => _inspectedMap[r.equipment_id] = { inspect_time: r.inspect_time, run_status: r.run_status });
   }
 
   const inspectedIds = new Set(Object.keys(_inspectedMap));
@@ -673,16 +709,21 @@ function renderEqList(eqs) {
   const todo = eqs.filter(e => !inspectedIds.has(e.equipment_id));
   const done = eqs.filter(e => inspectedIds.has(e.equipment_id));
   const html = [...todo, ...done].map(eq => {
-    const isDone = inspectedIds.has(eq.equipment_id);
-    const timeStr = isDone ? `<div class="eq-time">✓ ${fmtTime(_inspectedMap[eq.equipment_id])}</div>` : '';
+    const rec = _inspectedMap[eq.equipment_id];
+    const isDone = !!rec;
+    const isAbnormal = isDone && rec.run_status === 'abnormal';
+    const lightClass = !isDone ? 'amber' : (isAbnormal ? 'red' : 'green');
+    const timeStr = isDone ? `<div class="eq-time">${isAbnormal ? '⚠ 異常 ' : '✓ '} ${fmtTime(rec.inspect_time)}</div>` : '';
+    const badgeClass = !isDone ? 'badge-todo' : (isAbnormal ? 'badge-abnormal' : 'badge-done');
+    const badgeText = !isDone ? 'PENDING' : (isAbnormal ? 'ABNORMAL' : 'DONE');
     return `<div class="eq-card" onclick="openInspectModal('${eq.equipment_id}')">
-      <div class="light ${isDone ? 'green' : 'red'}"></div>
+      <div class="light ${lightClass}"></div>
       <div class="eq-info">
         <div class="eq-name">${eq.name}</div>
         <div class="eq-loc">📍 ${eq.location || '位置未設定'}</div>
         ${timeStr}
       </div>
-      <span class="eq-badge ${isDone ? 'badge-done' : 'badge-todo'}">${isDone ? 'DONE' : 'PENDING'}</span>
+      <span class="eq-badge ${badgeClass}">${badgeText}</span>
     </div>`;
   }).join('');
   document.getElementById('eqList').innerHTML = html || '<div style="text-align:center;color:var(--text-dim);padding:40px 0;font-family:var(--font-mono)">NO EQUIPMENT DATA</div>';
@@ -748,7 +789,10 @@ function handleQrResult(qrText) {
   document.getElementById('btn-normal').className = 'radio-btn';
   document.getElementById('btn-abnormal').className = 'radio-btn';
   document.getElementById('note-field').style.display = 'none';
+  document.getElementById('photo-field').style.display = 'none';
   document.getElementById('abnormalNote').value = '';
+  document.getElementById('photoInput').value = '';
+  document.getElementById('photoPreview').innerHTML = '點此拍照或選擇圖片';
 }
 
 function selectStatus(s) {
@@ -756,6 +800,7 @@ function selectStatus(s) {
   document.getElementById('btn-normal').className = 'radio-btn' + (s === 'normal' ? ' selected-normal' : '');
   document.getElementById('btn-abnormal').className = 'radio-btn' + (s === 'abnormal' ? ' selected-abnormal' : '');
   document.getElementById('note-field').style.display = s === 'abnormal' ? 'block' : 'none';
+  document.getElementById('photo-field').style.display = s === 'abnormal' ? 'block' : 'none';
 }
 
 async function saveInspection() {
@@ -763,9 +808,13 @@ async function saveInspection() {
   if (scanStatus === 'abnormal' && !document.getElementById('abnormalNote').value.trim()) {
     showToast('請填寫異常說明', true); return;
   }
+  if (scanStatus === 'abnormal' && !document.getElementById('photoInput').files[0]) {
+    showToast('異常狀態請上傳照片', true); return;
+  }
   const btn = document.getElementById('saveInspectBtn');
   btn.disabled = true;
-  await doSaveInspection(scannedEquipment, scanStatus, document.getElementById('abnormalNote').value.trim());
+  const photoFile = scanStatus === 'abnormal' ? document.getElementById('photoInput').files[0] : null;
+  await doSaveInspection(scannedEquipment, scanStatus, document.getElementById('abnormalNote').value.trim(), photoFile);
   btn.disabled = false;
   document.getElementById('scan-result-form').style.display = 'none';
   document.getElementById('scan-prompt').style.display = 'block';
@@ -788,7 +837,10 @@ function openInspectModal(eqId) {
   document.getElementById('modal-btn-normal').className = 'radio-btn';
   document.getElementById('modal-btn-abnormal').className = 'radio-btn';
   document.getElementById('modal-note-field').style.display = 'none';
+  document.getElementById('modal-photo-field').style.display = 'none';
   document.getElementById('modalAbnormalNote').value = '';
+  document.getElementById('modalPhotoInput').value = '';
+  document.getElementById('modalPhotoPreview').innerHTML = '點此拍照或選擇圖片';
   document.getElementById('inspectModal').classList.add('show');
 }
 
@@ -797,6 +849,7 @@ function selectModalStatus(s) {
   document.getElementById('modal-btn-normal').className = 'radio-btn' + (s === 'normal' ? ' selected-normal' : '');
   document.getElementById('modal-btn-abnormal').className = 'radio-btn' + (s === 'abnormal' ? ' selected-abnormal' : '');
   document.getElementById('modal-note-field').style.display = s === 'abnormal' ? 'block' : 'none';
+  document.getElementById('modal-photo-field').style.display = s === 'abnormal' ? 'block' : 'none';
 }
 
 function closeModal() { document.getElementById('inspectModal').classList.remove('show'); }
@@ -806,108 +859,15 @@ async function saveModalInspection() {
   if (modalStatus === 'abnormal' && !document.getElementById('modalAbnormalNote').value.trim()) {
     showToast('請填寫異常說明', true); return;
   }
+  if (modalStatus === 'abnormal' && !document.getElementById('modalPhotoInput').files[0]) {
+    showToast('異常狀態請上傳照片', true); return;
+  }
+  const photoFile = modalStatus === 'abnormal' ? document.getElementById('modalPhotoInput').files[0] : null;
+  const note = document.getElementById('modalAbnormalNote').value.trim();
   closeModal();
-  await doSaveInspection(modalEquipment, modalStatus, document.getElementById('modalAbnormalNote').value.trim());
+  await doSaveInspection(modalEquipment, modalStatus, note, photoFile);
 }
 
-async function doSaveInspection(eq, status, note) {
-  const record = {
-    equipment_id: eq.equipment_id,
-    inspector_id: currentUser.user_id,
-    cycle_id: currentCycle?.cycle_id || null,
-    inspect_time: new Date().toISOString(),
-    run_status: status,
-    abnormal_note: note || null,
-    light_status: 'green',
-  };
-
-  if (navigator.onLine) {
-    const { error } = await db.from('inspection_records').insert(record);
-    if (error) { showToast('儲存失敗', true); return; }
-    if (status === 'abnormal') await createRepairFromInspection(eq, note);
-    showToast(`${eq.name} 已記錄`);
-    await loadEquipment();
-  } else {
-    const q = getOfflineQueue();
-    q.push(record);
-    saveOfflineQueue(q);
-    checkOfflineQueue();
-    showToast(`${eq.name} 已暫存（離線）`);
-    equipmentMap[eq.equipment_id]._inspected = true;
-    await loadEquipment();
-  }
-  await writeAudit('inspection_records', record.record_id || 'offline', 'insert', null, record);
-}
-
-async function createRepairFromInspection(eq, faultDesc) {
-  const repair = {
-    source: 'inspection',
-    equipment_id: eq.equipment_id,
-    reporter: currentUser.name,
-    phone: currentUser.phone || '',
-    department: currentUser.department || '',
-    fault_desc: faultDesc,
-    status: 'pending',
-    created_by: currentUser.user_id,
-  };
-  const { data: repairData, error } = await db.from('repair_requests').insert(repair).select().single();
-  if (!error && repairData) {
-    await db.from('maintenance_orders').insert({
-      request_id: repairData.request_id,
-      equipment_id: eq.equipment_id,
-      status: 'pending',
-    });
-    await db.from('repair_requests').update({ status: 'transferred' }).eq('request_id', repairData.request_id);
-    await writeAudit('repair_requests', repairData.request_id, 'insert', null, repair);
-  }
-}
-
-async function submitRepair() {
-  const eqId = document.getElementById('repairEqId').value;
-  const reporter = document.getElementById('repairReporter').value.trim();
-  const phone = document.getElementById('repairPhone').value.trim();
-  const dept = document.getElementById('repairDept').value.trim();
-  const fault = document.getElementById('repairFault').value.trim();
-  if (!reporter || !fault) { showToast('請填寫報修人與故障說明', true); return; }
-
-  const repair = {
-    source: document.getElementById('repairSource').value,
-    equipment_id: eqId,
-    reporter, phone, department: dept, fault_desc: fault, status: 'pending',
-    created_by: currentUser.user_id,
-  };
-  const { data, error } = await db.from('repair_requests').insert(repair).select().single();
-  if (error) { showToast('送出失敗', true); return; }
-  await db.from('maintenance_orders').insert({ request_id: data.request_id, equipment_id: eqId, status: 'pending' });
-  await db.from('repair_requests').update({ status: 'transferred' }).eq('request_id', data.request_id);
-  await writeAudit('repair_requests', data.request_id, 'insert', null, repair);
-  showToast('報修單已送出');
-  document.getElementById('repairReporter').value = '';
-  document.getElementById('repairPhone').value = '';
-  document.getElementById('repairDept').value = '';
-  document.getElementById('repairFault').value = '';
-}
-
-async function writeAudit(table, recordId, action, before, after) {
-  if (!currentUser) return;
-  await db.from('audit_logs').insert({
-    table_name: table, record_id: String(recordId), action,
-    changes: { before, after }, operator_id: currentUser.user_id,
-    source: navigator.userAgent.substring(0, 100),
-  });
-}
-
-async function logout() {
-  await db.auth.signOut();
-  window.location.href = 'login.html';
-}
-
-function showToast(msg, isErr = false) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show' + (isErr ? ' err' : '');
-  setTimeout(() => { t.className = 'toast'; }, 2500);
-}
-</script>
-</body>
-</html>
+async function uploadPhoto(file, equipmentId) {
+  if (!file) return null;
+  const ext = file.name.split('.').pop() || 'jp
