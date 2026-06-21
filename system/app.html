@@ -895,8 +895,7 @@ async function saveModalInspection() {
 }
 
 async function doSaveInspection(eq, status, note, photoFile) {
-  let photoUrl = null;
-  if (photoFile) photoUrl = await uploadPhoto(photoFile, eq.equipment_id);
+  if (photoFile) uploadPhoto(photoFile, eq.equipment_id).catch(() => {});
 
   const record = {
     equipment_id: eq.equipment_id,
@@ -905,7 +904,6 @@ async function doSaveInspection(eq, status, note, photoFile) {
     inspect_time: new Date().toISOString(),
     run_status: status,
     abnormal_note: note || null,
-    photo_url: photoUrl,
     light_status: status === 'normal' ? 'green' : 'red',
   };
 
