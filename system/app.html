@@ -32,6 +32,7 @@ body{font-family:'Noto Sans TC',system-ui,sans-serif;background:#0f172a;color:#e
 .eq-info{flex:1;min-width:0}
 .eq-name{font-size:.95rem;font-weight:600;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .eq-loc{font-size:.75rem;color:#64748b;margin-top:2px}
+.eq-time{font-size:.72rem;color:#22c55e;margin-top:3px}
 .eq-badge{font-size:.7rem;padding:2px 8px;border-radius:99px;font-weight:600;flex-shrink:0}
 .badge-done{background:#14532d;color:#86efac}
 .badge-todo{background:#450a0a;color:#fca5a5}
@@ -276,23 +277,32 @@ async function loadEquipment() {
   eqs.forEach(e => equipmentMap[e.equipment_id] = e);
 
   // Load today's inspection records for current cycle
-  let inspectedIds = new Set();
+  let inspectedMap = {};
   if (currentCycle) {
-    const { data: recs } = await db.from('inspection_records').select('equipment_id').eq('cycle_id', currentCycle.cycle_id);
-    (recs || []).forEach(r => inspectedIds.add(r.equipment_id));
+    const { data: recs } = await db.from('inspection_records').select('equipment_id,inspect_time').eq('cycle_id', currentCycle.cycle_id);
+    (recs || []).forEach(r => inspectedMap[r.equipment_id] = r.inspect_time);
   }
 
+  const inspectedIds = new Set(Object.keys(inspectedMap));
   const done = eqs.filter(e => inspectedIds.has(e.equipment_id));
   const todo = eqs.filter(e => !inspectedIds.has(e.equipment_id));
   document.getElementById('pendingCount').textContent = `待巡檢 ${todo.length} / 共 ${eqs.length}`;
 
+  const fmtTime = iso => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  };
+
   const html = [...todo, ...done].map(eq => {
     const isDone = inspectedIds.has(eq.equipment_id);
+    const timeStr = isDone ? `<div class="eq-time">✓ ${fmtTime(inspectedMap[eq.equipment_id])}</div>` : '';
     return `<div class="eq-card" onclick="openInspectModal('${eq.equipment_id}')">
       <div class="light ${isDone ? 'green' : 'red'}"></div>
       <div class="eq-info">
         <div class="eq-name">${eq.name}</div>
         <div class="eq-loc">${eq.location || '位置未設定'}</div>
+        ${timeStr}
       </div>
       <span class="eq-badge ${isDone ? 'badge-done' : 'badge-todo'}">${isDone ? '已巡檢' : '未巡檢'}</span>
     </div>`;
