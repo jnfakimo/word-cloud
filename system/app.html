@@ -834,9 +834,6 @@ async function saveInspection() {
   if (scanStatus === 'abnormal' && !document.getElementById('abnormalNote').value.trim()) {
     showToast('請填寫異常說明', true); return;
   }
-  if (scanStatus === 'abnormal' && !document.getElementById('photoInput').files[0]) {
-    showToast('異常狀態請上傳照片', true); return;
-  }
   const btn = document.getElementById('saveInspectBtn');
   btn.disabled = true;
   const photoFile = scanStatus === 'abnormal' ? document.getElementById('photoInput').files[0] : null;
@@ -885,9 +882,6 @@ async function saveModalInspection() {
   if (modalStatus === 'abnormal' && !document.getElementById('modalAbnormalNote').value.trim()) {
     showToast('請填寫異常說明', true); return;
   }
-  if (modalStatus === 'abnormal' && !document.getElementById('modalPhotoInput').files[0]) {
-    showToast('異常狀態請上傳照片', true); return;
-  }
   const photoFile = modalStatus === 'abnormal' ? document.getElementById('modalPhotoInput').files[0] : null;
   const note = document.getElementById('modalAbnormalNote').value.trim();
   closeModal();
@@ -897,9 +891,14 @@ async function saveModalInspection() {
 async function doSaveInspection(eq, status, note, photoFile) {
   if (photoFile) uploadPhoto(photoFile, eq.equipment_id).catch(() => {});
 
+  // Always resolve inspector_id to actual users.user_id
+  const { data: uRow } = await db.from('users').select('user_id').limit(1).maybeSingle();
+  const inspectorId = uRow?.user_id || currentUser.user_id;
+  if (!inspectorId) { showToast('找不到巡檢員帳號，請聯絡管理員', true); return; }
+
   const record = {
     equipment_id: eq.equipment_id,
-    inspector_id: currentUser.user_id,
+    inspector_id: inspectorId,
     cycle_id: currentCycle?.cycle_id || null,
     inspect_time: new Date().toISOString(),
     run_status: status,
@@ -909,7 +908,7 @@ async function doSaveInspection(eq, status, note, photoFile) {
 
   if (navigator.onLine) {
     const { error } = await db.from('inspection_records').insert(record);
-    if (error) { showToast('儲存失敗', true); return; }
+    if (error) { showToast('儲存失敗：' + (error.message || error.code), true); return; }
     if (status === 'abnormal') await createRepairFromInspection(eq, note);
     showToast(`${eq.name} 已記錄`);
     await loadEquipment();
