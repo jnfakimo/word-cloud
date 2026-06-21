@@ -628,15 +628,21 @@ function saveOfflineQueue(q) { localStorage.setItem(OFFLINE_KEY, JSON.stringify(
       </div>`;
     document.getElementById('pendingCount').textContent = 'ERROR';
   };
+  const setStatus = txt => { document.getElementById('pendingCount').textContent = txt; };
 
   try {
+    setStatus('連線中…');
     const { data: profile, error: pErr } = await db.from('users').select('*').eq('name', '系統管理者').single();
+    if (pErr && pErr.code !== 'PGRST116') throw new Error('users 查詢失敗: ' + pErr.message);
     currentUser = profile || { user_id: 'eb771a87-aa4d-4066-b23d-9b810a5c00bd', name: '系統管理者', role: 'inspector' };
     document.getElementById('navUser').textContent = currentUser.name;
 
-    const { data: cycle } = await db.from('inspection_cycles').select('*').is('ended_at', null).order('started_at', { ascending: false }).limit(1).single();
+    setStatus('載入週期…');
+    const { data: cycle, error: cErr } = await db.from('inspection_cycles').select('*').is('ended_at', null).order('started_at', { ascending: false }).limit(1).single();
+    if (cErr && cErr.code !== 'PGRST116') throw new Error('inspection_cycles 查詢失敗: ' + cErr.message);
     currentCycle = cycle;
 
+    setStatus('載入設備…');
     await loadEquipment();
     setupTabs();
     setupOfflineDetect();
@@ -859,4 +865,156 @@ function openInspectModal(eqId) {
   document.getElementById('modal-note-field').style.display = 'none';
   document.getElementById('modal-photo-field').style.display = 'none';
   document.getElementById('modalAbnormalNote').value = '';
-  document.getElementById('modalPhotoInput
+  document.getElementById('modalPhotoInput').value = '';
+  document.getElementById('modalPhotoPreview').innerHTML = '點此拍照或選擇圖片';
+  document.getElementById('inspectModal').classList.add('show');
+}
+
+function selectModalStatus(s) {
+  modalStatus = s;
+  document.getElementById('modal-btn-normal').className = 'radio-btn' + (s === 'normal' ? ' selected-normal' : '');
+  document.getElementById('modal-btn-abnormal').className = 'radio-btn' + (s === 'abnormal' ? ' selected-abnormal' : '');
+  document.getElementById('modal-note-field').style.display = s === 'abnormal' ? 'block' : 'none';
+  document.getElementById('modal-photo-field').style.display = s === 'abnormal' ? 'block' : 'none';
+}
+
+function closeModal() { document.getElementById('inspectModal').classList.remove('show'); }
+
+async function saveModalInspection() {
+  if (!modalStatus) { showToast('請選擇運轉狀態', true); return; }
+  if (modalStatus === 'abnormal' && !document.getElementById('modalAbnormalNote').value.trim()) {
+    showToast('請填寫異常說明', true); return;
+  }
+  if (modalStatus === 'abnormal' && !document.getElementById('modalPhotoInput').files[0]) {
+    showToast('異常狀態請上傳照片', true); return;
+  }
+  const photoFile = modalStatus === 'abnormal' ? document.getElementById('modalPhotoInput').files[0] : null;
+  const note = document.getElementById('modalAbnormalNote').value.trim();
+  closeModal();
+  await doSaveInspection(modalEquipment, modalStatus, note, photoFile);
+}
+
+async function doSaveInspection(eq, status, note, photoFile) {
+  let photoUrl = null;
+  if (photoFile) photoUrl = await uploadPhoto(photoFile, eq.equipment_id);
+
+  const record = {
+    equipment_id: eq.equipment_id,
+    inspector_id: currentUser.user_id,
+    cycle_id: currentCycle?.cycle_id || null,
+    inspect_time: new Date().toISOString(),
+    run_status: status,
+    abnormal_note: note || null,
+    photo_url: photoUrl,
+    light_status: status === 'normal' ? 'green' : 'red',
+  };
+
+  if (navigator.onLine) {
+    const { error } = await db.from('inspection_records').insert(record);
+    if (error) { showToast('儲存失敗', true); return; }
+    if (status === 'abnormal') await createRepairFromInspection(eq, note);
+    showToast(`${eq.name} 已記錄`);
+    await loadEquipment();
+  } else {
+    const q = getOfflineQueue();
+    q.push(record);
+    saveOfflineQueue(q);
+    checkOfflineQueue();
+    showToast(`${eq.name} 已暫存（離線）`);
+    await loadEquipment();
+  }
+  await writeAudit('inspection_records', eq.equipment_id, 'insert', null, record);
+}
+
+async function uploadPhoto(file, equipmentId) {
+  if (!file) return null;
+  const ext = file.name.split('.').pop() || 'jpg';
+  const path = `inspections/${equipmentId}/${Date.now()}.${ext}`;
+  const { error } = await db.storage.from('inspection-photos').upload(path, file);
+  if (error) { console.error('Photo upload error', error); return null; }
+  return db.storage.from('inspection-photos').getPublicUrl(path).data.publicUrl;
+}
+
+function previewPhoto(inputId, previewId) {
+  const file = document.getElementById(inputId).files[0];
+  const preview = document.getElementById(previewId);
+  if (!file) { preview.innerHTML = '點此拍照或選擇圖片'; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    preview.innerHTML = `<img src="${e.target.result}" style="max-width:100%;max-height:200px;object-fit:contain">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function createRepairFromInspection(eq, faultDesc) {
+  const repair = {
+    source: 'inspection',
+    equipment_id: eq.equipment_id,
+    reporter: currentUser.name,
+    phone: currentUser.phone || '',
+    department: currentUser.department || '',
+    fault_desc: faultDesc,
+    status: 'pending',
+    created_by: currentUser.user_id,
+  };
+  const { data: repairData, error } = await db.from('repair_requests').insert(repair).select().single();
+  if (!error && repairData) {
+    await db.from('maintenance_orders').insert({
+      request_id: repairData.request_id,
+      equipment_id: eq.equipment_id,
+      status: 'pending',
+    });
+    await db.from('repair_requests').update({ status: 'transferred' }).eq('request_id', repairData.request_id);
+    await writeAudit('repair_requests', repairData.request_id, 'insert', null, repair);
+  }
+}
+
+async function submitRepair() {
+  const eqId = document.getElementById('repairEqId').value;
+  const reporter = document.getElementById('repairReporter').value.trim();
+  const phone = document.getElementById('repairPhone').value.trim();
+  const dept = document.getElementById('repairDept').value.trim();
+  const fault = document.getElementById('repairFault').value.trim();
+  if (!reporter || !fault) { showToast('請填寫報修人與故障說明', true); return; }
+
+  const repair = {
+    source: document.getElementById('repairSource').value,
+    equipment_id: eqId,
+    reporter, phone, department: dept, fault_desc: fault, status: 'pending',
+    created_by: currentUser.user_id,
+  };
+  const { data, error } = await db.from('repair_requests').insert(repair).select().single();
+  if (error) { showToast('送出失敗', true); return; }
+  await db.from('maintenance_orders').insert({ request_id: data.request_id, equipment_id: eqId, status: 'pending' });
+  await db.from('repair_requests').update({ status: 'transferred' }).eq('request_id', data.request_id);
+  await writeAudit('repair_requests', data.request_id, 'insert', null, repair);
+  showToast('報修單已送出');
+  document.getElementById('repairReporter').value = '';
+  document.getElementById('repairPhone').value = '';
+  document.getElementById('repairDept').value = '';
+  document.getElementById('repairFault').value = '';
+}
+
+async function writeAudit(table, recordId, action, before, after) {
+  if (!currentUser) return;
+  await db.from('audit_logs').insert({
+    table_name: table, record_id: String(recordId), action,
+    changes: { before, after }, operator_id: currentUser.user_id,
+    source: navigator.userAgent.substring(0, 100),
+  });
+}
+
+async function logout() {
+  await db.auth.signOut();
+  window.location.href = 'login.html';
+}
+
+function showToast(msg, isErr = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' err' : '');
+  setTimeout(() => { t.className = 'toast'; }, 2500);
+}
+</script>
+</body>
+</html>
