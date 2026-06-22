@@ -776,9 +776,11 @@ function lpGetId(sfx) { return _lpSelected[sfx] || null; }
 
   try {
     setStatus('連線中…');
-    const { data: profile, error: pErr } = await db.from('users').select('*').eq('name', '系統管理者').single();
-    if (pErr && pErr.code !== 'PGRST116') throw new Error('users 查詢失敗: ' + pErr.message);
-    currentUser = profile || { user_id: 'eb771a87-aa4d-4066-b23d-9b810a5c00bd', name: '系統管理者', role: 'inspector' };
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) { window.location.href = 'login.html'; return; }
+    const { data: profile, error: pErr } = await db.from('users').select('*').eq('auth_id', session.user.id).single();
+    if (pErr || !profile) { await db.auth.signOut(); window.location.href = 'login.html'; return; }
+    currentUser = profile;
     document.getElementById('navUser').textContent = currentUser.name;
 
     setStatus('載入週期…');

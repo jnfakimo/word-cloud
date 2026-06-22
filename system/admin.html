@@ -907,8 +907,11 @@ function fmtLoc(loc) {
 }
 
 (async () => {
-  const { data: profile } = await db.from('users').select('*').eq('auth_id', 'eb771a87-aa4d-4066-b23d-9b810a5c00bd').single();
-  currentUser = profile || { user_id: 'eb771a87-aa4d-4066-b23d-9b810a5c00bd', name: '系統管理者', role: 'admin', status: 'active' };
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) { window.location.href = 'login.html'; return; }
+  const { data: profile } = await db.from('users').select('*').eq('auth_id', session.user.id).single();
+  if (!profile) { await db.auth.signOut(); window.location.href = 'login.html'; return; }
+  currentUser = profile;
   document.getElementById('sidebarUser').textContent = `${currentUser.name} [${ROLE_LABEL[currentUser.role] || 'ADMIN'}]`;
 
   setupNav();
