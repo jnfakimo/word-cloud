@@ -776,18 +776,11 @@ function lpGetId(sfx) { return _lpSelected[sfx] || null; }
 
   try {
     setStatus('連線中…');
-    // 登入驗證已關閉：有 session 用 session 帳號，否則自動套用預設帳號
-    let profile = null;
     const { data: { session } } = await db.auth.getSession();
-    if (session) {
-      const { data } = await db.from('users').select('*').eq('auth_id', session.user.id).single();
-      profile = data;
-    }
-    if (!profile) {
-      const { data } = await db.from('users').select('*').eq('status', 'active').limit(1).maybeSingle();
-      profile = data;
-    }
-    currentUser = profile || { user_id: null, name: '巡檢人員', role: 'inspector' };
+    if (!session) { window.location.href = 'login.html'; return; }
+    const { data: profile, error: pErr } = await db.from('users').select('*').eq('auth_id', session.user.id).single();
+    if (pErr || !profile) { await db.auth.signOut(); window.location.href = 'login.html'; return; }
+    currentUser = profile;
     document.getElementById('navUser').textContent = currentUser.name;
 
     setStatus('載入週期…');
