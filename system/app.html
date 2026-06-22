@@ -555,7 +555,7 @@ body{
     </div>
     <div class="field">
       <label>部門</label>
-      <input id="repairDept" type="text" placeholder="部門名稱">
+      <select id="repairDept"><option value="">-- 選擇部門 --</option></select>
     </div>
     <div class="field">
       <label>發生位置 <span style="color:var(--text-dim);font-size:.72rem">（選填）</span></label>
@@ -665,16 +665,30 @@ function getOfflineQueue() { try { return JSON.parse(localStorage.getItem(OFFLIN
 function saveOfflineQueue(q) { localStorage.setItem(OFFLINE_KEY, JSON.stringify(q)); }
 
 // ── Location Picker ─────────────────────────────────────────
-let _lpMarkets = [], _lpLocs = [], _lpSelected = { i: null, r: null };
+let _lpMarkets = [], _lpLocs = [], _lpSelected = { i: null, r: null }, _appDepts = [];
 
 async function lpLoadData() {
   if (_lpMarkets.length) return;
-  const [{ data: mkt }, { data: locs }] = await Promise.all([
+  const [{ data: mkt }, { data: locs }, { data: depts }] = await Promise.all([
     db.from('markets').select('market_id,name').eq('status','active').order('sort_order'),
-    db.from('locations').select('location_id,market_id,floor,floor_order,area,area_order,detail,detail_order').eq('status','active').order('floor_order').order('area_order').order('detail_order')
+    db.from('locations').select('location_id,market_id,floor,floor_order,area,area_order,detail,detail_order').eq('status','active').order('floor_order').order('area_order').order('detail_order'),
+    db.from('departments').select('dept_id,parent_id,name,sort_order').order('sort_order')
   ]);
   _lpMarkets = mkt || [];
   _lpLocs    = locs || [];
+  _appDepts  = depts || [];
+  const dSel = document.getElementById('repairDept');
+  if (dSel && _appDepts.length) {
+    const l1 = _appDepts.filter(d => !d.parent_id);
+    let html = '<option value="">-- 選擇部門 --</option>';
+    for (const d of l1) {
+      html += `<option value="${d.name}">◈ ${d.name}</option>`;
+      _appDepts.filter(c => c.parent_id === d.dept_id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0)).forEach(c => {
+        html += `<option value="${c.name}">  └ ${c.name}</option>`;
+      });
+    }
+    dSel.innerHTML = html;
+  }
 }
 
 function lpInit(sfx) {
@@ -1107,7 +1121,7 @@ async function submitRepair() {
   const eqId = document.getElementById('repairEqId').value;
   const reporter = document.getElementById('repairReporter').value.trim();
   const phone = document.getElementById('repairPhone').value.trim();
-  const dept = document.getElementById('repairDept').value.trim();
+  const dept = document.getElementById('repairDept').value;
   const fault = document.getElementById('repairFault').value.trim();
   if (!reporter || !fault) { showToast('請填寫報修人與故障說明', true); return; }
 

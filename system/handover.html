@@ -394,7 +394,7 @@ let editingId = null;
   document.getElementById('navUser').textContent = '電子交接簿';
 
   const [{ data: depts }, { data: users }] = await Promise.all([
-    db.from('departments').select('*').eq('status','active').order('level').order('sort_order'),
+    db.from('departments').select('*').order('sort_order'),
     db.from('users').select('*').eq('status','active').order('name')
   ]);
   allDepts = depts || [];

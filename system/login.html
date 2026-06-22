@@ -29,8 +29,8 @@ input:focus{border-color:#6366f1}
   <div class="subtitle" style="font-size:.95rem;color:#94a3b8;margin-bottom:4px">第一果菜市場 設備巡檢維修系統</div>
   <div class="subtitle">請使用帳號登入</div>
   <div class="field">
-    <label>電子郵件</label>
-    <input id="email" type="email" placeholder="user@example.com" autocomplete="username">
+    <label>帳號（英數字）</label>
+    <input id="username" type="text" placeholder="例：tcfm_admin" autocomplete="username">
   </div>
   <div class="field">
     <label>密碼</label>
@@ -52,17 +52,24 @@ const ROLE_ROUTES = {
 };
 
 document.getElementById('loginBtn').addEventListener('click', async () => {
-  const email = document.getElementById('email').value.trim();
+  const username = document.getElementById('username').value.trim();
   const password = document.getElementById('password').value;
   const btn = document.getElementById('loginBtn');
   const err = document.getElementById('errMsg');
   err.textContent = '';
-  if (!email || !password) { err.textContent = '請填寫帳號與密碼'; return; }
+  if (!username || !password) { err.textContent = '請填寫帳號與密碼'; return; }
   btn.disabled = true; btn.textContent = '登入中…';
 
-  const { data, error } = await db.auth.signInWithPassword({ email, password });
+  const { data: profile0, error: lookupErr } = await db.from('users').select('email').eq('username', username).eq('status', 'active').single();
+  if (lookupErr || !profile0?.email) {
+    err.textContent = '找不到帳號，請確認帳號是否正確';
+    btn.disabled = false; btn.textContent = '登入';
+    return;
+  }
+
+  const { data, error } = await db.auth.signInWithPassword({ email: profile0.email, password });
   if (error) {
-    err.textContent = '帳號或密碼錯誤';
+    err.textContent = '密碼錯誤';
     btn.disabled = false; btn.textContent = '登入';
     return;
   }
@@ -81,6 +88,9 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   window.location.href = dest;
 });
 
+document.getElementById('username').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('password').focus();
+});
 document.getElementById('password').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('loginBtn').click();
 });

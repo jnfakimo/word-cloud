@@ -563,10 +563,11 @@ body{
         <div class="panel-title">新增帳號</div>
         <div class="form-grid">
           <div class="field"><label>姓名</label><input id="u-name" type="text" placeholder="姓名"></div>
-          <div class="field"><label>電子郵件（登入帳號）</label><input id="u-email" type="email" placeholder="user@example.com"></div>
+          <div class="field"><label>登入帳號（英數字/底線）</label><input id="u-username" type="text" placeholder="例：tcfm_admin" autocomplete="off"></div>
+          <div class="field"><label>電子郵件（密碼找回用）</label><input id="u-email" type="email" placeholder="user@example.com"></div>
           <div class="field"><label>初始密碼</label><input id="u-pass" type="password" placeholder="至少 6 碼"></div>
           <div class="field"><label>電話</label><input id="u-phone" type="text" placeholder="聯絡電話"></div>
-          <div class="field"><label>部門</label><input id="u-dept" type="text" placeholder="部門"></div>
+          <div class="field"><label>部門</label><select id="u-dept-id"><option value="">-- 選擇部門 --</option></select></div>
           <div class="field"><label>角色</label>
             <select id="u-role">
               <option value="inspector">巡檢人員</option>
@@ -585,7 +586,7 @@ body{
         </div>
         <div style="overflow-x:auto">
           <table class="data-table" id="usersTable">
-            <thead><tr><th>姓名</th><th>電話</th><th>部門</th><th>角色</th><th>狀態</th><th>操作</th></tr></thead>
+            <thead><tr><th>姓名</th><th>帳號</th><th>部門</th><th>角色</th><th>狀態</th><th>操作</th></tr></thead>
             <tbody id="usersTbody"><tr><td colspan="6" style="color:var(--text-dim);font-family:var(--font-mono)">LOADING…</td></tr></tbody>
           </table>
         </div>
@@ -671,6 +672,28 @@ body{
     <!-- COSTS -->
     <div class="page-section" id="page-costs">
       <div class="page-header"><h2>◬ 費用統計</h2><p>LIFECYCLE COST ANALYSIS</p></div>
+      <div class="panel">
+        <div class="panel-title">新增費用記錄</div>
+        <div class="form-grid">
+          <div class="field"><label>設備</label>
+            <select id="cost-eq"><option value="">-- 選擇設備 --</option></select>
+          </div>
+          <div class="field"><label>費用類型</label>
+            <select id="cost-type">
+              <option value="purchase">購置費</option>
+              <option value="outsource">委外維修</option>
+              <option value="parts">零件費</option>
+              <option value="labor">工時費</option>
+              <option value="other">其他</option>
+            </select>
+          </div>
+          <div class="field"><label>廠商</label><input id="cost-vendor" type="text" placeholder="廠商名稱（選填）"></div>
+          <div class="field"><label>日期</label><input id="cost-date" type="date"></div>
+          <div class="field"><label>金額（元）</label><input id="cost-amount" type="number" min="0" placeholder="0"></div>
+          <div class="field"><label>說明</label><input id="cost-note" type="text" placeholder="費用說明（選填）"></div>
+        </div>
+        <div style="margin-top:14px"><button class="btn btn-primary" onclick="addCostRecord()">+ 新增費用記錄</button></div>
+      </div>
       <div class="panel">
         <div class="panel-title">費用明細</div>
         <div class="search-bar">
@@ -870,7 +893,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
-let allUsers = [], allEquipment = [], userMap = {}, eqMap = {};
+let allUsers = [], allEquipment = [], allDepts = [], userMap = {}, eqMap = {}, deptMap = {};
 const ROLE_LABEL = { admin:'管理者', inspector:'巡檢人員', maintenance:'維修人員', supervisor:'主管' };
 const STATUS_LABEL = { pending:'待處理', transferred:'已轉維修', closed:'已結案' };
 const ORDER_STATUS_LABEL = { pending:'待處理', in_progress:'處理中', pending_review:'待驗收', completed:'已完成', closed:'結案' };
@@ -913,7 +936,7 @@ function setupNav() {
       else if (page === 'equipment') loadEquipmentList();
       else if (page === 'inspections') { populateEqFilter('inspEqFilter'); loadInspections(); }
       else if (page === 'repairs') loadRepairs();
-      else if (page === 'costs') { populateEqFilter('costEqFilter'); loadCostAdmin(); loadCostByEq(); }
+      else if (page === 'costs') { populateEqFilter('costEqFilter'); populateEqFilter('cost-eq'); loadCostAdmin(); loadCostByEq(); }
       else if (page === 'audit') loadAudit();
       else if (page === 'cycles') loadCycles();
       else if (page === 'locanalysis') loadLocationAnalysis();
@@ -923,20 +946,43 @@ function setupNav() {
 }
 
 async function loadAll() {
-  const [{ data: us }, { data: eqs }] = await Promise.all([
+  const [{ data: us }, { data: eqs }, { data: depts }] = await Promise.all([
     db.from('users').select('*').order('name'),
     db.from('equipment').select('*').order('name'),
+    db.from('departments').select('*').order('sort_order'),
   ]);
-  allUsers = us || []; allEquipment = eqs || [];
+  allUsers = us || []; allEquipment = eqs || []; allDepts = depts || [];
   allUsers.forEach(u => userMap[u.user_id] = u);
   allEquipment.forEach(e => eqMap[e.equipment_id] = e);
+  allDepts.forEach(d => deptMap[d.dept_id] = d);
+  populateDeptSelect('u-dept-id');
+  populateEqFilter('cost-eq');
+}
+
+function buildDeptOpts(el, selectedId) {
+  const l1 = allDepts.filter(d => !d.parent_id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+  let html = '<option value="">-- 選擇部門 --</option>';
+  for (const d of l1) {
+    html += `<option value="${d.dept_id}" ${d.dept_id===selectedId?'selected':''}>◈ ${d.name}</option>`;
+    allDepts.filter(c=>c.parent_id===d.dept_id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).forEach(c=>{
+      html += `<option value="${c.dept_id}" ${c.dept_id===selectedId?'selected':''}>  └ ${c.name}</option>`;
+    });
+  }
+  el.innerHTML = html;
+}
+
+function populateDeptSelect(id) {
+  const el = document.getElementById(id);
+  if (el) buildDeptOpts(el, el.value);
 }
 
 function populateEqFilter(selectId) {
   const el = document.getElementById(selectId);
   if (!el) return;
   const current = el.value;
-  el.innerHTML = '<option value="">全部設備</option>' + allEquipment.map(e => `<option value="${e.equipment_id}" ${e.equipment_id === current ? 'selected':''}>${e.name}</option>`).join('');
+  const isEntryForm = selectId === 'cost-eq';
+  el.innerHTML = `<option value="">${isEntryForm ? '-- 選擇設備 --' : '全部設備'}</option>` +
+    allEquipment.map(e => `<option value="${e.equipment_id}" ${e.equipment_id === current ? 'selected':''}>${e.name}</option>`).join('');
 }
 
 async function loadDashboard() {
@@ -977,8 +1023,8 @@ async function loadUsers() {
 function renderUsers(users) {
   document.getElementById('usersTbody').innerHTML = users.map(u => `<tr>
     <td>${u.name}</td>
-    <td style="font-family:var(--font-mono);font-size:.8rem">${u.phone || '—'}</td>
-    <td>${u.department || '—'}</td>
+    <td style="font-family:var(--font-mono);font-size:.8rem">${u.username || '—'}</td>
+    <td>${(deptMap[u.dept_id]?.name) || u.department || '—'}</td>
     <td><span class="role-badge">${ROLE_LABEL[u.role] || u.role}</span></td>
     <td><span class="badge ${u.status === 'active' ? 'badge-active' : 'badge-inactive'}">${u.status === 'active' ? 'ACTIVE' : 'INACTIVE'}</span></td>
     <td>
@@ -990,28 +1036,35 @@ function renderUsers(users) {
 
 function filterUsers() {
   const q = document.getElementById('userSearch').value.toLowerCase();
-  renderUsers(allUsers.filter(u => u.name.toLowerCase().includes(q) || (u.department || '').toLowerCase().includes(q)));
+  renderUsers(allUsers.filter(u =>
+    u.name.toLowerCase().includes(q) ||
+    (u.username || '').toLowerCase().includes(q) ||
+    ((deptMap[u.dept_id]?.name) || u.department || '').toLowerCase().includes(q)
+  ));
 }
 
 async function createUser() {
-  const name = document.getElementById('u-name').value.trim();
-  const email = document.getElementById('u-email').value.trim();
-  const pass = document.getElementById('u-pass').value;
-  const phone = document.getElementById('u-phone').value.trim();
-  const dept = document.getElementById('u-dept').value.trim();
-  const role = document.getElementById('u-role').value;
-  if (!name || !email || !pass) { showToast('請填寫姓名、郵件與密碼', true); return; }
+  const name     = document.getElementById('u-name').value.trim();
+  const username = document.getElementById('u-username').value.trim();
+  const email    = document.getElementById('u-email').value.trim();
+  const pass     = document.getElementById('u-pass').value;
+  const phone    = document.getElementById('u-phone').value.trim();
+  const deptId   = document.getElementById('u-dept-id').value || null;
+  const role     = document.getElementById('u-role').value;
+  if (!name || !username || !email || !pass) { showToast('請填寫姓名、帳號、郵件與密碼', true); return; }
+  if (!/^[A-Za-z0-9_]+$/.test(username)) { showToast('帳號僅限英文、數字、底線', true); return; }
 
   const { data: authData, error: authErr } = await db.auth.signUp({ email, password: pass });
   if (authErr) { showToast('建立帳號失敗：' + authErr.message, true); return; }
 
-  const profile = { auth_id: authData.user.id, name, phone: phone || null, department: dept || null, role, status: 'active', created_by: currentUser.user_id };
+  const profile = { auth_id: authData.user.id, name, username, email, phone: phone || null, dept_id: deptId, role, status: 'active', created_by: currentUser.user_id };
   const { error: profErr } = await db.from('users').insert(profile);
-  if (profErr) { showToast('建立使用者資料失敗', true); return; }
+  if (profErr) { showToast('建立使用者資料失敗：' + profErr.message, true); return; }
 
   await writeAudit('users', authData.user.id, 'insert', null, profile);
   showToast(`帳號「${name}」已建立`);
-  ['u-name','u-email','u-pass','u-phone','u-dept'].forEach(id => document.getElementById(id).value = '');
+  ['u-name','u-username','u-email','u-pass','u-phone'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('u-dept-id').value = '';
   await loadUsers();
 }
 
@@ -1161,16 +1214,21 @@ async function loadRepairs() {
   }).join('') : '<tr><td colspan="9" style="color:var(--text-dim);font-family:var(--font-mono)">NO RECORDS</td></tr>';
 }
 
+let _lastCosts = [];
 async function loadCostAdmin() {
   const eqFilter = document.getElementById('costEqFilter').value;
   const typeFilter = document.getElementById('costTypeFilter').value;
   let query = db.from('cost_records').select('*,equipment(name)').order('cost_date',{ascending:false}).limit(500);
   if (eqFilter) query = query.eq('equipment_id', eqFilter);
   if (typeFilter) query = query.eq('cost_type', typeFilter);
-  const { data } = await query;
-  const costs = data || [];
-  const total = costs.reduce((s, c) => s + Number(c.amount), 0);
-  document.getElementById('costTbody').innerHTML = costs.length ? costs.map(c => `<tr>
+  const { data, error } = await query;
+  if (error) {
+    document.getElementById('costTbody').innerHTML = `<tr><td colspan="6" style="color:var(--red);font-family:var(--font-mono)">ERROR: ${error.message}</td></tr>`;
+    return;
+  }
+  _lastCosts = data || [];
+  const total = _lastCosts.reduce((s, c) => s + Number(c.amount), 0);
+  document.getElementById('costTbody').innerHTML = _lastCosts.length ? _lastCosts.map(c => `<tr>
     <td>${c.equipment?.name || '—'}</td>
     <td>${COST_TYPE_LABEL[c.cost_type] || c.cost_type}</td>
     <td>${c.vendor || '—'}</td>
@@ -1178,7 +1236,30 @@ async function loadCostAdmin() {
     <td>${c.note || '—'}</td>
     <td style="text-align:right;font-family:var(--font-mono)">${Number(c.amount).toLocaleString()}</td>
   </tr>`).join('') : '<tr><td colspan="6" style="color:var(--text-dim);font-family:var(--font-mono)">NO COST RECORDS</td></tr>';
-  document.getElementById('costTotalDisplay').textContent = costs.length ? `TOTAL：${total.toLocaleString()} 元` : '';
+  document.getElementById('costTotalDisplay').textContent = _lastCosts.length ? `TOTAL：${total.toLocaleString()} 元` : '';
+}
+
+async function addCostRecord() {
+  if (!currentUser) return;
+  const eqId = document.getElementById('cost-eq').value;
+  const costType = document.getElementById('cost-type').value;
+  const vendor = document.getElementById('cost-vendor').value.trim();
+  const costDate = document.getElementById('cost-date').value;
+  const amount = parseFloat(document.getElementById('cost-amount').value);
+  const note = document.getElementById('cost-note').value.trim();
+  if (!eqId) { showToast('請選擇設備', true); return; }
+  if (!costDate) { showToast('請填寫日期', true); return; }
+  if (isNaN(amount) || amount < 0) { showToast('請填寫有效金額', true); return; }
+  const { error } = await db.from('cost_records').insert({
+    equipment_id: eqId, cost_type: costType, vendor: vendor || null,
+    cost_date: costDate, amount, note: note || null, created_by: currentUser.user_id
+  });
+  if (error) { showToast('新增失敗：' + error.message, true); return; }
+  showToast('費用記錄已新增');
+  document.getElementById('cost-vendor').value = '';
+  document.getElementById('cost-amount').value = '';
+  document.getElementById('cost-note').value = '';
+  loadCostAdmin(); loadCostByEq();
 }
 
 async function loadCostByEq() {
@@ -1196,11 +1277,11 @@ async function loadCostByEq() {
 }
 
 function exportCostCsv() {
-  const rows = document.getElementById('costTbody').querySelectorAll('tr');
+  if (!_lastCosts.length) { showToast('目前無費用記錄可下載', true); return; }
   let csv = '設備,費用類型,廠商,日期,說明,金額\n';
-  rows.forEach(r => {
-    const cells = r.querySelectorAll('td');
-    if (cells.length >= 6) csv += Array.from(cells).map(c => `"${c.textContent.trim()}"`).join(',') + '\n';
+  _lastCosts.forEach(c => {
+    const row = [c.equipment?.name || '', COST_TYPE_LABEL[c.cost_type] || c.cost_type, c.vendor || '', c.cost_date || '', c.note || '', c.amount];
+    csv += row.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',') + '\n';
   });
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
