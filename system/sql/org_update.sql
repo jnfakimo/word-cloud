@@ -69,3 +69,19 @@ BEGIN
     DELETE FROM departments WHERE dept_id = v_dup;
   END IF;
 END $$;
+
+-- 10. system_settings table (used by admin.html settings page)
+CREATE TABLE IF NOT EXISTS system_settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "allow_all_for_now" ON system_settings;
+CREATE POLICY "allow_all_for_now" ON system_settings FOR ALL USING (true);
+
+INSERT INTO system_settings (key, value) VALUES
+  ('org_name',  '臺北農產運銷股份有限公司'),
+  ('site_name', '第一果菜市場')
+ON CONFLICT (key) DO NOTHING;
