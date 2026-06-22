@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
+<title>場域位置管理 — 臺北農產巡檢系統</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;
+  --cyan:#00d4ff;--cyan-glow:0 0 14px rgba(0,212,255,.5);--blue:#1a7fff;--green:#00ff9d;
+  --amber:#ffb300;--red:#ff3b3b;--text:#a8d8f0;--text-hi:#d4eeff;--text-dim:#3a6a8a;
+  --font-mono:'Share Tech Mono',monospace;--font-head:'Rajdhani',sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);
+  background-image:linear-gradient(rgba(0,212,255,.015) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,212,255,.015) 1px,transparent 1px);
+  background-size:40px 40px;color:var(--text);min-height:100vh;padding-bottom:30px}
+a{color:inherit;text-decoration:none}
+
+/* NAV */
+.navbar{background:rgba(3,10,22,.97);border-bottom:1px solid var(--border);
+  padding:10px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:50}
+.navbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,var(--cyan),var(--blue) 40%,transparent);opacity:.5}
+.nav-title{font-family:var(--font-head);font-size:1.1rem;font-weight:700;
+  color:var(--cyan);letter-spacing:.06em;text-shadow:var(--cyan-glow)}
+.nav-sub{font-size:.7rem;color:var(--text-dim)}
+.nav-space{flex:1}
+.nav-back{font-size:.7rem;color:var(--text-dim);border:1px solid var(--border);
+  padding:5px 10px;border-radius:2px;cursor:pointer;background:none;
+  transition:all .2s;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.05em}
+.nav-back:hover{border-color:var(--cyan);color:var(--cyan)}
+
+/* TABS */
+.tabs{display:flex;border-bottom:1px solid var(--border);padding:0 16px;gap:4px;background:var(--surface)}
+.tab-btn{padding:10px 20px;background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--text-dim);cursor:pointer;font-size:.78rem;font-family:var(--font-head);
+  letter-spacing:.05em;text-transform:uppercase;font-weight:600;transition:all .2s}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+
+/* CONTENT */
+.content{padding:14px 16px}
+.tab-pane{display:none}.tab-pane.active{display:block}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.toolbar select,.toolbar input{background:var(--surface);border:1px solid var(--border);
+  color:var(--text);padding:6px 10px;border-radius:2px;font-size:.75rem;
+  font-family:'Noto Sans TC',sans-serif;outline:none;transition:border-color .2s}
+.toolbar select:focus,.toolbar input:focus{border-color:var(--cyan)}
+.t-space{flex:1}
+.btn-add{background:rgba(0,212,255,.1);border:1px solid var(--cyan);color:var(--cyan);
+  padding:7px 16px;border-radius:2px;cursor:pointer;font-size:.75rem;font-family:var(--font-head);
+  letter-spacing:.04em;text-transform:uppercase;transition:all .2s}
+.btn-add:hover{background:rgba(0,212,255,.2)}
+
+/* STATS */
+.stats-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.stat-card{background:var(--panel);border:1px solid var(--border);border-radius:2px;
+  padding:10px 16px;flex:1;min-width:100px}
+.stat-n{font-size:1.5rem;font-weight:700;color:var(--cyan);font-family:var(--font-head)}
+.stat-l{font-size:.68rem;color:var(--text-dim);margin-top:2px}
+
+/* TREE TABLE */
+.tree{width:100%;border-collapse:collapse}
+.tree-floor-row td{background:rgba(0,212,255,.06);padding:7px 12px;
+  font-size:.75rem;font-weight:700;color:var(--cyan);letter-spacing:.05em;
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);cursor:pointer}
+.tree-area-row td{padding:6px 14px;font-size:.73rem;color:var(--text);
+  border-bottom:1px solid rgba(12,40,64,.5);background:rgba(4,17,31,.5)}
+.tree-area-row td:first-child{padding-left:28px;color:var(--text-hi);font-weight:600}
+.tree-detail-row td{padding:5px 14px;font-size:.71rem;color:var(--text-dim);
+  border-bottom:1px solid rgba(12,40,64,.3)}
+.tree-detail-row td:first-child{padding-left:44px}
+.tree-detail-row:hover td{background:rgba(0,212,255,.04);color:var(--text)}
+.tree-detail-row.inactive td{opacity:.45}
+.badge{display:inline-block;padding:1px 7px;border-radius:8px;font-size:.62rem;
+  font-weight:700;margin-left:6px}
+.badge-on{background:rgba(0,255,157,.1);color:var(--green);border:1px solid rgba(0,255,157,.3)}
+.badge-off{background:rgba(255,59,59,.08);color:var(--red);border:1px solid rgba(255,59,59,.3)}
+.act-btn{background:none;border:1px solid var(--border);color:var(--text-dim);
+  padding:2px 8px;border-radius:2px;cursor:pointer;font-size:.65rem;
+  font-family:var(--font-head);letter-spacing:.04em;transition:all .2s;margin-left:4px}
+.act-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.act-btn.danger:hover{border-color:var(--red);color:var(--red)}
+.add-sub{background:none;border:1px dashed var(--border);color:var(--text-dim);
+  padding:2px 8px;border-radius:2px;cursor:pointer;font-size:.63rem;margin-left:6px;
+  transition:all .2s}
+.add-sub:hover{border-color:var(--cyan);color:var(--cyan)}
+.collapsed .tree-area-row,.collapsed .tree-detail-row{display:none}
+
+/* DEPARTMENT TREE */
+.dept-tree{list-style:none;padding:0}
+.dept-item{margin-bottom:2px}
+.dept-row{display:flex;align-items:center;gap:8px;padding:7px 12px;
+  background:var(--panel);border:1px solid var(--border);border-radius:2px;cursor:pointer;
+  transition:border-color .2s}
+.dept-row:hover{border-color:var(--border-hi)}
+.dept-name{font-size:.8rem;color:var(--text-hi);flex:1}
+.dept-code{font-size:.63rem;color:var(--text-dim);font-family:var(--font-mono)}
+.dept-lvl{font-size:.63rem;color:var(--text-dim)}
+.dept-children{list-style:none;padding:0;margin:2px 0 2px 20px}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(1,5,15,.85);z-index:200;
+  display:none;align-items:center;justify-content:center;padding:16px}
+.modal-bg.show{display:flex}
+.modal{background:var(--panel);border:1px solid var(--border-hi);border-radius:4px;
+  padding:20px;width:100%;max-width:420px;position:relative}
+.modal::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--cyan),var(--blue));border-radius:4px 4px 0 0}
+.modal-title{font-size:1rem;font-weight:700;color:var(--cyan);font-family:var(--font-head);
+  letter-spacing:.05em;margin-bottom:16px}
+.modal-close{position:absolute;top:14px;right:14px;background:none;border:none;
+  color:var(--text-dim);cursor:pointer;font-size:1.1rem;transition:color .2s}
+.modal-close:hover{color:var(--text)}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:.68rem;color:var(--text-dim);margin-bottom:5px;
+  font-family:var(--font-head);letter-spacing:.04em;text-transform:uppercase}
+.field input,.field select,.field textarea{width:100%;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:2px;
+  font-size:.8rem;font-family:'Noto Sans TC',sans-serif;outline:none;transition:border-color .2s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--cyan)}
+.field select option{background:var(--surface)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn-primary{width:100%;padding:10px;background:rgba(0,212,255,.12);border:1px solid var(--cyan);
+  color:var(--cyan);border-radius:2px;cursor:pointer;font-size:.8rem;font-family:var(--font-head);
+  letter-spacing:.06em;text-transform:uppercase;margin-top:6px;transition:all .2s}
+.btn-primary:hover{background:rgba(0,212,255,.22)}
+.btn-secondary{width:100%;padding:8px;background:none;border:1px solid var(--border);
+  color:var(--text-dim);border-radius:2px;cursor:pointer;font-size:.75rem;margin-top:6px;
+  font-family:var(--font-head);text-transform:uppercase;transition:all .2s}
+.btn-secondary:hover{border-color:var(--border-hi);color:var(--text)}
+.msg{font-size:.72rem;text-align:center;padding:4px;margin-top:6px}
+.msg.ok{color:var(--green)}.msg.err{color:var(--red)}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  background:var(--surface);border:1px solid var(--border-hi);color:var(--text);
+  padding:10px 20px;border-radius:4px;font-size:.78rem;z-index:300;
+  opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:40px;color:var(--text-dim);font-size:.8rem}
+</style>
+</head>
+<body>
+<nav class="navbar">
+  <div>
+    <div class="nav-title">◈ 場域位置管理</div>
+    <div class="nav-sub">臺北農產運銷股份有限公司 第一果菜市場</div>
+  </div>
+  <div class="nav-space"></div>
+  <a href="admin.html"><button class="nav-back">← 後台</button></a>
+  <a href="app.html"><button class="nav-back">巡檢 →</button></a>
+</nav>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('loc')">◈ 位置管理</button>
+  <button class="tab-btn" onclick="switchTab('dept')">⬡ 組織架構</button>
+</div>
+
+<div class="content">
+
+  <!-- ─── Location tab ─── -->
+  <div class="tab-pane active" id="pane-loc">
+    <div class="toolbar">
+      <select id="flt-market" onchange="renderTree()">
+        <option value="">所有市場</option>
+      </select>
+      <select id="flt-floor" onchange="renderTree()">
+        <option value="">所有樓層</option>
+      </select>
+      <input id="flt-q" placeholder="搜尋位置…" oninput="renderTree()" style="width:150px">
+      <div class="t-space"></div>
+      <button class="btn-add" onclick="openAddModal()">＋ 新增位置</button>
+    </div>
+
+    <div class="stats-row" id="stats-row">
+      <div class="stat-card"><div class="stat-n" id="sn-mkt">—</div><div class="stat-l">市場</div></div>
+      <div class="stat-card"><div class="stat-n" id="sn-fl">—</div><div class="stat-l">樓層</div></div>
+      <div class="stat-card"><div class="stat-n" id="sn-area">—</div><div class="stat-l">區域</div></div>
+      <div class="stat-card"><div class="stat-n" id="sn-det">—</div><div class="stat-l">細部位置</div></div>
+    </div>
+
+    <table class="tree" id="tree-table"><tbody id="tree-body">
+      <tr><td class="empty">載入中…</td></tr>
+    </tbody></table>
+  </div>
+
+  <!-- ─── Dept tab ─── -->
+  <div class="tab-pane" id="pane-dept">
+    <div class="toolbar">
+      <div class="t-space"></div>
+      <button class="btn-add" onclick="openDeptModal()">＋ 新增部門</button>
+    </div>
+    <ul class="dept-tree" id="dept-tree"><li style="padding:20px;color:var(--text-dim)">載入中…</li></ul>
+  </div>
+
+</div><!-- /content -->
+
+<!-- ─── Add/Edit Location Modal ─── -->
+<div class="modal-bg" id="loc-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('loc-modal')">✕</button>
+    <div class="modal-title" id="lm-title">新增位置</div>
+    <input type="hidden" id="lm-id">
+    <div class="field">
+      <label>市場</label>
+      <select id="lm-market" onchange="lmLoadFloors()"><option value="">選擇市場…</option></select>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>樓層代號</label>
+        <select id="lm-floor-sel" onchange="lmFloorSel()"><option value="">— 已有樓層 —</option></select>
+      </div>
+      <div class="field">
+        <label>新樓層名稱</label>
+        <input id="lm-floor" placeholder="B1 / 1F / 2F…">
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>區域</label>
+        <select id="lm-area-sel" onchange="lmAreaSel()"><option value="">— 已有區域 —</option></select>
+      </div>
+      <div class="field">
+        <label>新區域名稱</label>
+        <input id="lm-area" placeholder="配電室 / 蔬菜零批場…">
+      </div>
+    </div>
+    <div class="field">
+      <label>細部位置（留空 = 僅新增區域）</label>
+      <input id="lm-detail" placeholder="高壓盤區 / A區…">
+    </div>
+    <div class="field">
+      <label>排序</label>
+      <input id="lm-order" type="number" value="0" min="0" style="width:80px">
+    </div>
+    <div id="lm-msg" class="msg"></div>
+    <button class="btn-primary" onclick="saveLocation()">儲存</button>
+    <button class="btn-secondary" onclick="closeModal('loc-modal')">取消</button>
+  </div>
+</div>
+
+<!-- ─── Add/Edit Dept Modal ─── -->
+<div class="modal-bg" id="dept-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('dept-modal')">✕</button>
+    <div class="modal-title" id="dm-title">新增部門</div>
+    <input type="hidden" id="dm-id">
+    <div class="field">
+      <label>上層部門（頂層請留空）</label>
+      <select id="dm-parent"><option value="">（頂層）</option></select>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>部門名稱</label>
+        <input id="dm-name" placeholder="例：總務課">
+      </div>
+      <div class="field">
+        <label>代碼</label>
+        <input id="dm-code" placeholder="MGMT-GEN">
+      </div>
+    </div>
+    <div class="field">
+      <label>排序</label>
+      <input id="dm-order" type="number" value="0" min="0" style="width:80px">
+    </div>
+    <div id="dm-msg" class="msg"></div>
+    <button class="btn-primary" onclick="saveDept()">儲存</button>
+    <button class="btn-secondary" onclick="closeModal('dept-modal')">取消</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';
+const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
+const db=supabase.createClient(SUPA_URL,SUPA_KEY);
+
+// ─── State ───
+let allLocs=[], allMkts=[], allDepts=[];
+
+// ─── Init ────────────────────────────────────────────────────
+async function init(){
+  await Promise.all([loadMarkets(), loadLocations(), loadDepts()]);
+  buildMarketFilter();
+  renderTree();
+  renderDeptTree();
+}
+
+async function loadMarkets(){
+  const {data}=await db.from('markets').select('*').order('sort_order');
+  allMkts=data||[];
+}
+async function loadLocations(){
+  const {data}=await db.from('locations').select('*').order('floor_order').order('area_order').order('detail_order');
+  allLocs=data||[];
+}
+async function loadDepts(){
+  const {data}=await db.from('departments').select('*').order('sort_order');
+  allDepts=data||[];
+}
+
+// ─── Market filter select ────────────────────────────────────
+function buildMarketFilter(){
+  const sel=document.getElementById('flt-market');
+  sel.innerHTML='<option value="">所有市場</option>';
+  allMkts.forEach(m=>{
+    const o=document.createElement('option');
+    o.value=m.market_id; o.textContent=m.name; sel.appendChild(o);
+  });
+  // populate modal market select
+  const ms=document.getElementById('lm-market');
+  ms.innerHTML='<option value="">選擇市場…</option>';
+  allMkts.forEach(m=>{
+    const o=document.createElement('option');
+    o.value=m.market_id; o.textContent=m.name; ms.appendChild(o);
+  });
+}
+
+// ─── Location Tree Render ────────────────────────────────────
+function renderTree(){
+  const mktF=document.getElementById('flt-market').value;
+  const flF=document.getElementById('flt-floor').value;
+  const q=(document.getElementById('flt-q').value||'').trim().toLowerCase();
+
+  let rows=allLocs.filter(r=>(!mktF||r.market_id===mktF)&&(!flF||r.floor===flF));
+  if(q) rows=rows.filter(r=>(r.area+r.detail).toLowerCase().includes(q));
+
+  // Update floor filter options
+  const flSel=document.getElementById('flt-floor');
+  const curFl=flSel.value;
+  flSel.innerHTML='<option value="">所有樓層</option>';
+  const floors=[...new Map(rows.map(r=>[r.market_id+'|'+r.floor, {market_id:r.market_id,floor:r.floor,floor_order:r.floor_order}])).values()];
+  floors.forEach(f=>{
+    const mkt=allMkts.find(m=>m.market_id===f.market_id);
+    const o=document.createElement('option');
+    o.value=f.floor; o.textContent=(mkt?.short_name||f.market_id)+' '+f.floor;
+    if(f.floor===curFl) o.selected=true;
+    flSel.appendChild(o);
+  });
+
+  // Stats
+  const mkts=new Set(rows.map(r=>r.market_id));
+  const fls=new Set(rows.map(r=>r.market_id+'|'+r.floor));
+  const areas=new Set(rows.map(r=>r.market_id+'|'+r.floor+'|'+r.area));
+  const dets=rows.filter(r=>r.detail!=='').length;
+  document.getElementById('sn-mkt').textContent=mkts.size;
+  document.getElementById('sn-fl').textContent=fls.size;
+  document.getElementById('sn-area').textContent=areas.size;
+  document.getElementById('sn-det').textContent=dets;
+
+  // Build tree structure
+  const tree={};
+  rows.forEach(r=>{
+    const mk=r.market_id, fl=r.floor, ar=r.area, de=r.detail||'';
+    if(!tree[mk]) tree[mk]={};
+    if(!tree[mk][fl]) tree[mk][fl]={floor_order:r.floor_order,areas:{}};
+    if(!tree[mk][fl].areas[ar]) tree[mk][fl].areas[ar]={area_order:r.area_order,details:[]};
+    if(de!=='') tree[mk][fl].areas[ar].details.push(r);
+  });
+
+  const tbody=document.getElementById('tree-body');
+  tbody.innerHTML='';
+
+  let empty=true;
+  Object.entries(tree).forEach(([mkId,floors])=>{
+    const mkt=allMkts.find(m=>m.market_id===mkId);
+    Object.entries(floors).sort((a,b)=>a[1].floor_order-b[1].floor_order).forEach(([fl,flData])=>{
+      empty=false;
+      const flKey=mkId+'_'+fl;
+      // Floor header row
+      const flTr=document.createElement('tr');
+      flTr.className='tree-floor-row';
+      flTr.dataset.key=flKey;
+      flTr.onclick=()=>flTr.parentElement.querySelectorAll(`[data-floor="${flKey}"]`).forEach(el=>el.classList.toggle('row-hidden'));
+      flTr.innerHTML=`<td colspan="4">
+        ▼ ${mkt?.name||mkId} / ${fl}
+        <span style="font-size:.62rem;color:var(--text-dim);font-weight:400;margin-left:8px">
+          ${Object.keys(flData.areas).length} 個區域
+        </span>
+        <button class="add-sub" onclick="event.stopPropagation();openAddModal('${mkId}','${fl}')">＋ 新增區域</button>
+      </td>`;
+      tbody.appendChild(flTr);
+
+      // Area and detail rows
+      Object.entries(flData.areas).sort((a,b)=>a[1].area_order-b[1].area_order).forEach(([area,aData])=>{
+        const aTr=document.createElement('tr');
+        aTr.className='tree-area-row'; aTr.dataset.floor=flKey;
+        aTr.innerHTML=`
+          <td colspan="3">${area}
+            <span style="font-size:.62rem;color:var(--text-dim);margin-left:6px">${aData.details.length} 個細部位置</span>
+            <button class="add-sub" onclick="openAddModal('${mkId}','${fl}','${area.replace(/'/g,"\\'")}')">＋ 新增細部</button>
+          </td>
+          <td></td>`;
+        tbody.appendChild(aTr);
+
+        aData.details.forEach(loc=>{
+          const dTr=document.createElement('tr');
+          dTr.className='tree-detail-row'+(loc.status==='inactive'?' inactive':'');
+          dTr.dataset.floor=flKey;
+          dTr.innerHTML=`
+            <td>${loc.detail}
+              <span class="badge ${loc.status==='active'?'badge-on':'badge-off'}">${loc.status==='active'?'啟用':'停用'}</span>
+            </td>
+            <td style="font-size:.62rem;color:var(--text-dim);font-family:var(--font-mono)">${loc.location_id.substring(0,8)}…</td>
+            <td></td>
+            <td style="white-space:nowrap">
+              <button class="act-btn" onclick="openEditModal('${loc.location_id}')">✎ 編輯</button>
+              <button class="act-btn ${loc.status==='active'?'danger':''}" onclick="toggleLoc('${loc.location_id}','${loc.status}')">
+                ${loc.status==='active'?'⊘ 停用':'● 啟用'}
+              </button>
+            </td>`;
+          tbody.appendChild(dTr);
+        });
+      });
+    });
+  });
+  if(empty){
+    tbody.innerHTML='<tr><td colspan="4" class="empty">尚無位置資料<br><small>請先在 Supabase SQL Editor 執行 locations_schema.sql</small></td></tr>';
+  }
+}
+
+// ─── Location CRUD ────────────────────────────────────────────
+function openAddModal(market='',floor='',area=''){
+  document.getElementById('lm-id').value='';
+  document.getElementById('lm-title').textContent='新增位置';
+  document.getElementById('lm-market').value=market;
+  document.getElementById('lm-floor').value=floor;
+  document.getElementById('lm-area').value=area;
+  document.getElementById('lm-detail').value='';
+  document.getElementById('lm-order').value='0';
+  document.getElementById('lm-msg').textContent='';
+  if(market) lmLoadFloors().then(()=>{
+    document.getElementById('lm-floor-sel').value=floor||'';
+    if(floor) lmLoadAreas().then(()=>{
+      document.getElementById('lm-area-sel').value=area||'';
+    });
+  });
+  document.getElementById('loc-modal').classList.add('show');
+}
+
+function openEditModal(id){
+  const loc=allLocs.find(l=>l.location_id===id);
+  if(!loc) return;
+  document.getElementById('lm-id').value=id;
+  document.getElementById('lm-title').textContent='編輯位置';
+  document.getElementById('lm-market').value=loc.market_id;
+  document.getElementById('lm-floor').value=loc.floor;
+  document.getElementById('lm-area').value=loc.area;
+  document.getElementById('lm-detail').value=loc.detail;
+  document.getElementById('lm-order').value=loc.detail_order;
+  document.getElementById('lm-msg').textContent='';
+  document.getElementById('loc-modal').classList.add('show');
+}
+
+async function lmLoadFloors(){
+  const market=document.getElementById('lm-market').value;
+  const sel=document.getElementById('lm-floor-sel');
+  sel.innerHTML='<option value="">— 已有樓層 —</option>';
+  if(!market) return;
+  const floors=[...new Map(allLocs.filter(l=>l.market_id===market).map(l=>[l.floor,{floor:l.floor,order:l.floor_order}])).values()].sort((a,b)=>a.order-b.order);
+  floors.forEach(f=>sel.appendChild(Object.assign(document.createElement('option'),{value:f.floor,textContent:f.floor})));
+  await lmLoadAreas();
+}
+function lmFloorSel(){
+  const v=document.getElementById('lm-floor-sel').value;
+  if(v) document.getElementById('lm-floor').value=v;
+  lmLoadAreas();
+}
+async function lmLoadAreas(){
+  const market=document.getElementById('lm-market').value;
+  const floor=document.getElementById('lm-floor-sel').value||document.getElementById('lm-floor').value;
+  const sel=document.getElementById('lm-area-sel');
+  sel.innerHTML='<option value="">— 已有區域 —</option>';
+  if(!market||!floor) return;
+  const areas=[...new Map(allLocs.filter(l=>l.market_id===market&&l.floor===floor).map(l=>[l.area,{area:l.area,order:l.area_order}])).values()].sort((a,b)=>a.order-b.order);
+  areas.forEach(a=>sel.appendChild(Object.assign(document.createElement('option'),{value:a.area,textContent:a.area})));
+}
+function lmAreaSel(){
+  const v=document.getElementById('lm-area-sel').value;
+  if(v) document.getElementById('lm-area').value=v;
+}
+
+async function saveLocation(){
+  const id=document.getElementById('lm-id').value;
+  const market=document.getElementById('lm-market').value;
+  const floor=document.getElementById('lm-floor').value.trim();
+  const area=document.getElementById('lm-area').value.trim();
+  const detail=document.getElementById('lm-detail').value.trim();
+  const order=parseInt(document.getElementById('lm-order').value)||0;
+  const msg=document.getElementById('lm-msg');
+
+  if(!market||!floor||!area){msg.textContent='請填寫市場、樓層、區域';msg.className='msg err';return;}
+
+  const payload={market_id:market,floor,floor_order:order,area,area_order:order,detail,detail_order:order};
+  let err;
+  if(id){
+    ({error:err}=await db.from('locations').update(payload).eq('location_id',id));
+  } else {
+    ({error:err}=await db.from('locations').insert(payload));
+  }
+  if(err){msg.textContent='錯誤：'+err.message;msg.className='msg err';return;}
+  msg.textContent='已儲存';msg.className='msg ok';
+  await loadLocations(); renderTree();
+  setTimeout(()=>closeModal('loc-modal'),800);
+  toast(id?'已更新位置':'已新增位置');
+}
+
+async function toggleLoc(id,cur){
+  const nxt=cur==='active'?'inactive':'active';
+  const {error}=await db.from('locations').update({status:nxt}).eq('location_id',id);
+  if(error){toast('操作失敗：'+error.message,true);return;}
+  await loadLocations(); renderTree();
+  toast(nxt==='active'?'已啟用':'已停用');
+}
+
+// ─── Department Tree ──────────────────────────────────────────
+function renderDeptTree(){
+  const root=allDepts.filter(d=>!d.parent_id).sort((a,b)=>a.sort_order-b.sort_order);
+  const container=document.getElementById('dept-tree');
+  container.innerHTML='';
+  root.forEach(d=>container.appendChild(buildDeptNode(d)));
+  // Populate modal parent select
+  const ps=document.getElementById('dm-parent');
+  ps.innerHTML='<option value="">（頂層）</option>';
+  allDepts.filter(d=>d.level===1).forEach(d=>{
+    ps.appendChild(Object.assign(document.createElement('option'),{value:d.dept_id,textContent:d.name}));
+  });
+}
+
+function buildDeptNode(dept){
+  const li=document.createElement('li');
+  li.className='dept-item';
+  const children=allDepts.filter(d=>d.parent_id===dept.dept_id).sort((a,b)=>a.sort_order-b.sort_order);
+  li.innerHTML=`
+    <div class="dept-row" style="margin-left:${(dept.level-1)*16}px">
+      <div class="dept-name">${dept.name}</div>
+      <div class="dept-code">${dept.code||''}</div>
+      <div class="dept-lvl">Lv${dept.level}</div>
+      <span class="badge ${dept.status==='active'?'badge-on':'badge-off'}">${dept.status==='active'?'啟用':'停用'}</span>
+      <button class="act-btn" onclick="openEditDept('${dept.dept_id}')">✎</button>
+      <button class="act-btn ${dept.status==='active'?'danger':''}" onclick="toggleDept('${dept.dept_id}','${dept.status}')">
+        ${dept.status==='active'?'⊘':'●'}
+      </button>
+    </div>`;
+  if(children.length){
+    const ul=document.createElement('ul');ul.className='dept-children';
+    children.forEach(c=>ul.appendChild(buildDeptNode(c)));
+    li.appendChild(ul);
+  }
+  return li;
+}
+
+function openDeptModal(){
+  document.getElementById('dm-id').value='';
+  document.getElementById('dm-title').textContent='新增部門';
+  document.getElementById('dm-name').value='';
+  document.getElementById('dm-code').value='';
+  document.getElementById('dm-order').value='0';
+  document.getElementById('dm-msg').textContent='';
+  document.getElementById('dept-modal').classList.add('show');
+}
+function openEditDept(id){
+  const d=allDepts.find(x=>x.dept_id===id);if(!d) return;
+  document.getElementById('dm-id').value=id;
+  document.getElementById('dm-title').textContent='編輯部門';
+  document.getElementById('dm-parent').value=d.parent_id||'';
+  document.getElementById('dm-name').value=d.name;
+  document.getElementById('dm-code').value=d.code||'';
+  document.getElementById('dm-order').value=d.sort_order||0;
+  document.getElementById('dm-msg').textContent='';
+  document.getElementById('dept-modal').classList.add('show');
+}
+
+async function saveDept(){
+  const id=document.getElementById('dm-id').value;
+  const name=document.getElementById('dm-name').value.trim();
+  const code=document.getElementById('dm-code').value.trim()||null;
+  const parent=document.getElementById('dm-parent').value||null;
+  const order=parseInt(document.getElementById('dm-order').value)||0;
+  const msg=document.getElementById('dm-msg');
+  if(!name){msg.textContent='請填寫部門名稱';msg.className='msg err';return;}
+  const level=parent?(allDepts.find(d=>d.dept_id===parent)?.level||1)+1:1;
+  const payload={name,code,parent_id:parent,level,sort_order:order};
+  let err;
+  if(id){({error:err}=await db.from('departments').update(payload).eq('dept_id',id));}
+  else{({error:err}=await db.from('departments').insert(payload));}
+  if(err){msg.textContent='錯誤：'+err.message;msg.className='msg err';return;}
+  msg.textContent='已儲存';msg.className='msg ok';
+  await loadDepts(); renderDeptTree();
+  setTimeout(()=>closeModal('dept-modal'),800);
+  toast(id?'已更新部門':'已新增部門');
+}
+
+async function toggleDept(id,cur){
+  const nxt=cur==='active'?'inactive':'active';
+  const {error}=await db.from('departments').update({status:nxt}).eq('dept_id',id);
+  if(error){toast('操作失敗',true);return;}
+  await loadDepts(); renderDeptTree();
+  toast(nxt==='active'?'已啟用':'已停用');
+}
+
+// ─── UI helpers ───────────────────────────────────────────────
+function switchTab(t){
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['loc','dept'][i]===t));
+  document.querySelectorAll('.tab-pane').forEach((p,i)=>p.classList.toggle('active',['pane-loc','pane-dept'][i]==='pane-'+t));
+}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+
+let _toastTimer;
+function toast(msg,err=false){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.style.borderColor=err?'var(--red)':'var(--border-hi)';
+  el.style.color=err?'var(--red)':'var(--text)';
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(()=>el.classList.remove('show'),2500);
+}
+
+// ─── Start ────────────────────────────────────────────────────
+init().catch(e=>{document.getElementById('tree-body').innerHTML=`<tr><td colspan="4" class="empty" style="color:var(--red)">載入失敗：${e.message}</td></tr>`;});
+</script>
+</body>
+</html>
