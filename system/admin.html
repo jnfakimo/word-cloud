@@ -521,6 +521,7 @@ body{
       <div class="nav-item" data-page="costs"><span class="nav-icon">◬</span> 費用統計</div>
       <div class="nav-item" data-page="audit"><span class="nav-icon">◭</span> 稽核記錄</div>
       <div class="nav-item" data-page="cycles"><span class="nav-icon">↻</span> 巡檢週期</div>
+      <div class="nav-item" data-page="locanalysis"><span class="nav-icon">⊞</span> 位置分析</div>
       <a href="locations.html" style="display:flex;align-items:center;gap:10px;padding:11px 22px;color:var(--text-dim);text-decoration:none;font-size:.88rem;letter-spacing:.04em;transition:color .2s" onmouseover="this.style.color='var(--cyan)'" onmouseout="this.style.color='var(--text-dim)'"><span class="nav-icon">⊕</span> 場域位置管理</a>
     </nav>
     <div class="sidebar-footer">
@@ -752,6 +753,65 @@ body{
       </div>
     </div>
 
+    <!-- LOCATION ANALYSIS -->
+    <div class="page-section" id="page-locanalysis">
+      <div class="page-header" style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px">
+        <div>
+          <h2>⊞ 位置分析</h2>
+          <p>LOCATION DRILL-DOWN — 場域異常 &amp; 報修樞紐統計</p>
+        </div>
+        <button onclick="loadLocationAnalysis()" style="flex-shrink:0;padding:7px 16px;background:rgba(0,212,255,0.08);border:1px solid var(--border-hi);color:var(--cyan);font-family:var(--font-head);letter-spacing:.08em;text-transform:uppercase;cursor:pointer;border-radius:2px;font-size:0.75rem;font-weight:700;transition:all .2s" onmouseover="this.style.boxShadow='var(--cyan-glow)'" onmouseout="this.style.boxShadow='none'">↻ 重新整理</button>
+      </div>
+
+      <!-- Filter bar -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
+        <select id="laMarketFilter" onchange="renderLocAnalysis()" style="padding:8px 12px;background:rgba(2,8,20,.85);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-family:var(--font-mono);font-size:.82rem;outline:none">
+          <option value="">全部市場</option>
+        </select>
+        <select id="laFloorFilter" onchange="renderLocAnalysis()" style="padding:8px 12px;background:rgba(2,8,20,.85);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-family:var(--font-mono);font-size:.82rem;outline:none" disabled>
+          <option value="">全部樓層</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--text-dim);font-family:var(--font-mono);cursor:pointer">
+          <input type="checkbox" id="laHideZero" onchange="renderLocAnalysis()" style="accent-color:var(--cyan)"> 隱藏零筆紀錄
+        </label>
+        <span id="laUpdated" style="margin-left:auto;font-size:.72rem;color:var(--text-dim);font-family:var(--font-mono)"></span>
+      </div>
+
+      <!-- Summary cards -->
+      <div class="stats-grid" style="margin-bottom:16px">
+        <div class="stat-card"><div class="stat-val" id="la-total-insp">—</div><div class="stat-label">綁定位置巡檢</div></div>
+        <div class="stat-card" style="--card-color:var(--red)"><div class="stat-val" id="la-total-abn" style="color:var(--red);text-shadow:0 0 14px rgba(255,59,59,.5)">—</div><div class="stat-label">異常次數</div></div>
+        <div class="stat-card"><div class="stat-val" id="la-total-repair">—</div><div class="stat-label">綁定位置報修</div></div>
+        <div class="stat-card"><div class="stat-val" id="la-abn-rate">—</div><div class="stat-label">整體異常率</div></div>
+      </div>
+
+      <!-- Pivot table -->
+      <div class="panel">
+        <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>場域位置統計</span>
+          <span style="font-size:.72rem;font-family:var(--font-mono);color:var(--text-dim)">點擊市場/樓層列可收合展開</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table" id="laTable">
+            <thead>
+              <tr>
+                <th style="min-width:160px">市場</th>
+                <th style="min-width:60px">樓層</th>
+                <th style="min-width:120px">區域</th>
+                <th style="min-width:60px">細部位置</th>
+                <th style="text-align:right;min-width:70px">巡檢</th>
+                <th style="text-align:right;min-width:70px">異常</th>
+                <th style="text-align:right;min-width:70px">異常率</th>
+                <th style="text-align:right;min-width:70px">報修</th>
+                <th style="min-width:110px">最近巡檢</th>
+              </tr>
+            </thead>
+            <tbody id="laTbody"><tr><td colspan="9" style="color:var(--text-dim);font-family:var(--font-mono)">LOADING…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -855,6 +915,7 @@ function setupNav() {
       else if (page === 'costs') { populateEqFilter('costEqFilter'); loadCostAdmin(); loadCostByEq(); }
       else if (page === 'audit') loadAudit();
       else if (page === 'cycles') loadCycles();
+      else if (page === 'locanalysis') loadLocationAnalysis();
       else if (page === 'dashboard') loadDashboard();
     });
   });
@@ -1192,6 +1253,200 @@ async function writeAudit(table, recordId, action, before, after) {
   if (!currentUser) return;
   await db.from('audit_logs').insert({ table_name: table, record_id: String(recordId), action, changes: { before, after }, operator_id: currentUser.user_id });
 }
+
+// ── Location Analysis (Pivot Drill-Down) ─────────────────────────────────────
+let _laInsp = [], _laRepair = [], _laCollapsed = new Set();
+
+async function loadLocationAnalysis() {
+  document.getElementById('laTbody').innerHTML = '<tr><td colspan="9" style="color:var(--text-dim);font-family:var(--font-mono)">LOADING…</td></tr>';
+  const [{ data: insp }, { data: repair }] = await Promise.all([
+    db.from('inspection_records')
+      .select('location_id,run_status,inspect_time,locations(market_id,floor,floor_order,area,area_order,detail,detail_order,markets(name))')
+      .not('location_id', 'is', null),
+    db.from('repair_requests')
+      .select('location_id,locations(market_id,floor,floor_order,area,area_order,detail,markets(name))')
+      .not('location_id', 'is', null)
+  ]);
+  _laInsp   = insp   || [];
+  _laRepair = repair || [];
+  document.getElementById('laUpdated').textContent = '更新：' + new Date().toLocaleTimeString('zh-TW');
+
+  // Populate market filter
+  const markets = [...new Map(_laInsp.concat(_laRepair)
+    .filter(r => r.locations?.markets)
+    .map(r => [r.locations.market_id, r.locations.markets.name])).entries()];
+  const mSel = document.getElementById('laMarketFilter');
+  const curM = mSel.value;
+  mSel.innerHTML = '<option value="">全部市場</option>' +
+    markets.map(([id, name]) => `<option value="${id}" ${id === curM ? 'selected' : ''}>${name}</option>`).join('');
+
+  renderLocAnalysis();
+}
+
+function renderLocAnalysis() {
+  const mFilter = document.getElementById('laMarketFilter').value;
+  const fFilter = document.getElementById('laFloorFilter').value;
+  const hideZero = document.getElementById('laHideZero').checked;
+
+  // Update floor filter options when market changes
+  const fSel = document.getElementById('laFloorFilter');
+  const curF = fSel.value;
+  if (mFilter) {
+    const floors = [...new Map(_laInsp.concat(_laRepair)
+      .filter(r => r.locations?.market_id === mFilter)
+      .map(r => [r.locations.floor, r.locations.floor_order])).entries()]
+      .sort((a,b) => a[1]-b[1]);
+    fSel.innerHTML = '<option value="">全部樓層</option>' +
+      floors.map(([f]) => `<option value="${f}" ${f === curF ? 'selected' : ''}>${f}</option>`).join('');
+    fSel.disabled = false;
+  } else {
+    fSel.innerHTML = '<option value="">全部樓層</option>';
+    fSel.disabled = true;
+  }
+
+  // Filter records
+  const inspF = _laInsp.filter(r => {
+    const l = r.locations;
+    if (!l) return false;
+    if (mFilter && l.market_id !== mFilter) return false;
+    if (fFilter && l.floor !== fFilter) return false;
+    return true;
+  });
+  const repF = _laRepair.filter(r => {
+    const l = r.locations;
+    if (!l) return false;
+    if (mFilter && l.market_id !== mFilter) return false;
+    if (fFilter && l.floor !== fFilter) return false;
+    return true;
+  });
+
+  // Build tree: market → floor → area → detail
+  const tree = {};
+  const addRow = (l, isInsp, isAbn, time) => {
+    const mk = l.market_id, fl = l.floor, ar = l.area, dt = l.detail || '';
+    if (!tree[mk]) tree[mk] = { name: l.markets?.name || mk, floorOrder: {}, floors: {} };
+    const mNode = tree[mk];
+    if (!mNode.floors[fl]) { mNode.floors[fl] = { areas: {} }; mNode.floorOrder[fl] = l.floor_order || 0; }
+    const fNode = mNode.floors[fl];
+    if (!fNode.areas[ar]) fNode.areas[ar] = { areaOrder: l.area_order || 0, details: {} };
+    const aNode = fNode.areas[ar];
+    if (!aNode.details[dt]) aNode.details[dt] = { detailOrder: l.detail_order || 0, insp:0, abn:0, repair:0, lastTime:null };
+    const dNode = aNode.details[dt];
+    if (isInsp) { dNode.insp++; if (isAbn) dNode.abn++; if (time && (!dNode.lastTime || time > dNode.lastTime)) dNode.lastTime = time; }
+    else dNode.repair++;
+  };
+  inspF.forEach(r => addRow(r.locations, true, r.run_status === 'abnormal', r.inspect_time));
+  repF.forEach(r => addRow(r.locations, false, false, null));
+
+  // Summary totals
+  let totalInsp = 0, totalAbn = 0, totalRepair = 0;
+  inspF.forEach(r => { totalInsp++; if (r.run_status === 'abnormal') totalAbn++; });
+  totalRepair = repF.length;
+  document.getElementById('la-total-insp').textContent   = totalInsp;
+  document.getElementById('la-total-abn').textContent    = totalAbn;
+  document.getElementById('la-total-repair').textContent = totalRepair;
+  document.getElementById('la-abn-rate').textContent     = totalInsp ? (totalAbn/totalInsp*100).toFixed(1) + '%' : '—';
+
+  // Render rows
+  const rows = [];
+  const sortedMarkets = Object.entries(tree).sort((a,b) => a[0].localeCompare(b[0]));
+  for (const [mk, mNode] of sortedMarkets) {
+    const mkKey = mk;
+    const mkCollapsed = _laCollapsed.has(mkKey);
+    // Market subtotals
+    let mkInsp=0, mkAbn=0, mkRepair=0;
+    Object.values(mNode.floors).forEach(fn => Object.values(fn.areas).forEach(an =>
+      Object.values(an.details).forEach(dn => { mkInsp+=dn.insp; mkAbn+=dn.abn; mkRepair+=dn.repair; })));
+    if (hideZero && mkInsp+mkRepair === 0) continue;
+    rows.push(`<tr class="la-market-row" onclick="laToggle('${mkKey}')" style="cursor:pointer;background:rgba(0,212,255,0.06);border-top:1px solid var(--border-hi)">
+      <td colspan="4" style="font-family:var(--font-head);font-size:.85rem;color:var(--cyan);letter-spacing:.06em;padding-left:12px">
+        <span style="margin-right:6px">${mkCollapsed ? '▶' : '▼'}</span>${mNode.name}
+      </td>
+      <td style="text-align:right;font-family:var(--font-mono)">${mkInsp||'—'}</td>
+      <td style="text-align:right;font-family:var(--font-mono);color:${mkAbn?'var(--red)':'inherit'}">${mkAbn||'—'}</td>
+      <td style="text-align:right;font-family:var(--font-mono);color:${mkAbn?'var(--red)':'var(--text-dim)'}">${mkInsp?(mkAbn/mkInsp*100).toFixed(1)+'%':'—'}</td>
+      <td style="text-align:right;font-family:var(--font-mono)">${mkRepair||'—'}</td>
+      <td></td>
+    </tr>`);
+    if (mkCollapsed) continue;
+
+    const sortedFloors = Object.entries(mNode.floors).sort((a,b) => (mNode.floorOrder[a[0]]||0)-(mNode.floorOrder[b[0]]||0));
+    for (const [fl, fNode] of sortedFloors) {
+      const flKey = mk + '|' + fl;
+      const flCollapsed = _laCollapsed.has(flKey);
+      let flInsp=0, flAbn=0, flRepair=0;
+      Object.values(fNode.areas).forEach(an => Object.values(an.details).forEach(dn => { flInsp+=dn.insp; flAbn+=dn.abn; flRepair+=dn.repair; }));
+      if (hideZero && flInsp+flRepair === 0) continue;
+      rows.push(`<tr class="la-floor-row" onclick="laToggle('${flKey}')" style="cursor:pointer;background:rgba(0,212,255,0.03)">
+        <td style="padding-left:22px;color:var(--text-dim);font-family:var(--font-mono);font-size:.8rem">
+          <span style="margin-right:6px">${flCollapsed ? '▶' : '▼'}</span>
+        </td>
+        <td style="font-family:var(--font-head);font-size:.82rem;color:var(--text-hi);letter-spacing:.04em">${fl}</td>
+        <td colspan="2" style="color:var(--text-dim);font-size:.78rem;font-family:var(--font-mono)">小計</td>
+        <td style="text-align:right;font-family:var(--font-mono)">${flInsp||'—'}</td>
+        <td style="text-align:right;font-family:var(--font-mono);color:${flAbn?'var(--red)':'inherit'}">${flAbn||'—'}</td>
+        <td style="text-align:right;font-family:var(--font-mono);color:${flAbn?'var(--red)':'var(--text-dim)'}">${flInsp?(flAbn/flInsp*100).toFixed(1)+'%':'—'}</td>
+        <td style="text-align:right;font-family:var(--font-mono)">${flRepair||'—'}</td>
+        <td></td>
+      </tr>`);
+      if (flCollapsed) continue;
+
+      const sortedAreas = Object.entries(fNode.areas).sort((a,b) => a[1].areaOrder - b[1].areaOrder);
+      for (const [ar, aNode] of sortedAreas) {
+        const sortedDetails = Object.entries(aNode.details).sort((a,b) => a[1].detailOrder - b[1].detailOrder);
+        let arInsp=0, arAbn=0, arRepair=0, arLast=null;
+        sortedDetails.forEach(([,dn]) => { arInsp+=dn.insp; arAbn+=dn.abn; arRepair+=dn.repair; if (dn.lastTime&&(!arLast||dn.lastTime>arLast)) arLast=dn.lastTime; });
+        if (hideZero && arInsp+arRepair === 0) continue;
+
+        if (sortedDetails.length === 1 && !sortedDetails[0][0]) {
+          // Area-level only (no detail)
+          rows.push(areaRow(ar, '', arInsp, arAbn, arRepair, arLast, false));
+        } else {
+          // Area header row
+          rows.push(areaRow(ar, '（小計）', arInsp, arAbn, arRepair, arLast, true));
+          for (const [dt, dn] of sortedDetails) {
+            if (!dt) continue;
+            if (hideZero && dn.insp+dn.repair === 0) continue;
+            rows.push(`<tr>
+              <td></td><td></td>
+              <td style="padding-left:8px;font-size:.78rem;color:var(--text-dim)">${ar}</td>
+              <td style="font-size:.82rem;color:var(--text-hi)">${dt}</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:.82rem">${dn.insp||'—'}</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:.82rem;color:${dn.abn?'var(--red)':'inherit'}">${dn.abn||'—'}</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:.78rem;color:${dn.abn?'var(--red)':'var(--text-dim)'}">${dn.insp?(dn.abn/dn.insp*100).toFixed(1)+'%':'—'}</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-size:.82rem">${dn.repair||'—'}</td>
+              <td style="font-family:var(--font-mono);font-size:.72rem;color:var(--text-dim)">${dn.lastTime ? new Date(dn.lastTime).toLocaleDateString('zh-TW') : '—'}</td>
+            </tr>`);
+          }
+        }
+      }
+    }
+  }
+
+  document.getElementById('laTbody').innerHTML = rows.length
+    ? rows.join('')
+    : '<tr><td colspan="9" style="color:var(--text-dim);font-family:var(--font-mono);text-align:center;padding:24px">無綁定位置資料</td></tr>';
+}
+
+function areaRow(ar, suffix, insp, abn, repair, lastTime, isHeader) {
+  const style = isHeader ? 'background:rgba(255,255,255,0.02)' : '';
+  return `<tr style="${style}">
+    <td></td><td></td>
+    <td style="font-size:.85rem;color:${isHeader ? 'var(--text-hi)' : 'var(--text-hi)'};padding-left:4px">${ar} <span style="color:var(--text-dim);font-size:.72rem">${suffix}</span></td>
+    <td style="color:var(--text-dim);font-size:.78rem">—</td>
+    <td style="text-align:right;font-family:var(--font-mono)">${insp||'—'}</td>
+    <td style="text-align:right;font-family:var(--font-mono);color:${abn?'var(--red)':'inherit'}">${abn||'—'}</td>
+    <td style="text-align:right;font-family:var(--font-mono);color:${abn?'var(--red)':'var(--text-dim)'}">${insp?(abn/insp*100).toFixed(1)+'%':'—'}</td>
+    <td style="text-align:right;font-family:var(--font-mono)">${repair||'—'}</td>
+    <td style="font-family:var(--font-mono);font-size:.72rem;color:var(--text-dim)">${lastTime ? new Date(lastTime).toLocaleDateString('zh-TW') : '—'}</td>
+  </tr>`;
+}
+
+function laToggle(key) {
+  if (_laCollapsed.has(key)) _laCollapsed.delete(key); else _laCollapsed.add(key);
+  renderLocAnalysis();
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function logout() { await db.auth.signOut(); window.location.href = 'login.html'; }
 

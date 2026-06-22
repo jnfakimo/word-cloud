@@ -131,6 +131,59 @@ insert into locations (market_id,floor,floor_order,area,area_order,detail,detail
 on conflict (market_id,floor,area,detail) do nothing;
 
 -- ============================================================
+-- Seed: Locations — 第一市場 2F 二樓
+-- ============================================================
+insert into locations (market_id,floor,floor_order,area,area_order,detail,detail_order) values
+-- 蔬菜承銷區
+('market1','2F',30,'蔬菜承銷區', 10,'蔬菜理貨間',  10),
+('market1','2F',30,'蔬菜承銷區', 10,'蔬菜冷藏間',  20),
+('market1','2F',30,'蔬菜承銷區', 10,'主通道',      30),
+-- 果品承銷區
+('market1','2F',30,'果品承銷區', 20,'拍賣台區',    10),
+('market1','2F',30,'果品承銷區', 20,'作業區',      20),
+-- 物流作業區
+('market1','2F',30,'物流作業區', 30,'裝卸月台',    10),
+('market1','2F',30,'物流作業區', 30,'暫存區',      20)
+on conflict (market_id,floor,area,detail) do nothing;
+
+-- ============================================================
+-- Seed: Locations — 第一市場 3F 三樓
+-- ============================================================
+insert into locations (market_id,floor,floor_order,area,area_order,detail,detail_order) values
+-- 花卉交易區
+('market1','3F',40,'花卉交易區',   10,'花卉冷藏間',  10),
+('market1','3F',40,'花卉交易區',   10,'花卉交易A',   20),
+('market1','3F',40,'花卉交易區',   10,'花卉交易B',   30),
+-- 市場管理辦公
+('market1','3F',40,'市場管理辦公', 20,'主任辦公室',  10),
+('market1','3F',40,'市場管理辦公', 20,'會議室A',     20),
+('market1','3F',40,'市場管理辦公', 20,'會議室B',     30),
+-- 公共服務區
+('market1','3F',40,'公共服務區',   30,'展覽廳',      10),
+('market1','3F',40,'公共服務區',   30,'員工餐廳',    20),
+('market1','3F',40,'公共服務區',   30,'廁所',        30)
+on conflict (market_id,floor,area,detail) do nothing;
+
+-- ============================================================
+-- Seed: Locations — 第一市場 4F 四樓（機電層）
+-- ============================================================
+insert into locations (market_id,floor,floor_order,area,area_order,detail,detail_order) values
+-- 機電設備層
+('market1','4F',50,'機電設備層', 10,'主機組A',    10),
+('market1','4F',50,'機電設備層', 10,'主機組B',    20),
+('market1','4F',50,'機電設備層', 10,'控制室',     30),
+('market1','4F',50,'機電設備層', 10,'工具間',     40),
+('market1','4F',50,'機電設備層', 10,'水塔區',     50),
+('market1','4F',50,'機電設備層', 10,'AHU機組',    60),
+-- 冷凍機房
+('market1','4F',50,'冷凍機房',   20,'冷凍壓縮機', 10),
+('market1','4F',50,'冷凍機房',   20,'冷卻水塔',   20),
+-- 擴充預留區
+('market1','4F',50,'擴充預留區', 30,'預留空間A',  10),
+('market1','4F',50,'擴充預留區', 30,'預留空間B',  20)
+on conflict (market_id,floor,area,detail) do nothing;
+
+-- ============================================================
 -- Seed: Departments / Org structure
 -- ============================================================
 do $$
