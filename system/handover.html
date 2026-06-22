@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>電子交接簿 — 臺北農產</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#020b18;--surface:#04111f;--panel:#05101e;
+  --border:#0c2840;--border-hi:#1a4a70;
+  --cyan:#00d4ff;--cyan-dim:rgba(0,212,255,0.10);
+  --green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;--blue:#1a7fff;
+  --text:#a8d8f0;--text-hi:#d4eeff;--text-dim:#3a6a8a;
+  --font-mono:'Share Tech Mono',monospace;
+  --font-head:'Rajdhani',sans-serif;
+  --cyan-glow:0 0 12px rgba(0,212,255,.45);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:var(--font-mono);display:flex;flex-direction:column}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.018) 1px,transparent 1px);background-size:48px 48px;pointer-events:none}
+
+/* TOPBAR */
+.topbar{position:relative;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:44px;background:rgba(2,8,20,.95);border-bottom:1px solid var(--border-hi);flex-shrink:0}
+.topbar-left{display:flex;gap:14px;align-items:center;font-size:.72rem;letter-spacing:.08em}
+.topbar-org{color:var(--text-dim)}
+.topbar-title{color:var(--cyan);font-family:var(--font-head);font-size:.95rem;font-weight:700;letter-spacing:.1em}
+.topbar-right{display:flex;gap:10px;align-items:center;font-size:.72rem}
+.topbar-right a{color:var(--text-dim);text-decoration:none;padding:3px 8px;border:1px solid var(--border);border-radius:2px;transition:all .2s}
+.topbar-right a:hover{color:var(--cyan);border-color:var(--cyan)}
+.nav-user{color:var(--cyan);font-size:.78rem}
+.logout-btn{background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:3px 10px;cursor:pointer;font-family:var(--font-mono);font-size:.72rem;border-radius:2px;transition:all .2s}
+.logout-btn:hover{border-color:var(--red);color:var(--red)}
+.clock{color:var(--cyan);font-size:.72rem;letter-spacing:.1em;margin-left:6px}
+
+/* TABS */
+.tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);background:rgba(2,8,20,.7);flex-shrink:0;padding:0 20px}
+.tab-btn{padding:10px 20px;cursor:pointer;font-family:var(--font-head);font-size:.88rem;font-weight:700;letter-spacing:.08em;color:var(--text-dim);border:none;background:transparent;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tab-btn.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+.tab-btn:hover:not(.active){color:var(--text-hi)}
+
+/* SCROLL AREA */
+.tab-content{flex:1;overflow:hidden;position:relative}
+.tab-panel{position:absolute;inset:0;overflow-y:auto;padding:20px;display:none}
+.tab-panel.active{display:block}
+.tab-panel::-webkit-scrollbar{width:4px}
+.tab-panel::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:2px}
+
+/* PANELS */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:2px;margin-bottom:16px}
+.panel-head{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.panel-title{font-family:var(--font-head);font-size:.85rem;font-weight:700;color:var(--cyan);letter-spacing:.08em;text-transform:uppercase}
+.panel-body{padding:16px}
+
+/* FORM */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.field{margin-bottom:0}
+.field label{display:block;font-size:.72rem;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;background:rgba(2,8,20,.8);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-family:var(--font-mono);font-size:.88rem;padding:9px 12px;outline:none;transition:border .2s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--cyan);box-shadow:0 0 0 1px rgba(0,212,255,.15)}
+.field textarea{resize:vertical;min-height:72px}
+.field select option{background:var(--bg)}
+
+/* EQ STATUS CARDS */
+.eq-cards{display:flex;gap:12px;flex-wrap:wrap}
+.eq-card{flex:1;min-width:100px;padding:12px 16px;border:1px solid var(--border);border-radius:2px;text-align:center;background:rgba(2,8,20,.5)}
+.eq-val{font-family:var(--font-head);font-size:1.8rem;font-weight:700;line-height:1}
+.eq-label{font-size:.72rem;color:var(--text-dim);letter-spacing:.08em;margin-top:4px}
+
+/* DYNAMIC LIST */
+.dyn-list{margin-top:10px}
+.dyn-item{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;animation:fadeIn .2s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.dyn-item-text{flex:1;background:rgba(0,212,255,.04);border:1px solid var(--border);border-radius:2px;padding:8px 10px;font-size:.84rem;color:var(--text-hi);line-height:1.5;word-break:break-all}
+.dyn-item-text.issue{border-left:3px solid var(--red)}
+.dyn-item-text.pending{border-left:3px solid var(--amber)}
+.dyn-del{background:transparent;border:1px solid var(--border);color:var(--text-dim);width:28px;height:28px;cursor:pointer;flex-shrink:0;font-size:.9rem;border-radius:2px;transition:all .15s;margin-top:1px}
+.dyn-del:hover{border-color:var(--red);color:var(--red)}
+.add-row{display:flex;gap:8px;margin-top:8px}
+.add-input{flex:1;background:rgba(2,8,20,.8);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-family:var(--font-mono);font-size:.84rem;padding:8px 10px;outline:none;transition:border .2s}
+.add-input:focus{border-color:var(--cyan)}
+.add-btn{background:var(--cyan-dim);border:1px solid var(--cyan);color:var(--cyan);padding:8px 14px;cursor:pointer;font-family:var(--font-mono);font-size:.82rem;border-radius:2px;white-space:nowrap;transition:all .15s}
+.add-btn:hover{background:rgba(0,212,255,.18)}
+
+/* BUTTONS */
+.btn-primary{width:100%;padding:12px;background:rgba(0,212,255,.1);border:1px solid var(--cyan);color:var(--cyan);font-family:var(--font-head);font-weight:700;font-size:.92rem;letter-spacing:.1em;cursor:pointer;border-radius:2px;transition:all .2s;text-transform:uppercase;margin-top:4px}
+.btn-primary:hover{background:rgba(0,212,255,.2);box-shadow:var(--cyan-glow)}
+.btn-confirm{background:rgba(0,255,157,.08);border-color:var(--green);color:var(--green)}
+.btn-confirm:hover{background:rgba(0,255,157,.16);box-shadow:0 0 12px rgba(0,255,157,.35)}
+.btn-secondary{background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:9px 18px;cursor:pointer;font-family:var(--font-mono);font-size:.84rem;border-radius:2px;transition:all .2s}
+.btn-secondary:hover{border-color:var(--cyan);color:var(--cyan)}
+.btn-row{display:flex;gap:10px;margin-top:12px}
+.btn-row .btn-primary{flex:1}
+
+/* FILTER BAR */
+.filter-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.filter-bar select,.filter-bar input[type=date]{padding:8px 12px;background:rgba(2,8,20,.85);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-family:var(--font-mono);font-size:.82rem;outline:none;transition:border .2s}
+.filter-bar select:focus,.filter-bar input[type=date]:focus{border-color:var(--cyan)}
+.filter-bar select option{background:var(--bg)}
+
+/* TABLE */
+.data-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.data-table th{padding:9px 12px;text-align:left;font-family:var(--font-head);font-size:.72rem;font-weight:700;letter-spacing:.1em;color:var(--cyan);border-bottom:1px solid var(--border-hi);white-space:nowrap;background:rgba(0,212,255,.04)}
+.data-table td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.data-table tr:hover td{background:rgba(0,212,255,.03)}
+.badge{display:inline-block;padding:2px 8px;font-size:.72rem;font-family:var(--font-mono);border-radius:2px;letter-spacing:.06em;white-space:nowrap}
+.badge-draft{background:rgba(255,179,0,.1);color:var(--amber);border:1px solid rgba(255,179,0,.3)}
+.badge-confirmed{background:rgba(0,255,157,.08);color:var(--green);border:1px solid rgba(0,255,157,.25)}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:none;align-items:center;justify-content:center;padding:16px}
+.modal-bg.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border-hi);border-radius:2px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;box-shadow:0 16px 64px rgba(0,0,0,.7)}
+.modal::-webkit-scrollbar{width:4px}
+.modal::-webkit-scrollbar-thumb{background:var(--border-hi)}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1}
+.modal-title{font-family:var(--font-head);font-size:1rem;font-weight:700;color:var(--cyan);letter-spacing:.08em}
+.modal-close{background:transparent;border:1px solid var(--border);color:var(--text-dim);width:30px;height:30px;cursor:pointer;border-radius:2px;font-size:1rem;transition:all .15s}
+.modal-close:hover{border-color:var(--red);color:var(--red)}
+.modal-body{padding:20px}
+.detail-row{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)}
+.detail-row:last-child{border-bottom:none}
+.detail-label{width:90px;flex-shrink:0;font-size:.72rem;color:var(--text-dim);letter-spacing:.06em;padding-top:2px}
+.detail-value{flex:1;color:var(--text-hi);font-size:.85rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+.detail-section{margin-top:16px;padding:12px;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:2px}
+.detail-section-title{font-family:var(--font-head);font-size:.78rem;font-weight:700;color:var(--cyan);letter-spacing:.08em;margin-bottom:8px;text-transform:uppercase}
+.detail-item{padding:6px 10px;border-left:3px solid var(--border-hi);margin-bottom:4px;font-size:.84rem;color:var(--text-hi);background:rgba(0,212,255,.02)}
+.detail-item.issue{border-left-color:var(--red)}
+.detail-item.pending{border-left-color:var(--amber)}
+.detail-empty{color:var(--text-dim);font-size:.82rem;font-family:var(--font-mono)}
+
+/* SHIFT BADGE */
+.shift-morning{color:var(--amber)}
+.shift-afternoon{color:var(--cyan)}
+.shift-night{color:var(--blue)}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(0,212,255,.15);border:1px solid var(--cyan);color:var(--cyan);padding:10px 24px;border-radius:2px;font-family:var(--font-mono);font-size:.84rem;pointer-events:none;opacity:0;transition:opacity .3s;z-index:200;white-space:nowrap}
+.toast.show{opacity:1}
+.toast.err{background:rgba(255,59,59,.15);border-color:var(--red);color:var(--red)}
+
+/* STATUS INDICATOR */
+.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;vertical-align:middle}
+
+/* PRINT */
+@media print{
+  .topbar,.tab-bar,.filter-bar,.btn-row,.btn-primary,.btn-secondary,.dyn-del,.add-row{display:none!important}
+  .tab-panel{display:block!important;position:static!important;overflow:visible!important;padding:0!important}
+  body{background:white;color:black}
+  .panel{border:1px solid #ccc;page-break-inside:avoid}
+  .panel-title,.modal-title{color:#333}
+  .detail-label{color:#666}
+  .detail-value{color:#000}
+}
+
+@media(max-width:600px){
+  .form-grid{grid-template-columns:1fr}
+  .topbar-org{display:none}
+  .topbar-right a{display:none}
+}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;700&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="topbar-org">臺北農產運銷股份有限公司 第一果菜市場</span>
+    <span class="topbar-title">◈ 電子交接簿</span>
+  </div>
+  <div class="topbar-right">
+    <a href="app.html">◉ 巡檢</a>
+    <a href="maintenance.html">◪ 維修</a>
+    <a href="admin.html">⬡ 後台</a>
+    <span class="nav-user" id="navUser">LOADING…</span>
+    <span class="clock" id="topClock">--:--:--</span>
+    <button class="logout-btn" onclick="logout()">⏻ 登出</button>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('new')" id="tab-new">✏ 新增交接</button>
+  <button class="tab-btn" onclick="switchTab('history')" id="tab-history">📋 交接記錄</button>
+</div>
+
+<div class="tab-content">
+
+  <!-- ── TAB: NEW HANDOVER ── -->
+  <div class="tab-panel active" id="panel-new">
+
+    <!-- 班別 / 日期 / 部門 -->
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">⊞ 基本資訊</span></div>
+      <div class="panel-body">
+        <div class="form-grid">
+          <div class="field">
+            <label>班別</label>
+            <select id="hShift" onchange="onShiftChange()">
+              <option value="morning">早班 06:00–14:00</option>
+              <option value="afternoon">中班 14:00–22:00</option>
+              <option value="night">夜班 22:00–06:00</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>交接日期</label>
+            <input type="date" id="hDate" onchange="onShiftChange()">
+          </div>
+          <div class="field">
+            <label>部門 <span style="color:var(--text-dim);font-size:.7rem">（組織架構）</span></label>
+            <select id="hDept" onchange="onDeptChange()">
+              <option value="">— 選擇部門 —</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 交接人 / 接班人 -->
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">◉ 值班人員</span></div>
+      <div class="panel-body">
+        <div class="form-grid">
+          <div class="field">
+            <label>交接人（離班）</label>
+            <select id="hHandoverBy">
+              <option value="">— 請先選擇部門 —</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>接班人（到班）</label>
+            <select id="hTakeoverBy">
+              <option value="">— 請先選擇部門 —</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 設備運轉概況（自動抓取） -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">◧ 設備運轉概況</span>
+        <button class="btn-secondary" style="padding:4px 12px;font-size:.75rem" onclick="fetchEqStatus()">↻ 重新抓取</button>
+      </div>
+      <div class="panel-body">
+        <div class="eq-cards">
+          <div class="eq-card">
+            <div class="eq-val" id="eqNormal" style="color:var(--green)">—</div>
+            <div class="eq-label">✓ 正常台數</div>
+          </div>
+          <div class="eq-card">
+            <div class="eq-val" id="eqAbnormal" style="color:var(--red)">—</div>
+            <div class="eq-label">✗ 異常台數</div>
+          </div>
+          <div class="eq-card">
+            <div class="eq-val" id="eqTotal" style="color:var(--text-dim)">—</div>
+            <div class="eq-label">◈ 巡檢總數</div>
+          </div>
+        </div>
+        <div id="eqNote" style="margin-top:10px;font-size:.78rem;color:var(--text-dim);font-family:var(--font-mono)">
+          — 選擇班別與日期後自動載入當班巡檢結果 —
+        </div>
+      </div>
+    </div>
+
+    <!-- 異常事項 -->
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title" style="color:var(--red)">⚠ 異常事項</span></div>
+      <div class="panel-body">
+        <div class="dyn-list" id="issueList"></div>
+        <div class="add-row">
+          <input class="add-input" id="issueInput" placeholder="輸入異常事項（按 Enter 新增）…" onkeydown="if(event.key==='Enter')addIssue()">
+          <button class="add-btn" onclick="addIssue()">＋ 新增</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 待辦事項 -->
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title" style="color:var(--amber)">◎ 待辦事項</span></div>
+      <div class="panel-body">
+        <div class="dyn-list" id="pendingList"></div>
+        <div class="add-row">
+          <input class="add-input" id="pendingInput" placeholder="輸入待辦事項（按 Enter 新增）…" onkeydown="if(event.key==='Enter')addPending()">
+          <button class="add-btn" style="border-color:var(--amber);color:var(--amber);background:rgba(255,179,0,.06)" onclick="addPending()">＋ 新增</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 備註 -->
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">備註</span></div>
+      <div class="panel-body">
+        <textarea id="hNotes" placeholder="其他需要說明的事項…" style="width:100%;min-height:80px;background:rgba(2,8,20,.8);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-family:var(--font-mono);font-size:.88rem;padding:10px;outline:none;resize:vertical;transition:border .2s" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+      </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="btn-row">
+      <button class="btn-primary" onclick="saveDraft()" style="flex:1">儲存草稿</button>
+      <button class="btn-primary btn-confirm" onclick="confirmHandover()" style="flex:1">✓ 確認交接完成</button>
+    </div>
+    <div style="height:24px"></div>
+
+  </div><!-- /panel-new -->
+
+  <!-- ── TAB: HISTORY ── -->
+  <div class="tab-panel" id="panel-history">
+
+    <div class="filter-bar">
+      <select id="fDept" onchange="loadHistory()" style="min-width:140px">
+        <option value="">全部部門</option>
+      </select>
+      <select id="fShift" onchange="loadHistory()">
+        <option value="">全部班別</option>
+        <option value="morning">早班</option>
+        <option value="afternoon">中班</option>
+        <option value="night">夜班</option>
+      </select>
+      <select id="fStatus" onchange="loadHistory()">
+        <option value="">全部狀態</option>
+        <option value="draft">草稿</option>
+        <option value="confirmed">已確認</option>
+      </select>
+      <input type="date" id="fDateFrom" onchange="loadHistory()" title="起始日期">
+      <input type="date" id="fDateTo" onchange="loadHistory()" title="結束日期">
+      <button class="btn-secondary" onclick="loadHistory()" style="padding:7px 14px;font-size:.78rem">↻ 重整</button>
+    </div>
+
+    <div class="panel">
+      <div style="overflow-x:auto">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>日期</th><th>班別</th><th>部門</th>
+              <th>交接人</th><th>接班人</th>
+              <th style="text-align:right">正常</th><th style="text-align:right">異常</th>
+              <th>事項摘要</th><th>狀態</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="historyTbody">
+            <tr><td colspan="10" style="color:var(--text-dim);font-family:var(--font-mono);padding:24px;text-align:center">LOADING…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /panel-history -->
+
+</div><!-- /tab-content -->
+
+<!-- DETAIL MODAL -->
+<div class="modal-bg" id="detailModal">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title" id="modalTitle">交接記錄詳情</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const SHIFT_LABEL = { morning:'早班', afternoon:'中班', night:'夜班' };
+const SHIFT_HOURS = { morning:[6,14], afternoon:[14,22], night:[22,30] };
+
+let currentUser = null;
+let allDepts = [];
+let allUsers = [];
+let issues = [];
+let pendings = [];
+let editingId = null;
+
+// ── CLOCK ────────────────────────────────────────────────────
+(function tick(){
+  const n=new Date(),p=x=>String(x).padStart(2,'0');
+  document.getElementById('topClock').textContent=`${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
+  setTimeout(tick,1000);
+})();
+
+// ── INIT ─────────────────────────────────────────────────────
+(async () => {
+  const { data: { user }, error } = await db.auth.getUser();
+  if (error || !user) { window.location.href = 'login.html'; return; }
+
+  const { data: profile } = await db.from('users').select('*').eq('email', user.email).maybeSingle();
+  currentUser = profile || { user_id: user.id, name: user.email.split('@')[0], role: 'inspector' };
+  document.getElementById('navUser').textContent = currentUser.name;
+
+  const [{ data: depts }, { data: users }] = await Promise.all([
+    db.from('departments').select('*').eq('status','active').order('level').order('sort_order'),
+    db.from('users').select('*').eq('status','active').order('name')
+  ]);
+  allDepts = depts || [];
+  allUsers = users || [];
+
+  buildDeptSelects();
+
+  // Default date + auto shift
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('hDate').value = today;
+  const h = new Date().getHours();
+  document.getElementById('hShift').value = h >= 6 && h < 14 ? 'morning' : h >= 14 && h < 22 ? 'afternoon' : 'night';
+
+  await fetchEqStatus();
+  await loadHistory();
+})();
+
+// ── DEPT DROPDOWNS ───────────────────────────────────────────
+function buildDeptSelects() {
+  const opts = buildDeptOpts(allDepts);
+  ['hDept','fDept'].forEach(id => {
+    const sel = document.getElementById(id);
+    const first = id === 'hDept' ? '<option value="">— 選擇部門 —</option>' : '<option value="">全部部門</option>';
+    sel.innerHTML = first + opts;
+  });
+}
+
+function buildDeptOpts(depts) {
+  // Build tree
+  const roots = depts.filter(d => !d.parent_id);
+  const children = {};
+  depts.filter(d => d.parent_id).forEach(d => {
+    if (!children[d.parent_id]) children[d.parent_id] = [];
+    children[d.parent_id].push(d);
+  });
+  let html = '';
+  for (const r of roots) {
+    html += `<option value="${r.dept_id}">${r.name}</option>`;
+    for (const c of (children[r.dept_id] || [])) {
+      html += `<option value="${c.dept_id}">&nbsp;&nbsp;└ ${c.name}</option>`;
+    }
+  }
+  return html;
+}
+
+// ── DEPT → USERS ─────────────────────────────────────────────
+function onDeptChange() {
+  const deptId = document.getElementById('hDept').value;
+  const filtered = deptId ? allUsers.filter(u => u.dept_id === deptId) : allUsers;
+  const opts = '<option value="">— 選擇 —</option>' +
+    filtered.map(u => `<option value="${u.user_id}">${u.name}</option>`).join('');
+  document.getElementById('hHandoverBy').innerHTML = opts;
+  document.getElementById('hTakeoverBy').innerHTML = opts;
+}
+
+// ── SHIFT CHANGE ─────────────────────────────────────────────
+function onShiftChange() { fetchEqStatus(); }
+
+// ── SHIFT TIME RANGE ─────────────────────────────────────────
+function shiftRange(dateStr, type) {
+  const [h1, h2] = SHIFT_HOURS[type];
+  const base = new Date(dateStr + 'T00:00:00');
+  return {
+    from: new Date(base.getTime() + h1 * 3600000).toISOString(),
+    to:   new Date(base.getTime() + h2 * 3600000).toISOString()
+  };
+}
+
+// ── FETCH EQ STATUS ──────────────────────────────────────────
+async function fetchEqStatus() {
+  const date = document.getElementById('hDate').value;
+  const shift = document.getElementById('hShift').value;
+  if (!date || !shift) return;
+
+  const { from, to } = shiftRange(date, shift);
+  const { data } = await db.from('inspection_records')
+    .select('run_status,abnormal_note,equipment(name)')
+    .gte('inspect_time', from)
+    .lte('inspect_time', to);
+
+  const recs = data || [];
+  const normal   = recs.filter(r => r.run_status === 'normal').length;
+  const abnRecs  = recs.filter(r => r.run_status === 'abnormal');
+  const total    = recs.length;
+
+  document.getElementById('eqNormal').textContent   = normal;
+  document.getElementById('eqAbnormal').textContent  = abnRecs.length;
+  document.getElementById('eqTotal').textContent     = total;
+  document.getElementById('eqAbnormal').style.color  = abnRecs.length ? 'var(--red)' : 'var(--green)';
+  document.getElementById('eqNote').textContent =
+    total ? `已取得 ${date} ${SHIFT_LABEL[shift]}（${['morning','afternoon','night'].indexOf(shift)===0?'06:00-14:00':shift==='afternoon'?'14:00-22:00':'22:00-06:00'}）共 ${total} 筆巡檢紀錄` :
+    `${date} ${SHIFT_LABEL[shift]} 尚無巡檢紀錄`;
+
+  // Pre-fill issues from abnormal records (only if list is empty)
+  if (abnRecs.length > 0 && issues.length === 0) {
+    issues = abnRecs.map(r => `【${r.equipment?.name || '設備'}】${r.abnormal_note || '異常'}`);
+    renderIssues();
+  }
+}
+
+// ── DYNAMIC LISTS ─────────────────────────────────────────────
+function renderIssues() {
+  document.getElementById('issueList').innerHTML = issues.map((txt, i) => `
+    <div class="dyn-item">
+      <div class="dyn-item-text issue">⚠ ${escHtml(txt)}</div>
+      <button class="dyn-del" onclick="removeIssue(${i})" title="刪除">✕</button>
+    </div>`).join('');
+}
+function renderPendings() {
+  document.getElementById('pendingList').innerHTML = pendings.map((txt, i) => `
+    <div class="dyn-item">
+      <div class="dyn-item-text pending">◎ ${escHtml(txt)}</div>
+      <button class="dyn-del" onclick="removePending(${i})" title="刪除">✕</button>
+    </div>`).join('');
+}
+function addIssue() {
+  const v = document.getElementById('issueInput').value.trim();
+  if (!v) return;
+  issues.push(v);
+  document.getElementById('issueInput').value = '';
+  renderIssues();
+}
+function removeIssue(i) { issues.splice(i, 1); renderIssues(); }
+function addPending() {
+  const v = document.getElementById('pendingInput').value.trim();
+  if (!v) return;
+  pendings.push(v);
+  document.getElementById('pendingInput').value = '';
+  renderPendings();
+}
+function removePending(i) { pendings.splice(i, 1); renderPendings(); }
+
+// ── SAVE / CONFIRM ────────────────────────────────────────────
+async function saveDraft() { await doSave('draft'); }
+async function confirmHandover() {
+  const taker = document.getElementById('hTakeoverBy').value;
+  if (!taker) { showToast('請選擇接班人再確認交接', true); return; }
+  await doSave('confirmed');
+}
+
+async function doSave(status) {
+  const shift     = document.getElementById('hShift').value;
+  const date      = document.getElementById('hDate').value;
+  const deptId    = document.getElementById('hDept').value || null;
+  const handoverBy = document.getElementById('hHandoverBy').value || null;
+  const takeoverBy = document.getElementById('hTakeoverBy').value || null;
+  const notes     = document.getElementById('hNotes').value.trim();
+  const eqNormal  = parseInt(document.getElementById('eqNormal').textContent) || 0;
+  const eqAbnormal= parseInt(document.getElementById('eqAbnormal').textContent) || 0;
+
+  if (!date) { showToast('請選擇交接日期', true); return; }
+  if (!handoverBy && !takeoverBy) { showToast('請至少填寫交接人或接班人', true); return; }
+
+  const record = {
+    shift_date:   date,
+    shift_type:   shift,
+    dept_id:      deptId,
+    handover_by:  handoverBy,
+    takeover_by:  takeoverBy,
+    eq_normal:    eqNormal,
+    eq_abnormal:  eqAbnormal,
+    issues:       issues.join('\n'),
+    pending:      pendings.join('\n'),
+    notes,
+    status,
+    created_by:   currentUser.user_id,
+    confirmed_at: status === 'confirmed' ? new Date().toISOString() : null,
+    confirmed_by: status === 'confirmed' ? currentUser.user_id : null,
+  };
+
+  let err;
+  if (editingId) {
+    ({ error: err } = await db.from('handover_records').update(record).eq('record_id', editingId));
+  } else {
+    ({ error: err } = await db.from('handover_records').insert(record));
+  }
+  if (err) { showToast('儲存失敗：' + (err.message || err.code), true); return; }
+
+  showToast(status === 'confirmed' ? '✓ 交接已確認完成' : '草稿已儲存');
+  resetForm();
+  editingId = null;
+  await loadHistory();
+  switchTab('history');
+}
+
+function resetForm() {
+  issues = []; pendings = [];
+  renderIssues(); renderPendings();
+  document.getElementById('hNotes').value = '';
+  document.getElementById('hHandoverBy').value = '';
+  document.getElementById('hTakeoverBy').value = '';
+  document.getElementById('eqNormal').textContent = '—';
+  document.getElementById('eqAbnormal').textContent = '—';
+  document.getElementById('eqTotal').textContent = '—';
+}
+
+// ── HISTORY ──────────────────────────────────────────────────
+async function loadHistory() {
+  const deptFilter   = document.getElementById('fDept').value;
+  const shiftFilter  = document.getElementById('fShift').value;
+  const statusFilter = document.getElementById('fStatus').value;
+  const dateFrom     = document.getElementById('fDateFrom').value;
+  const dateTo       = document.getElementById('fDateTo').value;
+
+  let q = db.from('handover_records')
+    .select('*,departments(name),handover_user:users!handover_by(name),takeover_user:users!takeover_by(name)')
+    .order('shift_date', { ascending: false })
+    .order('shift_type')
+    .limit(200);
+
+  if (deptFilter)   q = q.eq('dept_id', deptFilter);
+  if (shiftFilter)  q = q.eq('shift_type', shiftFilter);
+  if (statusFilter) q = q.eq('status', statusFilter);
+  if (dateFrom)     q = q.gte('shift_date', dateFrom);
+  if (dateTo)       q = q.lte('shift_date', dateTo);
+
+  const { data, error } = await q;
+  if (error) { showToast('載入失敗', true); return; }
+  const rows = data || [];
+
+  const SHIFT_CLASS = { morning:'shift-morning', afternoon:'shift-afternoon', night:'shift-night' };
+  document.getElementById('historyTbody').innerHTML = rows.length ? rows.map(r => {
+    const issueLines = r.issues ? r.issues.split('\n').filter(Boolean) : [];
+    const pendLines  = r.pending ? r.pending.split('\n').filter(Boolean) : [];
+    const summary = issueLines.length ? `⚠ ${issueLines.length}項異常` : (pendLines.length ? `◎ ${pendLines.length}項待辦` : '—');
+    return `<tr>
+      <td style="font-family:var(--font-mono);font-size:.78rem">${r.shift_date}</td>
+      <td><span class="${SHIFT_CLASS[r.shift_type]}">${SHIFT_LABEL[r.shift_type]}</span></td>
+      <td style="font-size:.82rem">${r.departments?.name || '—'}</td>
+      <td style="font-size:.82rem">${r.handover_user?.name || '—'}</td>
+      <td style="font-size:.82rem">${r.takeover_user?.name || '—'}</td>
+      <td style="text-align:right;font-family:var(--font-mono);color:var(--green)">${r.eq_normal || '—'}</td>
+      <td style="text-align:right;font-family:var(--font-mono);color:${r.eq_abnormal ? 'var(--red)' : 'var(--text-dim)'}">${r.eq_abnormal || '—'}</td>
+      <td style="font-size:.8rem;color:${r.issues ? 'var(--red)' : 'var(--text-dim)'}">${escHtml(summary)}</td>
+      <td><span class="badge badge-${r.status}">${r.status === 'confirmed' ? '已確認' : '草稿'}</span></td>
+      <td>
+        <button class="btn-secondary" style="padding:3px 10px;font-size:.74rem" onclick="openDetail('${r.record_id}')">查看</button>
+        ${r.status === 'draft' ? `<button class="btn-secondary" style="padding:3px 10px;font-size:.74rem;margin-left:4px;color:var(--green);border-color:var(--green)" onclick="quickConfirm('${r.record_id}')">確認</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="10" style="color:var(--text-dim);font-family:var(--font-mono);text-align:center;padding:24px">NO RECORDS</td></tr>';
+}
+
+// ── DETAIL MODAL ──────────────────────────────────────────────
+async function openDetail(id) {
+  const { data: r } = await db.from('handover_records')
+    .select('*,departments(name,parent_id),handover_user:users!handover_by(name),takeover_user:users!takeover_by(name),confirmed_user:users!confirmed_by(name)')
+    .eq('record_id', id).single();
+  if (!r) { showToast('載入失敗', true); return; }
+
+  const issueLines   = r.issues  ? r.issues.split('\n').filter(Boolean)  : [];
+  const pendingLines = r.pending ? r.pending.split('\n').filter(Boolean) : [];
+
+  const deptName = r.departments?.name || '—';
+  const SHIFT_CLASS = { morning:'shift-morning', afternoon:'shift-afternoon', night:'shift-night' };
+
+  document.getElementById('modalTitle').textContent =
+    `${r.shift_date} ${SHIFT_LABEL[r.shift_type]} 交接記錄`;
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="detail-row"><span class="detail-label">日期</span><span class="detail-value">${r.shift_date}</span></div>
+    <div class="detail-row"><span class="detail-label">班別</span><span class="detail-value"><span class="${SHIFT_CLASS[r.shift_type]}">${SHIFT_LABEL[r.shift_type]}</span></span></div>
+    <div class="detail-row"><span class="detail-label">部門</span><span class="detail-value">${deptName}</span></div>
+    <div class="detail-row"><span class="detail-label">交接人</span><span class="detail-value">${r.handover_user?.name || '—'}</span></div>
+    <div class="detail-row"><span class="detail-label">接班人</span><span class="detail-value">${r.takeover_user?.name || '—'}</span></div>
+    <div class="detail-row">
+      <span class="detail-label">設備狀況</span>
+      <span class="detail-value">
+        <span style="color:var(--green)">✓ 正常 ${r.eq_normal} 台</span>
+        <span style="color:${r.eq_abnormal ? 'var(--red)' : 'var(--text-dim)'}">✗ 異常 ${r.eq_abnormal} 台</span>
+      </span>
+    </div>
+    <div class="detail-row"><span class="detail-label">狀態</span><span class="detail-value"><span class="badge badge-${r.status}">${r.status === 'confirmed' ? '已確認' : '草稿'}</span>${r.confirmed_at ? `<span style="font-size:.75rem;color:var(--text-dim);margin-left:8px">確認時間：${new Date(r.confirmed_at).toLocaleString('zh-TW')}　by ${r.confirmed_user?.name||'—'}</span>` : ''}</span></div>
+    <div class="detail-row"><span class="detail-label">建立時間</span><span class="detail-value" style="font-family:var(--font-mono);font-size:.78rem">${new Date(r.created_at).toLocaleString('zh-TW')}</span></div>
+
+    <div class="detail-section">
+      <div class="detail-section-title" style="color:var(--red)">⚠ 異常事項（${issueLines.length} 項）</div>
+      ${issueLines.length ? issueLines.map(l => `<div class="detail-item issue">${escHtml(l)}</div>`).join('') : '<span class="detail-empty">無異常事項</span>'}
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title" style="color:var(--amber)">◎ 待辦事項（${pendingLines.length} 項）</div>
+      ${pendingLines.length ? pendingLines.map(l => `<div class="detail-item pending">${escHtml(l)}</div>`).join('') : '<span class="detail-empty">無待辦事項</span>'}
+    </div>
+
+    ${r.notes ? `<div class="detail-section"><div class="detail-section-title">備註</div><div style="font-size:.85rem;color:var(--text-hi);white-space:pre-wrap">${escHtml(r.notes)}</div></div>` : ''}
+
+    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+      ${r.status === 'draft' ? `<button class="btn-primary btn-confirm" style="flex:1;min-width:120px" onclick="quickConfirm('${r.record_id}',true)">✓ 確認交接</button>` : ''}
+      <button class="btn-secondary" onclick="window.print()">🖨 列印</button>
+      <button class="btn-secondary" onclick="closeModal()" style="margin-left:auto">關閉</button>
+    </div>
+  `;
+  document.getElementById('detailModal').classList.add('show');
+}
+
+async function quickConfirm(id, closeAfter) {
+  const updates = {
+    status: 'confirmed',
+    confirmed_at: new Date().toISOString(),
+    confirmed_by: currentUser.user_id
+  };
+  const { error } = await db.from('handover_records').update(updates).eq('record_id', id);
+  if (error) { showToast('確認失敗', true); return; }
+  showToast('✓ 交接已確認');
+  if (closeAfter) closeModal();
+  await loadHistory();
+}
+
+function closeModal() { document.getElementById('detailModal').classList.remove('show'); }
+
+// ── TAB SWITCH ────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'history') loadHistory();
+}
+
+// ── UTILS ─────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg, isErr = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' err' : '');
+  setTimeout(() => { t.className = 'toast'; }, 2800);
+}
+
+async function logout() { await db.auth.signOut(); window.location.href = 'login.html'; }
+</script>
+</body>
+</html>
