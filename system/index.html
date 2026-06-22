@@ -18,7 +18,7 @@
     --font-tc:'Noto Sans TC',sans-serif;
   }
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%;overflow:hidden}
+  html,body{min-height:100%}
 
   body {
     background:var(--bg);
@@ -236,6 +236,16 @@
   .corner-tr{top:10px;right:10px;border-width:2px 2px 0 0}
   .corner-bl{bottom:10px;left:10px;border-width:0 0 2px 2px}
   .corner-br{bottom:10px;right:10px;border-width:0 2px 2px 0}
+
+/* ===== MOBILE RESPONSIVE FIX (added) ===== */
+@media (max-width:640px){
+  .statusbar{padding:0 14px;font-size:0.56rem}
+  .statusbar-left{gap:10px}
+  .cards-area{flex:none;align-items:stretch;justify-content:flex-start;
+    padding:14px 16px 36px;gap:16px}
+  .sys-card{width:100%;max-width:400px;margin:0 auto}
+}
+
 </style>
 </head>
 <body>
