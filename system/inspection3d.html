@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>臺北農產 第一果菜市場 — 3D 巡檢地圖</title>
+<style>
+  :root {
+    --bg: #020b18;
+    --panel: #041428;
+    --border: #0a3a5a;
+    --cyan: #00d4ff;
+    --cyan2: #00a8cc;
+    --green: #00ff88;
+    --red: #ff3366;
+    --yellow: #ffd700;
+    --text: #b0d8f0;
+    --text2: #5a8ab0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+
+  #canvas-container {
+    position: fixed; inset: 0;
+  }
+  canvas { display: block; width: 100% !important; height: 100% !important; }
+
+  /* Top bar */
+  #topbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 52px;
+    background: linear-gradient(180deg, rgba(2,11,24,0.97) 0%, rgba(4,20,40,0.9) 100%);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 16px; gap: 12px; z-index: 100;
+  }
+  #topbar .logo {
+    font-size: 13px; font-weight: 700; color: var(--cyan);
+    letter-spacing: 0.05em; white-space: nowrap;
+  }
+  #topbar .sep { width: 1px; height: 28px; background: var(--border); }
+  #topbar .title { font-size: 11px; color: var(--text2); }
+  #topbar .spacer { flex: 1; }
+  #btnFullscreen {
+    background: var(--border); border: 1px solid var(--cyan2); color: var(--cyan);
+    padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
+    transition: background 0.2s;
+  }
+  #btnFullscreen:hover { background: #0a3a5a; }
+  #btnBack {
+    background: var(--border); border: 1px solid var(--border); color: var(--text2);
+    padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
+    text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  #btnBack:hover { border-color: var(--cyan); color: var(--cyan); }
+
+  /* Floor nav */
+  #floor-nav {
+    position: fixed; right: 16px; top: 72px;
+    background: rgba(4,20,40,0.92); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; z-index: 100;
+  }
+  .floor-btn {
+    display: block; width: 100%; padding: 9px 20px;
+    background: none; border: none; border-bottom: 1px solid var(--border);
+    color: var(--text2); cursor: pointer; font-size: 12px; text-align: center;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+  }
+  .floor-btn:last-child { border-bottom: none; }
+  .floor-btn:hover { background: rgba(0,212,255,0.08); color: var(--cyan); }
+  .floor-btn.active { background: rgba(0,212,255,0.15); color: var(--cyan); font-weight: 700; }
+
+  /* Stats bar */
+  #stats-bar {
+    position: fixed; left: 16px; top: 72px;
+    background: rgba(4,20,40,0.92); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 16px; z-index: 100; min-width: 160px;
+  }
+  .stat-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+    font-size: 11px;
+  }
+  .stat-row:last-child { margin-bottom: 0; }
+  .stat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .stat-label { color: var(--text2); flex: 1; }
+  .stat-val { font-weight: 700; font-size: 13px; }
+
+  /* Info panel */
+  #info-panel {
+    position: fixed; left: 16px; bottom: 16px;
+    background: rgba(4,20,40,0.95); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px; z-index: 100; min-width: 220px; max-width: 280px;
+    display: none;
+    box-shadow: 0 0 20px rgba(0,212,255,0.1);
+  }
+  #info-panel.show { display: block; }
+  #info-panel .ip-header {
+    display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;
+  }
+  #info-panel .ip-name { font-size: 14px; font-weight: 700; color: var(--cyan); }
+  #info-panel .ip-close {
+    background: none; border: none; color: var(--text2); cursor: pointer;
+    font-size: 16px; line-height: 1; padding: 0 2px;
+  }
+  #info-panel .ip-close:hover { color: var(--text); }
+  #info-panel .ip-row { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+  #info-panel .ip-row span { color: var(--text); }
+  #info-panel .ip-status {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 700; margin-top: 6px;
+  }
+  #info-panel .status-green { background: rgba(0,255,136,0.15); color: var(--green); }
+  #info-panel .status-red { background: rgba(255,51,102,0.15); color: var(--red); }
+  #info-panel .status-yellow { background: rgba(255,215,0,0.15); color: var(--yellow); }
+  #info-panel .ip-btn {
+    display: block; width: 100%; margin-top: 10px; padding: 7px;
+    background: rgba(0,212,255,0.1); border: 1px solid var(--cyan2); color: var(--cyan);
+    border-radius: 4px; cursor: pointer; font-size: 12px; text-align: center;
+    transition: background 0.2s; text-decoration: none;
+  }
+  #info-panel .ip-btn:hover { background: rgba(0,212,255,0.2); }
+
+  /* Controls hint */
+  #ctrl-hint {
+    position: fixed; bottom: 16px; right: 16px;
+    font-size: 10px; color: var(--text2); z-index: 100; text-align: right; line-height: 1.8;
+  }
+
+  /* Loading overlay */
+  #loading {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 200; gap: 16px;
+  }
+  #loading .ld-title { font-size: 14px; color: var(--cyan); letter-spacing: 0.1em; }
+  #loading .ld-bar { width: 200px; height: 2px; background: var(--border); border-radius: 2px; }
+  #loading .ld-fill { height: 100%; background: var(--cyan); border-radius: 2px; width: 0%; transition: width 0.3s; }
+  #loading .ld-msg { font-size: 11px; color: var(--text2); }
+</style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loading">
+  <div class="ld-title">載入 3D 場景中…</div>
+  <div class="ld-bar"><div class="ld-fill" id="ld-fill"></div></div>
+  <div class="ld-msg" id="ld-msg">初始化…</div>
+</div>
+
+<!-- Top bar -->
+<div id="topbar">
+  <div class="logo">臺北農產 第一果菜市場</div>
+  <div class="sep"></div>
+  <div class="title">3D 建物巡檢地圖</div>
+  <div class="spacer"></div>
+  <a href="app.html" id="btnBack">← 返回巡檢</a>
+  <button id="btnFullscreen" onclick="toggleFullscreen()">⛶ 全螢幕</button>
+</div>
+
+<!-- Floor navigation -->
+<div id="floor-nav">
+  <button class="floor-btn" data-floor="4" onclick="gotoFloor(4)">4F 機電設備層</button>
+  <button class="floor-btn" data-floor="3" onclick="gotoFloor(3)">3F 花卉交易</button>
+  <button class="floor-btn" data-floor="2" onclick="gotoFloor(2)">2F 蔬果承銷</button>
+  <button class="floor-btn active" data-floor="1" onclick="gotoFloor(1)">1F 拍賣市場</button>
+  <button class="floor-btn" data-floor="0" onclick="gotoFloor(0)">B1 地下層</button>
+</div>
+
+<!-- Stats bar -->
+<div id="stats-bar">
+  <div class="stat-row">
+    <div class="stat-dot" style="background:var(--green)"></div>
+    <div class="stat-label">正常</div>
+    <div class="stat-val" id="cnt-green" style="color:var(--green)">—</div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-dot" style="background:var(--red)"></div>
+    <div class="stat-label">異常</div>
+    <div class="stat-val" id="cnt-red" style="color:var(--red)">—</div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-dot" style="background:var(--yellow)"></div>
+    <div class="stat-label">待巡檢</div>
+    <div class="stat-val" id="cnt-yellow" style="color:var(--yellow)">—</div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-dot" style="background:var(--text2)"></div>
+    <div class="stat-label">設備總數</div>
+    <div class="stat-val" id="cnt-total" style="color:var(--text)">—</div>
+  </div>
+</div>
+
+<!-- Equipment info panel -->
+<div id="info-panel">
+  <div class="ip-header">
+    <div class="ip-name" id="ip-name">—</div>
+    <button class="ip-close" onclick="closeInfoPanel()">✕</button>
+  </div>
+  <div class="ip-row">位置：<span id="ip-location">—</span></div>
+  <div class="ip-row">QR碼：<span id="ip-qr">—</span></div>
+  <div class="ip-row">最近巡檢：<span id="ip-last">—</span></div>
+  <div id="ip-status-wrap"></div>
+  <a href="#" id="ip-link" class="ip-btn" onclick="return gotoInspect()">前往巡檢</a>
+</div>
+
+<!-- Controls hint -->
+<div id="ctrl-hint">
+  拖曳 旋轉 &nbsp;|&nbsp; 滾輪 縮放 &nbsp;|&nbsp; 右鍵/雙指 平移
+</div>
+
+<!-- Canvas -->
+<div id="canvas-container"></div>
+
+<!-- Three.js r128 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- Supabase client -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<script>
+// ============================================================
+// Config
+// ============================================================
+const SUPA_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
+const db = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// Building polygon (XZ plane, Y=up). Matches actual floor plan shape.
+// Origin roughly at building centroid. Units = metres / 2 (1 unit ≈ 2m)
+const HULL = [
+  [-50, -33],  // NW
+  [-28, -37],  // N-NW
+  [ 10, -37],  // N
+  [ 36, -22],  // NE (road boundary diagonal)
+  [ 50,  -5],  // E upper
+  [ 46,  14],  // E centre
+  [ 32,  32],  // SE
+  [-50,  32],  // SW
+];
+
+const FLOOR_HEIGHT = 4; // metres per floor
+
+const FLOORS = [
+  { id: 'B1', label: 'B1 地下一層', floorIdx: 0, elev: -4, color: 0x003344,
+    zones: [
+      { name: '西側停車場',   x: -50, z: -37, w: 45, d: 69 },
+      { name: '機電設備區',   x:  -5, z: -37, w: 25, d: 37 },
+      { name: '配電機房',     x:  20, z: -37, w: 30, d: 37 },
+      { name: '廢水處理區',   x:  -5, z:   0, w: 55, d: 32 },
+    ]},
+  { id: '1F', label: '1F 一樓',     floorIdx: 1, elev:  0, color: 0x002233,
+    zones: [
+      { name: '蔬果拍賣場A區', x: -50, z: -37, w: 50, d: 32 },
+      { name: '蔬果拍賣場B區', x:   0, z: -37, w: 50, d: 32 },
+      { name: '魚貨交易區',    x: -50, z:  -5, w: 70, d: 37 },
+      { name: '服務管理區',    x:  20, z:  -5, w: 30, d: 37 },
+    ]},
+  { id: '2F', label: '2F 二樓',     floorIdx: 2, elev:  4, color: 0x002233,
+    zones: [
+      { name: '蔬菜承銷區',  x: -50, z: -37, w: 55, d: 69 },
+      { name: '果品承銷區',  x:   5, z: -37, w: 45, d: 37 },
+      { name: '物流作業區',  x:   5, z:   0, w: 45, d: 32 },
+    ]},
+  { id: '3F', label: '3F 三樓',     floorIdx: 3, elev:  8, color: 0x002233,
+    zones: [
+      { name: '花卉交易區',    x: -50, z: -37, w: 60, d: 69 },
+      { name: '市場管理辦公',  x:  10, z: -37, w: 40, d: 32 },
+      { name: '公共服務區',    x:  10, z:  -5, w: 40, d: 37 },
+    ]},
+  { id: '4F', label: '4F 四樓',     floorIdx: 4, elev: 12, color: 0x002233,
+    zones: [
+      { name: '機電設備層',  x: -50, z: -37, w: 70, d: 69 },
+      { name: '冷凍機房',    x:  20, z: -37, w: 30, d: 37 },
+      { name: '擴充預留區',  x:  20, z:   0, w: 30, d: 32 },
+    ]},
+];
+
+// Fallback equipment positions (spread across floors)
+const EQ_FLOOR_MAP = { 'B1': 0, '1F': 1, '2F': 2, '3F': 3, '4F': 4 };
+
+// ============================================================
+// Globals
+// ============================================================
+let scene, camera, renderer, raycaster, mouse;
+let controls; // custom orbit
+let allEquipment = [];
+let equipmentMeshes = []; // {mesh, data}
+let selectedFloor = 1;
+let selectedEquipment = null;
+let animFrame;
+
+// Colors
+const COLOR_GREEN  = new THREE.Color(0x00ff88);
+const COLOR_RED    = new THREE.Color(0xff3366);
+const COLOR_YELLOW = new THREE.Color(0xffd700);
+const COLOR_CYAN   = new THREE.Color(0x00d4ff);
+
+// ============================================================
+// Progress
+// ============================================================
+function setProgress(pct, msg) {
+  document.getElementById('ld-fill').style.width = pct + '%';
+  document.getElementById('ld-msg').textContent = msg;
+}
+
+// ============================================================
+// Three.js setup
+// ============================================================
+function initThree() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x020b18);
+  scene.fog = new THREE.FogExp2(0x020b18, 0.0035);
+
+  const w = window.innerWidth, h = window.innerHeight;
+  camera = new THREE.PerspectiveCamera(45, w / h, 0.5, 800);
+  camera.position.set(0, 90, 130);
+  camera.lookAt(0, 0, 0);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(w, h);
+  document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+  raycaster = new THREE.Raycaster();
+  mouse = new THREE.Vector2();
+
+  // Ambient
+  scene.add(new THREE.AmbientLight(0x112233, 1.5));
+  const dirLight = new THREE.DirectionalLight(0x00d4ff, 0.4);
+  dirLight.position.set(50, 80, 50);
+  scene.add(dirLight);
+
+  window.addEventListener('resize', onResize);
+  renderer.domElement.addEventListener('click', onCanvasClick);
+  renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+}
+
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ============================================================
+// Custom orbit controls
+// ============================================================
+const orbit = {
+  isDown: false, isRight: false,
+  startX: 0, startY: 0,
+  theta: -0.3, phi: 0.9,
+  radius: 160,
+  targetX: 0, targetY: 5, targetZ: 0,
+  minPhi: 0.15, maxPhi: 1.45,
+  minRadius: 30, maxRadius: 350,
+  dampTheta: 0, dampPhi: 0,
+  dampRX: 0, dampRY: 0,
+};
+
+function setupOrbit() {
+  const el = renderer.domElement;
+  el.addEventListener('mousedown', e => {
+    if (e.button === 0) { orbit.isDown = true; orbit.startX = e.clientX; orbit.startY = e.clientY; }
+    if (e.button === 2) { orbit.isRight = true; orbit.startX = e.clientX; orbit.startY = e.clientY; }
+  });
+  window.addEventListener('mouseup', () => { orbit.isDown = false; orbit.isRight = false; });
+  window.addEventListener('mousemove', e => {
+    if (orbit.isDown) {
+      const dx = (e.clientX - orbit.startX) * 0.005;
+      const dy = (e.clientY - orbit.startY) * 0.005;
+      orbit.theta -= dx;
+      orbit.phi = Math.max(orbit.minPhi, Math.min(orbit.maxPhi, orbit.phi - dy));
+      orbit.startX = e.clientX; orbit.startY = e.clientY;
+    }
+    if (orbit.isRight) {
+      const dx = (e.clientX - orbit.startX) * 0.08;
+      const dy = (e.clientY - orbit.startY) * 0.08;
+      const ct = Math.cos(orbit.theta), st = Math.sin(orbit.theta);
+      orbit.targetX -= ct * dx + st * 0;
+      orbit.targetZ -= st * dx - ct * 0;
+      orbit.targetY += dy;
+      orbit.startX = e.clientX; orbit.startY = e.clientY;
+    }
+  });
+  el.addEventListener('wheel', e => {
+    orbit.radius = Math.max(orbit.minRadius, Math.min(orbit.maxRadius, orbit.radius + e.deltaY * 0.15));
+    e.preventDefault();
+  }, { passive: false });
+
+  // Touch
+  let touches = [], pinchDist = 0;
+  el.addEventListener('touchstart', e => {
+    touches = Array.from(e.touches);
+    if (touches.length === 1) {
+      orbit.isDown = true;
+      orbit.startX = touches[0].clientX; orbit.startY = touches[0].clientY;
+    }
+    if (touches.length === 2) {
+      orbit.isDown = false;
+      pinchDist = Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+    }
+  }, { passive: true });
+  el.addEventListener('touchmove', e => {
+    const t = Array.from(e.touches);
+    if (t.length === 1 && orbit.isDown) {
+      const dx = (t[0].clientX - orbit.startX) * 0.005;
+      const dy = (t[0].clientY - orbit.startY) * 0.005;
+      orbit.theta -= dx;
+      orbit.phi = Math.max(orbit.minPhi, Math.min(orbit.maxPhi, orbit.phi - dy));
+      orbit.startX = t[0].clientX; orbit.startY = t[0].clientY;
+    }
+    if (t.length === 2) {
+      const d = Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+      orbit.radius = Math.max(orbit.minRadius, Math.min(orbit.maxRadius, orbit.radius - (d - pinchDist) * 0.5));
+      pinchDist = d;
+    }
+    e.preventDefault();
+  }, { passive: false });
+  el.addEventListener('touchend', () => { orbit.isDown = false; });
+}
+
+function updateCamera() {
+  const x = orbit.targetX + orbit.radius * Math.sin(orbit.phi) * Math.sin(orbit.theta);
+  const y = orbit.targetY + orbit.radius * Math.cos(orbit.phi);
+  const z = orbit.targetZ + orbit.radius * Math.sin(orbit.phi) * Math.cos(orbit.theta);
+  camera.position.set(x, y, z);
+  camera.lookAt(orbit.targetX, orbit.targetY, orbit.targetZ);
+}
+
+// ============================================================
+// Building geometry
+// ============================================================
+function buildingOutlineShape() {
+  const shape = new THREE.Shape();
+  shape.moveTo(HULL[0][0], HULL[0][1]);
+  for (let i = 1; i < HULL.length; i++) shape.lineTo(HULL[i][0], HULL[i][1]);
+  shape.closePath();
+  return shape;
+}
+
+function makeFloorSlab(elev, color, opacity) {
+  const shape = buildingOutlineShape();
+  const geo = new THREE.ShapeGeometry(shape);
+  const mat = new THREE.MeshBasicMaterial({
+    color: color, transparent: true, opacity: opacity,
+    side: THREE.DoubleSide, depthWrite: false,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.y = elev;
+  mesh.renderOrder = 0;
+  return mesh;
+}
+
+function makeFloorOutline(elev, color) {
+  const pts = HULL.map(p => new THREE.Vector3(p[0], elev, p[1]));
+  pts.push(pts[0].clone());
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = new THREE.LineBasicMaterial({ color: color });
+  return new THREE.Line(geo, mat);
+}
+
+function makeVerticalEdges(elev0, elev1, color) {
+  const lines = new THREE.Group();
+  for (const p of HULL) {
+    const pts = [new THREE.Vector3(p[0], elev0, p[1]), new THREE.Vector3(p[0], elev1, p[1])];
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.5 });
+    lines.add(new THREE.Line(geo, mat));
+  }
+  return lines;
+}
+
+function makeGridLines(floor) {
+  const group = new THREE.Group();
+  const y = floor.elev + 0.05;
+  const step = 10;
+  const minX = -50, maxX = 50, minZ = -37, maxZ = 32;
+  const mat = new THREE.LineBasicMaterial({ color: 0x0a2a3a, transparent: true, opacity: 0.6 });
+  for (let x = minX; x <= maxX; x += step) {
+    const pts = [new THREE.Vector3(x, y, minZ), new THREE.Vector3(x, y, maxZ)];
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
+  }
+  for (let z = minZ; z <= maxZ; z += step) {
+    const pts = [new THREE.Vector3(minX, y, z), new THREE.Vector3(maxX, y, z)];
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
+  }
+  return group;
+}
+
+function makeZoneOutline(zone, elev) {
+  const y = elev + 0.1;
+  const { x, z, w, d } = zone;
+  const pts = [
+    new THREE.Vector3(x, y, z),
+    new THREE.Vector3(x + w, y, z),
+    new THREE.Vector3(x + w, y, z + d),
+    new THREE.Vector3(x, y, z + d),
+    new THREE.Vector3(x, y, z),
+  ];
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = new THREE.LineBasicMaterial({ color: 0x005580, transparent: true, opacity: 0.7 });
+  return new THREE.Line(geo, mat);
+}
+
+function buildScene() {
+  const topElev = FLOORS[FLOORS.length - 1].elev + FLOOR_HEIGHT;
+
+  // Ground shadow
+  const groundGeo = new THREE.PlaneGeometry(300, 300);
+  const groundMat = new THREE.MeshBasicMaterial({ color: 0x010810, side: THREE.DoubleSide });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -5;
+  scene.add(ground);
+
+  // Build each floor
+  FLOORS.forEach((floor, fi) => {
+    const isActive = (fi === selectedFloor - 1) || true; // all visible at start
+
+    // Floor slab
+    const slab = makeFloorSlab(floor.elev, floor.color, 0.25);
+    slab.userData.floorId = floor.id;
+    scene.add(slab);
+
+    // Floor outline
+    const outline = makeFloorOutline(floor.elev, 0x00d4ff);
+    outline.userData.floorId = floor.id;
+    scene.add(outline);
+
+    // Ceiling of each floor = floor of next, or +4
+    const ceilElev = floor.elev + FLOOR_HEIGHT;
+    const ceilOutline = makeFloorOutline(ceilElev, 0x004466);
+    scene.add(ceilOutline);
+
+    // Vertical edges
+    scene.add(makeVerticalEdges(floor.elev, ceilElev, 0x005580));
+
+    // Grid
+    scene.add(makeGridLines(floor));
+
+    // Zone outlines
+    floor.zones.forEach(zone => {
+      scene.add(makeZoneOutline(zone, floor.elev));
+    });
+  });
+
+  // Top roof outline (stronger)
+  const roof = makeFloorOutline(topElev, 0x00d4ff);
+  scene.add(roof);
+
+  // Roof slab
+  const roofSlab = makeFloorSlab(topElev, 0x003344, 0.15);
+  scene.add(roofSlab);
+
+  // Compass / ground frame
+  const frameGeo = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-70, -5, -50),
+    new THREE.Vector3( 70, -5, -50),
+    new THREE.Vector3( 70, -5,  50),
+    new THREE.Vector3(-70, -5,  50),
+    new THREE.Vector3(-70, -5, -50),
+  ]);
+  const frameMat = new THREE.LineBasicMaterial({ color: 0x02273a, transparent: true, opacity: 0.4 });
+  scene.add(new THREE.Line(frameGeo, frameMat));
+}
+
+// ============================================================
+// Equipment markers
+// ============================================================
+function getEquipFloor(eq) {
+  const loc = (eq.location || '').toLowerCase();
+  if (loc.includes('b1') || loc.includes('地下')) return 'B1';
+  if (loc.includes('4f') || loc.includes('四樓') || loc.includes('4樓')) return '4F';
+  if (loc.includes('3f') || loc.includes('三樓') || loc.includes('3樓')) return '3F';
+  if (loc.includes('2f') || loc.includes('二樓') || loc.includes('2樓')) return '2F';
+  return '1F'; // default
+}
+
+function getEquipStatus(eq) {
+  if (eq._light === 'red') return 'red';
+  if (eq._light === 'green') return 'green';
+  return 'yellow';
+}
+
+function addEquipmentMarkers(equipment) {
+  // Remove old markers
+  equipmentMeshes.forEach(em => scene.remove(em.mesh));
+  equipmentMeshes = [];
+
+  const floorEquip = {};
+  FLOORS.forEach(f => { floorEquip[f.id] = []; });
+
+  equipment.forEach(eq => {
+    const fid = getEquipFloor(eq);
+    if (floorEquip[fid]) floorEquip[fid].push(eq);
+    else floorEquip['1F'].push(eq);
+  });
+
+  FLOORS.forEach((floor, fi) => {
+    const eqs = floorEquip[floor.id] || [];
+    const cols = Math.max(1, Math.ceil(Math.sqrt(eqs.length)));
+    eqs.forEach((eq, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const px = -40 + col * 12;
+      const pz = -28 + row * 12;
+      const py = floor.elev + 0.4;
+
+      const status = getEquipStatus(eq);
+      const color = status === 'green' ? COLOR_GREEN : status === 'red' ? COLOR_RED : COLOR_YELLOW;
+
+      // Outer ring
+      const ringGeo = new THREE.RingGeometry(1.2, 1.6, 16);
+      const ringMat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(px, py, pz);
+
+      // Core dot
+      const dotGeo = new THREE.CircleGeometry(0.7, 16);
+      const dotMat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
+      const dot = new THREE.Mesh(dotGeo, dotMat);
+      dot.rotation.x = -Math.PI / 2;
+      dot.position.set(px, py + 0.01, pz);
+
+      // Vertical glow beam
+      const beamPts = [new THREE.Vector3(px, py, pz), new THREE.Vector3(px, py + 3, pz)];
+      const beamGeo = new THREE.BufferGeometry().setFromPoints(beamPts);
+      const beamMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.3 });
+      const beam = new THREE.Line(beamGeo, beamMat);
+
+      const group = new THREE.Group();
+      group.add(ring, dot, beam);
+      group.userData = { eq, status, floorId: floor.id };
+      scene.add(group);
+
+      // Clickable proxy sphere
+      const sphereGeo = new THREE.SphereGeometry(1.8, 8, 8);
+      const sphereMat = new THREE.MeshBasicMaterial({ visible: false });
+      const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+      sphere.position.set(px, py + 0.5, pz);
+      sphere.userData = { eq, status, floorId: floor.id, isEquipProxy: true };
+      scene.add(sphere);
+
+      equipmentMeshes.push({ mesh: sphere, group, data: eq, status, floorId: floor.id });
+    });
+  });
+
+  updateStats(equipment);
+}
+
+function updateStats(equipment) {
+  let green = 0, red = 0, yellow = 0;
+  equipment.forEach(eq => {
+    const s = getEquipStatus(eq);
+    if (s === 'green') green++;
+    else if (s === 'red') red++;
+    else yellow++;
+  });
+  document.getElementById('cnt-green').textContent = green;
+  document.getElementById('cnt-red').textContent = red;
+  document.getElementById('cnt-yellow').textContent = yellow;
+  document.getElementById('cnt-total').textContent = equipment.length;
+}
+
+// ============================================================
+// Supabase data
+// ============================================================
+async function loadData() {
+  setProgress(60, '載入設備資料…');
+  const { data: eqs } = await db.from('equipment').select('*').eq('status', 'active');
+  if (!eqs || eqs.length === 0) { setProgress(90, '無設備資料'); addEquipmentMarkers([]); return; }
+
+  setProgress(75, '載入巡檢狀態…');
+  // Get latest light_status for each equipment from inspection_records
+  const eqIds = eqs.map(e => e.equipment_id);
+  const { data: records } = await db
+    .from('inspection_records')
+    .select('equipment_id, light_status, inspect_time')
+    .in('equipment_id', eqIds)
+    .order('inspect_time', { ascending: false });
+
+  // Map latest status per equipment
+  const statusMap = {};
+  if (records) {
+    records.forEach(r => {
+      if (!statusMap[r.equipment_id]) statusMap[r.equipment_id] = r;
+    });
+  }
+
+  allEquipment = eqs.map(eq => ({
+    ...eq,
+    _light: statusMap[eq.equipment_id]?.light_status || null,
+    _lastInspect: statusMap[eq.equipment_id]?.inspect_time || null,
+  }));
+
+  setProgress(90, '建立設備標記…');
+  addEquipmentMarkers(allEquipment);
+}
+
+// ============================================================
+// Floor navigation
+// ============================================================
+function gotoFloor(floorNum) {
+  selectedFloor = floorNum;
+  // floorNum: 0=B1,1=1F,2=2F,3=3F,4=4F (button data-floor)
+  const floorIdx = floorNum; // matches FLOORS array index
+  const floor = FLOORS[floorIdx];
+  const targetY = floor.elev + 2;
+
+  // Animate camera target Y
+  const startY = orbit.targetY;
+  const endY = targetY;
+  let t = 0;
+  const animate = () => {
+    t += 0.05;
+    orbit.targetY = startY + (endY - startY) * Math.min(t, 1);
+    if (t < 1) requestAnimationFrame(animate);
+  };
+  animate();
+
+  // Update floor buttons
+  document.querySelectorAll('.floor-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.floor) === floorNum);
+  });
+
+  // Adjust floor opacities
+  highlightFloor(floorIdx);
+}
+
+function highlightFloor(activeIdx) {
+  // Nothing to do for wireframe — all floors remain visible
+}
+
+// ============================================================
+// Click handling
+// ============================================================
+function onCanvasClick(e) {
+  if (Math.abs(e.clientX - (orbit.startX || e.clientX)) > 5) return; // dragged
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  const proxies = equipmentMeshes.map(em => em.mesh);
+  const hits = raycaster.intersectObjects(proxies);
+  if (hits.length > 0) {
+    const hit = hits[0].object;
+    showInfoPanel(hit.userData.eq, hit.userData.status);
+  } else {
+    closeInfoPanel();
+  }
+}
+
+function showInfoPanel(eq, status) {
+  selectedEquipment = eq;
+  document.getElementById('ip-name').textContent = eq.name;
+  document.getElementById('ip-location').textContent = eq.location || '—';
+  document.getElementById('ip-qr').textContent = eq.qr_code || '—';
+
+  const lastTime = eq._lastInspect ? new Date(eq._lastInspect).toLocaleString('zh-TW') : '未巡檢';
+  document.getElementById('ip-last').textContent = lastTime;
+
+  const statusLabels = { green: '正常', red: '異常', yellow: '待巡檢' };
+  const statusClasses = { green: 'status-green', red: 'status-red', yellow: 'status-yellow' };
+  const wrap = document.getElementById('ip-status-wrap');
+  wrap.innerHTML = `<div class="ip-status ${statusClasses[status] || 'status-yellow'}">${statusLabels[status] || '未知'}</div>`;
+
+  document.getElementById('info-panel').classList.add('show');
+}
+
+function closeInfoPanel() {
+  document.getElementById('info-panel').classList.remove('show');
+  selectedEquipment = null;
+}
+
+function gotoInspect() {
+  if (selectedEquipment) {
+    window.location.href = `app.html?eq=${encodeURIComponent(selectedEquipment.equipment_id)}`;
+  }
+  return false;
+}
+
+// ============================================================
+// Fullscreen
+// ============================================================
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+    document.getElementById('btnFullscreen').textContent = '⛶ 退出全螢幕';
+  } else {
+    document.exitFullscreen();
+    document.getElementById('btnFullscreen').textContent = '⛶ 全螢幕';
+  }
+}
+
+// ============================================================
+// Animation loop
+// ============================================================
+function animate() {
+  animFrame = requestAnimationFrame(animate);
+  updateCamera();
+
+  // Pulse equipment markers
+  const t = Date.now() * 0.001;
+  equipmentMeshes.forEach(({ group, status }) => {
+    if (!group) return;
+    const pulse = 0.85 + 0.15 * Math.sin(t * 2 + group.position.x);
+    // Scale ring slightly
+    if (group.children[0]) group.children[0].scale.setScalar(pulse);
+  });
+
+  renderer.render(scene, camera);
+}
+
+// ============================================================
+// Main
+// ============================================================
+async function main() {
+  setProgress(10, '初始化渲染引擎…');
+  initThree();
+
+  setProgress(25, '建立建物模型…');
+  buildScene();
+
+  setProgress(45, '設置相機控制…');
+  setupOrbit();
+
+  await loadData();
+
+  setProgress(100, '完成');
+  setTimeout(() => {
+    document.getElementById('loading').style.opacity = '0';
+    document.getElementById('loading').style.transition = 'opacity 0.5s';
+    setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 500);
+  }, 200);
+
+  animate();
+}
+
+main().catch(err => {
+  document.getElementById('ld-msg').textContent = '載入失敗：' + err.message;
+  console.error(err);
+});
+</script>
+</body>
+</html>
