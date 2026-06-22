@@ -3,356 +3,325 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>文字雲</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/wordcloud@1.2.2/src/wordcloud2.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<title>臺北農產運銷 ｜ 系統入口</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;700&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:#020b18; --surface:#04111f; --panel:#05101e;
+    --border:#0c2840; --border-hi:#1a4a70;
+    --cyan:#00d4ff; --cyan-dim:rgba(0,212,255,0.12);
+    --blue:#1a7fff; --green:#00ff9d; --amber:#ffb300; --red:#ff3b3b;
+    --text:#a8d8f0; --text-hi:#d4eeff; --text-dim:#3a6a8a;
+    --font-mono:'Share Tech Mono',monospace;
+    --font-head:'Rajdhani',sans-serif;
+    --font-tc:'Noto Sans TC',sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html,body{min-height:100%}
 
   body {
-    font-family: 'Noto Sans TC', sans-serif;
-    background: #0f172a;
-    color: #e2e8f0;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 24px 16px;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-mono);
+    display:flex;
+    flex-direction:column;
   }
 
-  h1 {
-    font-size: 1.6rem;
-    font-weight: 700;
-    margin-bottom: 20px;
-    color: #f8fafc;
-    letter-spacing: 0.05em;
+  /* grid background */
+  body::before {
+    content:'';
+    position:fixed;inset:0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.022) 1px, transparent 1px),
+      linear-gradient(90deg,rgba(0,212,255,0.022) 1px, transparent 1px);
+    background-size:48px 48px;
+    pointer-events:none;
+  }
+  /* corner vignette */
+  body::after {
+    content:'';
+    position:fixed;inset:0;
+    background:radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,.65) 100%);
+    pointer-events:none;
   }
 
-  .input-area {
-    display: flex;
-    gap: 10px;
-    width: 100%;
-    max-width: 520px;
-    margin-bottom: 16px;
+  /* ── TOP STATUS BAR ── */
+  .statusbar {
+    position:relative;z-index:10;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 24px;
+    height:36px;
+    background:rgba(2,8,20,.9);
+    border-bottom:1px solid var(--border);
+    font-size:.68rem;letter-spacing:.1em;
+    flex-shrink:0;
+  }
+  .statusbar-left{display:flex;gap:18px;align-items:center}
+  .status-pill{display:flex;align-items:center;gap:6px}
+  .dot-online{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:blink 2s ease-in-out infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+  .statusbar-right{color:var(--text-dim)}
+  #clock{color:var(--cyan);font-size:.76rem;letter-spacing:.12em}
+
+  /* ── HEADER ── */
+  .header {
+    position:relative;z-index:10;
+    text-align:center;
+    padding:32px 24px 20px;
+    flex-shrink:0;
+  }
+  .org-badge {
+    display:inline-block;
+    font-size:.72rem;
+    font-family:var(--font-mono);
+    letter-spacing:.18em;
+    color:var(--text-dim);
+    border:1px solid var(--border);
+    padding:4px 14px;
+    margin-bottom:14px;
+    clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px));
+  }
+  .org-name {
+    font-family:var(--font-tc);
+    font-weight:700;
+    font-size:1.72rem;
+    color:var(--text-hi);
+    letter-spacing:.04em;
+    line-height:1.2;
+    text-shadow:0 0 28px rgba(0,212,255,0.25);
+  }
+  .sub-name {
+    font-family:var(--font-tc);
+    font-size:.96rem;
+    color:var(--text-dim);
+    margin-top:4px;
+    letter-spacing:.06em;
+  }
+  .header-divider {
+    width:120px;height:1px;
+    background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+    margin:18px auto 0;
+    opacity:.5;
+  }
+  .sys-label {
+    font-size:.62rem;letter-spacing:.22em;color:var(--text-dim);margin-top:10px;
+    font-family:var(--font-mono);
   }
 
-  #wordInput {
-    flex: 1;
-    padding: 12px 16px;
-    font-size: 1.1rem;
-    border-radius: 12px;
-    border: 2px solid #334155;
-    background: #1e293b;
-    color: #f1f5f9;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  #wordInput:focus { border-color: #6366f1; }
-  #wordInput::placeholder { color: #64748b; }
-
-  button {
-    padding: 12px 20px;
-    border-radius: 12px;
-    border: none;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s;
+  /* ── CARDS AREA ── */
+  .cards-area {
+    position:relative;z-index:10;
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0 24px 24px;
+    gap:24px;
+    flex-wrap:wrap;
   }
 
-  #submitBtn {
-    background: #6366f1;
-    color: white;
+  /* ── SYSTEM CARD ── */
+  .sys-card {
+    position:relative;
+    width:300px;
+    padding:28px 24px 26px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    clip-path:polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,18px 100%,0 calc(100% - 18px));
+    cursor:pointer;
+    text-decoration:none;
+    display:block;
+    transition:border-color .25s, transform .2s;
+    overflow:hidden;
   }
-  #submitBtn:hover { background: #4f46e5; transform: translateY(-1px); }
-  #submitBtn:active { transform: none; }
-
-  .controls {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
+  .sys-card::before {
+    content:'';
+    position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg, var(--card-color), transparent);
+    opacity:.7;
+    transition:opacity .25s;
   }
-
-  #toggleBtn {
-    background: #1e293b;
-    color: #94a3b8;
-    border: 2px solid #334155;
-    font-size: 0.9rem;
+  .sys-card::after {
+    content:'';
+    position:absolute;inset:0;
+    background:radial-gradient(ellipse at 50% 0%, rgba(var(--card-rgb),.06) 0%, transparent 70%);
+    transition:opacity .25s;
   }
-  #toggleBtn:hover { border-color: #6366f1; color: #e2e8f0; }
-
-  #clearBtn {
-    background: #1e293b;
-    color: #94a3b8;
-    border: 2px solid #334155;
-    font-size: 0.9rem;
+  .sys-card:hover {
+    border-color:var(--card-color);
+    transform:translateY(-4px);
+    box-shadow:0 8px 32px rgba(var(--card-rgb),.18);
   }
-  #clearBtn:hover { border-color: #ef4444; color: #fca5a5; }
+  .sys-card:hover::before{opacity:1}
 
-  #downloadBtn {
-    background: #1e293b;
-    color: #94a3b8;
-    border: 2px solid #334155;
-    font-size: 0.9rem;
+  .card-icon {
+    font-size:2rem;
+    margin-bottom:14px;
+    display:block;
+    filter:drop-shadow(0 0 8px var(--card-color));
   }
-  #downloadBtn:hover { border-color: #34d399; color: #6ee7b7; }
-
-  .cloud-wrapper {
-    width: 100%;
-    max-width: 800px;
-    transition: opacity 0.4s, max-height 0.4s;
-    overflow: hidden;
+  .card-sys-id {
+    font-size:.6rem;letter-spacing:.2em;
+    color:var(--card-color);
+    opacity:.7;margin-bottom:6px;
   }
-  .cloud-wrapper.hidden { opacity: 0; max-height: 0 !important; }
-
-  .cloud-container {
-    aspect-ratio: 16/9;
-    background: #1e293b;
-    border-radius: 20px;
-    border: 1px solid #334155;
-    overflow: hidden;
-    position: relative;
+  .card-title {
+    font-family:var(--font-head);
+    font-size:1.45rem;
+    font-weight:700;
+    color:var(--text-hi);
+    margin-bottom:6px;
+    letter-spacing:.04em;
   }
-
-  #canvas { width: 100%; height: 100%; display: block; }
-
-  .empty-msg {
-    position: absolute;
-    inset: 0;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    color: #475569;
-    font-size: 1rem;
-    pointer-events: none;
+  .card-desc {
+    font-size:.74rem;
+    color:var(--text-dim);
+    line-height:1.6;
+    font-family:var(--font-tc);
+    margin-bottom:18px;
   }
-
-  .toast {
-    position: fixed;
-    bottom: 80px;
-    left: 50%;
-    transform: translateX(-50%) translateY(20px);
-    background: #4ade80;
-    color: #052e16;
-    padding: 10px 24px;
-    border-radius: 999px;
-    font-weight: 600;
-    opacity: 0;
-    transition: all 0.3s;
-    pointer-events: none;
-    z-index: 100;
+  .card-enter {
+    display:inline-flex;align-items:center;gap:8px;
+    font-size:.7rem;letter-spacing:.14em;
+    color:var(--card-color);
+    font-family:var(--font-mono);
+    border:1px solid var(--card-color);
+    padding:6px 14px;
+    clip-path:polygon(0 0,calc(100% - 6px) 0,100% 6px,100% 100%,6px 100%,0 calc(100% - 6px));
+    transition:background .2s, color .2s;
   }
-  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  .toast.error { background: #f87171; color: #450a0a; }
+  .sys-card:hover .card-enter {
+    background:var(--card-color);
+    color:var(--bg);
+  }
+  .card-enter-arrow {
+    transition:transform .2s;
+  }
+  .sys-card:hover .card-enter-arrow{transform:translateX(4px)}
 
-  .url-section {
-    margin-top: 24px;
-    background: #1e293b;
-    border-radius: 16px;
-    border: 1px solid #334155;
-    padding: 20px;
-    width: 100%;
-    max-width: 520px;
-    display: flex;
-    align-items: center;
-    gap: 20px;
+  /* card color tokens */
+  .card-admin   { --card-color:var(--cyan);  --card-rgb:0,212,255  }
+  .card-maint   { --card-color:var(--amber); --card-rgb:255,179,0  }
+  .card-inspect { --card-color:var(--green); --card-rgb:0,255,157  }
+
+  /* ── FOOTER ── */
+  .footer {
+    position:relative;z-index:10;
+    text-align:center;padding:10px 24px;
+    font-size:.6rem;letter-spacing:.1em;color:var(--text-dim);
+    border-top:1px solid var(--border);
+    flex-shrink:0;
   }
 
-  .url-text { flex: 1; }
-  .url-label {
-    font-size: 0.75rem;
-    color: #64748b;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+  /* scan-line flicker */
+  @keyframes scanline {
+    0%  { transform:translateY(-100%) }
+    100%{ transform:translateY(100vh) }
   }
-  .url-value {
-    font-size: 0.85rem;
-    color: #a5b4fc;
-    word-break: break-all;
-    font-family: monospace;
+  .scanline {
+    position:fixed;top:0;left:0;width:100%;height:2px;
+    background:linear-gradient(transparent,rgba(0,212,255,.04),transparent);
+    animation:scanline 6s linear infinite;
+    pointer-events:none;z-index:1;
   }
 
-  #qrcode img, #qrcode canvas {
-    border-radius: 8px;
-    background: white;
-    padding: 4px;
+  /* corner decorations */
+  .corner {
+    position:fixed;width:28px;height:28px;
+    border-color:var(--cyan);border-style:solid;
+    opacity:.3;
   }
+  .corner-tl{top:10px;left:10px;border-width:2px 0 0 2px}
+  .corner-tr{top:10px;right:10px;border-width:2px 2px 0 0}
+  .corner-bl{bottom:10px;left:10px;border-width:0 0 2px 2px}
+  .corner-br{bottom:10px;right:10px;border-width:0 2px 2px 0}
 
-  .word-count {
-    margin-top: 12px;
-    font-size: 0.8rem;
-    color: #64748b;
-  }
+/* ===== MOBILE RESPONSIVE FIX (added) ===== */
+@media (max-width:640px){
+  .statusbar{padding:0 14px;font-size:0.56rem}
+  .statusbar-left{gap:10px}
+  .cards-area{flex:none;align-items:stretch;justify-content:flex-start;
+    padding:14px 16px 36px;gap:16px}
+  .sys-card{width:100%;max-width:400px;margin:0 auto}
+}
+
 </style>
 </head>
 <body>
+  <div class="scanline"></div>
+  <div class="corner corner-tl"></div>
+  <div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div>
+  <div class="corner corner-br"></div>
 
-<h1>📝 文字雲</h1>
-
-<div class="input-area">
-  <input id="wordInput" type="text" placeholder="輸入詞彙，按 Enter 送出" maxlength="30" autofocus>
-  <button id="submitBtn">送出</button>
-</div>
-
-<div class="controls">
-  <button id="toggleBtn">👁 隱藏文字雲</button>
-  <button id="clearBtn">🗑 清除全部</button>
-  <button id="downloadBtn">⬇ 下載資料</button>
-</div>
-
-<div class="cloud-wrapper" id="cloudWrapper">
-  <div class="cloud-container">
-    <canvas id="canvas"></canvas>
-    <div class="empty-msg" id="emptyMsg">等待詞彙輸入中...</div>
+  <!-- STATUS BAR -->
+  <div class="statusbar">
+    <div class="statusbar-left">
+      <div class="status-pill">
+        <div class="dot-online"></div>
+        <span>SYSTEM ONLINE</span>
+      </div>
+      <span style="color:var(--text-dim)">第一果菜市場</span>
+    </div>
+    <div class="statusbar-right">
+      <span id="clock">--:--:--</span>
+    </div>
   </div>
-</div>
 
-<p class="word-count" id="wordCount"></p>
-
-<div class="url-section">
-  <div class="url-text">
-    <div class="url-label">掃描 QR Code 加入</div>
-    <div class="url-value" id="urlDisplay"></div>
+  <!-- HEADER -->
+  <div class="header">
+    <div class="org-badge">TAPMC · FIRST FRUIT &amp; VEGETABLE MARKET</div>
+    <div class="org-name">臺北農產運銷股份有限公司</div>
+    <div class="sub-name">第一果菜市場</div>
+    <div class="header-divider"></div>
+    <div class="sys-label">INTEGRATED MANAGEMENT SYSTEM PORTAL</div>
   </div>
-  <div id="qrcode"></div>
-</div>
 
-<div class="toast" id="toast"></div>
+  <!-- CARDS -->
+  <div class="cards-area">
+
+    <a class="sys-card card-admin" href="admin.html">
+      <span class="card-icon">◈</span>
+      <div class="card-sys-id">SYS-01 ｜ ADMIN</div>
+      <div class="card-title">後台管理系統</div>
+      <div class="card-desc">設備管理、巡檢週期設定、報修單總覽、QR 碼產生與系統稽核紀錄。</div>
+      <div class="card-enter">ENTER <span class="card-enter-arrow">▶</span></div>
+    </a>
+
+    <a class="sys-card card-maint" href="maintenance.html">
+      <span class="card-icon">◪</span>
+      <div class="card-sys-id">SYS-02 ｜ MAINTENANCE</div>
+      <div class="card-title">維修管理系統</div>
+      <div class="card-desc">報修單處理流程、維修人員指派、進度追蹤與結案驗收管理。</div>
+      <div class="card-enter">ENTER <span class="card-enter-arrow">▶</span></div>
+    </a>
+
+    <a class="sys-card card-inspect" href="app.html">
+      <span class="card-icon">◉</span>
+      <div class="card-sys-id">SYS-03 ｜ INSPECTION</div>
+      <div class="card-title">巡檢系統</div>
+      <div class="card-desc">行動端 QR 掃描巡檢、異常回報、離線暫存與即時同步上傳。</div>
+      <div class="card-enter">ENTER <span class="card-enter-arrow">▶</span></div>
+    </a>
+
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    臺北農產運銷股份有限公司 第一果菜市場 ｜ INTEGRATED MANAGEMENT SYSTEM ｜ v2.0
+  </div>
 
 <script>
-const SUPABASE_URL = 'https://wifekdftslzsdcqygnis.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndpZmVrZGZ0c2x6c2RjcXlnbmlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTQ5OTAsImV4cCI6MjA5NzI3MDk5MH0.Q6REdEi5BxclCOqJn2I0_CDmy8HHdZVVJwtCccTF-QM';
-
-const { createClient } = supabase;
-const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-let allWords = [];
-let cloudVisible = true;
-
-const canvas = document.getElementById('canvas');
-const emptyMsg = document.getElementById('emptyMsg');
-const wordCount = document.getElementById('wordCount');
-const toggleBtn = document.getElementById('toggleBtn');
-const clearBtn = document.getElementById('clearBtn');
-const cloudWrapper = document.getElementById('cloudWrapper');
-
-// QR Code + URL
-const pageUrl = window.location.href.split('?')[0];
-document.getElementById('urlDisplay').textContent = pageUrl;
-new QRCode(document.getElementById('qrcode'), {
-  text: pageUrl,
-  width: 80,
-  height: 80,
-  colorDark: '#0f172a',
-  colorLight: '#ffffff',
-});
-
-function showToast(msg, isError = false) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show' + (isError ? ' error' : '');
-  setTimeout(() => { t.className = 'toast'; }, 2500);
-}
-
-function drawCloud() {
-  if (allWords.length === 0) {
-    emptyMsg.style.display = 'flex';
-    wordCount.textContent = '';
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    return;
+  // Real-time clock
+  function tick() {
+    const n = new Date();
+    const p = x => String(x).padStart(2,'0');
+    document.getElementById('clock').textContent =
+      `${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
   }
-  emptyMsg.style.display = 'none';
-
-  const maxCount = Math.max(...allWords.map(w => w.count));
-  const list = allWords.map(w => [w.word, Math.round(16 + (w.count / maxCount) * 64)]);
-  const colors = ['#818cf8','#a78bfa','#f472b6','#34d399','#60a5fa','#fbbf24','#f87171','#38bdf8'];
-
-  const rect = canvas.parentElement.getBoundingClientRect();
-  const w = rect.width || 800;
-  const h = rect.height || 450;
-  canvas.width = w;
-  canvas.height = h;
-
-  WordCloud(canvas, {
-    list,
-    gridSize: Math.round(8 * w / 1024),
-    weightFactor: 1,
-    fontFamily: 'Noto Sans TC, sans-serif',
-    color: () => colors[Math.floor(Math.random() * colors.length)],
-    rotateRatio: 0.3,
-    rotationSteps: 2,
-    backgroundColor: '#1e293b',
-    shuffle: false,
-  });
-
-  wordCount.textContent = `共 ${allWords.length} 個詞彙`;
-}
-
-async function loadWords() {
-  const { data, error } = await db
-    .from('word_cloud')
-    .select('word, count')
-    .order('count', { ascending: false });
-
-  if (error) { showToast('載入失敗', true); return; }
-  allWords = data || [];
-  drawCloud();
-}
-
-async function submitWord() {
-  const input = document.getElementById('wordInput');
-  const word = input.value.trim();
-  if (!word) return;
-  input.value = '';
-  input.focus();
-
-  const { error } = await db.rpc('upsert_word', { p_word: word });
-  if (error) { showToast('送出失敗 😢', true); return; }
-  showToast(`「${word}」已加入！`);
-  await loadWords();
-}
-
-toggleBtn.addEventListener('click', () => {
-  cloudVisible = !cloudVisible;
-  cloudWrapper.classList.toggle('hidden', !cloudVisible);
-  toggleBtn.textContent = cloudVisible ? '👁 隱藏文字雲' : '👁 顯示文字雲';
-});
-
-clearBtn.addEventListener('click', async () => {
-  if (!confirm('確定要清除所有詞彙嗎？')) return;
-  const { error } = await db.from('word_cloud').delete().gte('count', 0);
-  if (error) { showToast('清除失敗', true); return; }
-  allWords = [];
-  drawCloud();
-  showToast('已清除');
-});
-
-document.getElementById('downloadBtn').addEventListener('click', () => {
-  if (allWords.length === 0) { showToast('目前沒有資料', true); return; }
-  const header = '詞彙,次數\n';
-  const rows = allWords.map(w => `${w.word},${w.count}`).join('\n');
-  const blob = new Blob(['﻿' + header + rows], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `文字雲資料_${new Date().toLocaleDateString('zh-TW').replace(/\//g,'-')}.csv`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-});
-
-document.getElementById('wordInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') submitWord();
-});
-document.getElementById('submitBtn').addEventListener('click', submitWord);
-
-// Realtime
-db.channel('word_cloud_changes')
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'word_cloud' }, () => loadWords())
-  .subscribe();
-
-loadWords();
+  tick();
+  setInterval(tick, 1000);
 </script>
 </body>
 </html>

@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>臺北農產運銷股份有限公司 第一果菜市場 後台管理系統</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ===== RESET ===== */
+*{box-sizing:border-box;margin:0;padding:0}
+
+/* ===== THEME VARS ===== */
+:root{
+  --bg:#020b18;
+  --surface:#04111f;
+  --panel:#05101e;
+  --border:#0c2840;
+  --border-hi:#1a4a70;
+  --cyan:#00d4ff;
+  --cyan-dim:rgba(0,212,255,0.12);
+  --cyan-glow:0 0 14px rgba(0,212,255,0.5);
+  --blue:#1a7fff;
+  --green:#00ff9d;
+  --green-dim:rgba(0,255,157,0.1);
+  --amber:#ffb300;
+  --red:#ff3b3b;
+  --text:#a8d8f0;
+  --text-hi:#d4eeff;
+  --text-dim:#3a6a8a;
+  --font-mono:'Share Tech Mono',monospace;
+  --font-head:'Rajdhani',sans-serif;
+}
+
+/* ===== BODY ===== */
+body{
+  font-family:'Noto Sans TC',system-ui,sans-serif;
+  background:var(--bg);
+  background-image:
+    linear-gradient(rgba(0,212,255,0.022) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,212,255,0.022) 1px,transparent 1px);
+  background-size:48px 48px;
+  color:var(--text);
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+
+/* ===== TOP STATUS BAR ===== */
+.topbar{
+  background:rgba(2,8,20,0.95);
+  border-bottom:1px solid var(--border);
+  padding:6px 20px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  font-family:var(--font-mono);
+  font-size:0.68rem;
+  color:var(--text-dim);
+  flex-shrink:0;
+}
+.topbar-left{display:flex;gap:20px;align-items:center}
+.topbar-right{display:flex;gap:20px;align-items:center}
+.sys-tag{color:var(--cyan);letter-spacing:0.08em}
+.topbar-clock{color:var(--cyan);font-size:0.72rem;letter-spacing:0.1em}
+.online-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--green);
+  display:inline-block;margin-right:5px;
+  box-shadow:0 0 8px var(--green);
+  animation:blink 2s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.4}}
+
+/* ===== LAYOUT ===== */
+.layout{display:flex;flex:1;min-height:0}
+
+/* ===== SIDEBAR ===== */
+.sidebar{
+  width:240px;
+  background:linear-gradient(180deg,#030d1c 0%,#020910 100%);
+  border-right:1px solid var(--border);
+  flex-shrink:0;
+  display:flex;
+  flex-direction:column;
+  position:sticky;top:0;height:100vh;
+  overflow:hidden;
+}
+.sidebar::before{
+  content:'';
+  position:absolute;left:0;top:0;
+  width:2px;height:100%;
+  background:linear-gradient(180deg,transparent,var(--cyan) 30%,var(--blue) 70%,transparent);
+  opacity:0.7;
+}
+
+.sidebar-logo{
+  padding:22px 20px 18px;
+  border-bottom:1px solid var(--border);
+  position:relative;
+}
+.sidebar-logo::after{
+  content:'';position:absolute;
+  bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,var(--cyan),transparent 60%);
+  opacity:0.5;
+}
+.org-label{
+  font-family:'Noto Sans TC',system-ui,sans-serif;
+  font-size:1.32rem;
+  font-weight:700;
+  color:var(--text-hi);
+  line-height:1.4;
+  margin-bottom:8px;
+  letter-spacing:0.02em;
+}
+.sidebar-logo h1{
+  font-family:var(--font-head);
+  font-size:1.1rem;font-weight:700;
+  color:var(--cyan);
+  letter-spacing:0.06em;
+  text-shadow:var(--cyan-glow);
+}
+
+.sidebar-nav{flex:1;padding:14px 0;overflow-y:auto}
+.sidebar-nav::-webkit-scrollbar{width:3px}
+.sidebar-nav::-webkit-scrollbar-track{background:transparent}
+.sidebar-nav::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:2px}
+
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:11px 18px 11px 22px;
+  cursor:pointer;
+  font-size:0.84rem;
+  color:var(--text-dim);
+  transition:all 0.2s;
+  border-left:2px solid transparent;
+  position:relative;
+  letter-spacing:0.02em;
+}
+.nav-item:hover{
+  color:var(--text-hi);
+  background:rgba(0,212,255,0.04);
+  border-left-color:rgba(0,212,255,0.35);
+}
+.nav-item.active{
+  color:var(--cyan);
+  border-left-color:var(--cyan);
+  background:linear-gradient(90deg,rgba(0,212,255,0.1),transparent);
+  font-weight:600;
+  text-shadow:0 0 10px rgba(0,212,255,0.4);
+}
+.nav-item.active::after{
+  content:'';
+  position:absolute;right:0;top:0;bottom:0;
+  width:1px;
+  background:linear-gradient(180deg,transparent,var(--cyan),transparent);
+}
+.nav-icon{font-size:1rem;width:20px;text-align:center}
+
+.sidebar-footer{
+  padding:14px 20px;
+  border-top:1px solid var(--border);
+}
+.user-info{
+  font-size:0.72rem;
+  color:var(--text-dim);
+  margin-bottom:8px;
+  font-family:var(--font-mono);
+  letter-spacing:0.04em;
+}
+.logout-btn{
+  font-size:0.72rem;color:var(--text-dim);
+  background:none;
+  border:1px solid var(--border);
+  padding:6px 14px;border-radius:2px;
+  cursor:pointer;width:100%;
+  transition:all 0.2s;
+  letter-spacing:0.06em;
+  font-family:var(--font-head);text-transform:uppercase;
+}
+.logout-btn:hover{
+  border-color:var(--red);color:var(--red);
+  text-shadow:0 0 8px rgba(255,59,59,0.5);
+  box-shadow:0 0 10px rgba(255,59,59,0.15) inset;
+}
+
+/* ===== MAIN ===== */
+.main{flex:1;overflow-y:auto;padding:28px}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-track{background:transparent}
+.main::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:2px}
+
+.page-header{margin-bottom:24px;padding-bottom:14px;border-bottom:1px solid var(--border);position:relative}
+.page-header::after{
+  content:'';position:absolute;bottom:-1px;left:0;
+  width:100px;height:1px;
+  background:var(--cyan);
+  box-shadow:var(--cyan-glow);
+}
+.page-header h2{
+  font-family:var(--font-head);
+  font-size:1.65rem;font-weight:700;
+  color:var(--cyan);
+  letter-spacing:0.06em;
+  text-shadow:var(--cyan-glow);
+  text-transform:uppercase;
+}
+.page-header p{
+  font-size:0.73rem;
+  color:var(--text-dim);
+  margin-top:4px;
+  font-family:var(--font-mono);
+  letter-spacing:0.05em;
+}
+
+/* ===== PANELS ===== */
+.panel{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:2px;
+  padding:20px;
+  margin-bottom:20px;
+  position:relative;
+  clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px));
+}
+.panel::before{
+  content:'';
+  position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--cyan),var(--blue) 50%,transparent);
+  opacity:0.5;
+}
+
+.panel-title{
+  font-family:var(--font-head);
+  font-size:0.92rem;font-weight:700;
+  color:var(--cyan);
+  margin-bottom:16px;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  display:flex;align-items:center;gap:8px;
+}
+.panel-title::before{content:'◈';font-size:0.6rem;color:var(--cyan);opacity:0.8}
+
+/* ===== TABLE ===== */
+.data-table{width:100%;border-collapse:collapse;font-size:0.83rem}
+.data-table th{
+  text-align:left;padding:10px 14px;
+  color:var(--cyan);
+  border-bottom:1px solid var(--border-hi);
+  font-weight:600;white-space:nowrap;
+  font-family:var(--font-head);letter-spacing:0.08em;text-transform:uppercase;font-size:0.72rem;
+}
+.data-table td{
+  padding:11px 14px;
+  border-bottom:1px solid rgba(12,40,64,0.5);
+  color:var(--text);vertical-align:middle;
+}
+.data-table tr:hover td{background:rgba(0,212,255,0.025)}
+
+/* ===== FORM ===== */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:640px){.form-grid{grid-template-columns:1fr}}
+.field{margin-bottom:0}
+.field label{
+  display:block;font-size:0.68rem;
+  color:var(--text-dim);
+  margin-bottom:6px;font-weight:600;
+  letter-spacing:0.08em;text-transform:uppercase;
+  font-family:var(--font-head);
+}
+.field input,.field select,.field textarea{
+  width:100%;padding:9px 13px;
+  background:rgba(2,8,20,0.8);
+  border:1px solid var(--border);
+  border-radius:2px;
+  color:var(--text-hi);font-size:0.88rem;
+  outline:none;transition:all 0.2s;
+  font-family:inherit;
+}
+.field input:focus,.field select:focus,.field textarea:focus{
+  border-color:var(--cyan);
+  box-shadow:0 0 0 1px rgba(0,212,255,0.2),0 0 14px rgba(0,212,255,0.1);
+}
+.field textarea{resize:vertical;min-height:60px}
+
+/* ===== BUTTONS ===== */
+.btn{
+  padding:9px 18px;border:none;border-radius:2px;
+  font-size:0.82rem;font-weight:700;cursor:pointer;
+  transition:all 0.2s;letter-spacing:0.08em;
+  font-family:var(--font-head);text-transform:uppercase;
+}
+.btn-primary{
+  background:linear-gradient(135deg,#093060,#0055a8);
+  color:var(--cyan);
+  border:1px solid var(--cyan);
+  text-shadow:0 0 8px rgba(0,212,255,0.5);
+}
+.btn-primary:hover{
+  background:linear-gradient(135deg,#0d4080,#006fcf);
+  box-shadow:var(--cyan-glow);
+}
+.btn-sm{padding:5px 12px;font-size:0.72rem}
+.btn-warn{
+  background:rgba(255,179,0,0.1);color:var(--amber);
+  border:1px solid rgba(255,179,0,0.4);
+}
+.btn-warn:hover{background:rgba(255,179,0,0.2);box-shadow:0 0 10px rgba(255,179,0,0.25)}
+.btn-danger{
+  background:rgba(255,59,59,0.08);color:var(--red);
+  border:1px solid rgba(255,59,59,0.3);
+}
+
+/* ===== BADGES ===== */
+.badge{
+  display:inline-block;font-size:0.68rem;
+  padding:2px 8px;border-radius:2px;font-weight:700;
+  font-family:var(--font-mono);letter-spacing:0.06em;
+}
+.badge-active{background:rgba(0,255,157,0.08);color:var(--green);border:1px solid rgba(0,255,157,0.3)}
+.badge-inactive{background:rgba(58,106,138,0.1);color:var(--text-dim);border:1px solid rgba(58,106,138,0.3)}
+.badge-retired{background:rgba(255,59,59,0.08);color:var(--red);border:1px solid rgba(255,59,59,0.25)}
+.role-badge{
+  font-size:0.68rem;padding:2px 8px;border-radius:2px;
+  background:rgba(26,127,255,0.12);color:#60b0ff;
+  border:1px solid rgba(26,127,255,0.3);
+  font-family:var(--font-mono);
+}
+
+/* ===== STAT CARDS ===== */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:20px}
+.stat-card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:2px;padding:20px;
+  position:relative;overflow:hidden;
+  clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,0 100%);
+}
+.stat-card::before{
+  content:'';position:absolute;
+  top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--cyan),transparent);
+}
+.stat-card::after{
+  content:'';position:absolute;
+  bottom:-20px;right:-20px;
+  width:80px;height:80px;
+  background:radial-gradient(circle,rgba(0,212,255,0.07),transparent 70%);
+}
+.stat-val{
+  font-family:var(--font-mono);
+  font-size:2.4rem;font-weight:700;
+  color:var(--cyan);
+  text-shadow:var(--cyan-glow);
+  line-height:1;
+}
+.stat-label{
+  font-size:0.68rem;color:var(--text-dim);margin-top:8px;
+  letter-spacing:0.08em;text-transform:uppercase;
+  font-family:var(--font-head);
+}
+
+/* ===== TOAST ===== */
+.toast{
+  position:fixed;bottom:24px;right:24px;
+  background:rgba(0,255,157,0.1);color:var(--green);
+  border:1px solid rgba(0,255,157,0.35);
+  padding:10px 20px;border-radius:2px;
+  font-weight:700;opacity:0;transition:all 0.3s;
+  pointer-events:none;z-index:200;font-size:0.82rem;
+  font-family:var(--font-mono);letter-spacing:0.05em;
+  text-shadow:0 0 8px rgba(0,255,157,0.5);
+  box-shadow:0 0 20px rgba(0,255,157,0.15);
+}
+.toast.show{opacity:1}
+.toast.err{
+  background:rgba(255,59,59,0.1);color:var(--red);
+  border-color:rgba(255,59,59,0.35);
+  text-shadow:0 0 8px rgba(255,59,59,0.5);
+  box-shadow:0 0 20px rgba(255,59,59,0.15);
+}
+
+/* ===== MODAL ===== */
+.modal-bg{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,0.85);
+  backdrop-filter:blur(6px);
+  z-index:100;display:none;
+  align-items:center;justify-content:center;padding:20px;
+}
+.modal-bg.show{display:flex}
+.modal{
+  background:var(--surface);
+  border:1px solid var(--border-hi);
+  border-radius:2px;
+  padding:28px;width:100%;max-width:520px;
+  max-height:90vh;overflow-y:auto;
+  position:relative;
+  clip-path:polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,18px 100%,0 calc(100% - 18px));
+}
+.modal::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--cyan),var(--blue));
+}
+.modal-title{
+  font-family:var(--font-head);font-size:1.1rem;font-weight:700;
+  color:var(--cyan);margin-bottom:20px;
+  letter-spacing:0.08em;text-transform:uppercase;
+}
+.modal-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
+
+/* ===== PAGES ===== */
+.page-section{display:none}
+.page-section.active{display:block}
+
+/* ===== AUDIT ===== */
+.audit-row{
+  font-size:0.76rem;padding:10px 14px;
+  border-bottom:1px solid rgba(12,40,64,0.4);
+  font-family:var(--font-mono);
+}
+.audit-row:hover{background:rgba(0,212,255,0.02)}
+.audit-action-insert{color:var(--green)}
+.audit-action-update{color:#60a5fa}
+.audit-action-status_change{color:var(--amber)}
+
+/* ===== SEARCH BAR ===== */
+.search-bar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.search-input{
+  flex:1;min-width:160px;padding:9px 13px;
+  background:rgba(2,8,20,0.8);
+  border:1px solid var(--border);
+  border-radius:2px;color:var(--text-hi);font-size:0.88rem;outline:none;
+}
+.search-input:focus{border-color:var(--cyan);box-shadow:0 0 0 1px rgba(0,212,255,0.2)}
+.search-bar select{
+  padding:9px 13px;
+  background:rgba(2,8,20,0.8);
+  border:1px solid var(--border);
+  border-radius:2px;color:var(--text-hi);font-size:0.88rem;outline:none;
+}
+.search-bar select:focus{border-color:var(--cyan)}
+
+/* ===== COST ===== */
+.cost-eq-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 0;border-bottom:1px solid rgba(12,40,64,0.4);font-size:0.84rem;
+}
+.cost-eq-name{color:var(--text)}
+.cost-eq-amount{color:var(--cyan);font-weight:700;font-family:var(--font-mono)}
+
+/* ===== QR ===== */
+#qrPreview{display:inline-block;background:#fff;padding:8px;border-radius:2px;margin-top:12px;border:1px solid var(--cyan);box-shadow:var(--cyan-glow)}
+
+/* ===== MOBILE RESPONSIVE FIX (added) ===== */
+@media (max-width:768px){
+  html,body{overflow-x:hidden}
+  .topbar{flex-wrap:wrap;gap:4px 12px;font-size:0.58rem;padding:6px 12px}
+  .topbar-left,.topbar-right{gap:10px}
+  .layout{flex-direction:column;min-height:0}
+  .sidebar{width:100%;height:auto;position:static;overflow:visible;
+    border-right:none;border-bottom:1px solid var(--border)}
+  .sidebar::before{display:none}
+  .sidebar-logo{padding:14px 16px 12px}
+  .org-label{font-size:1.05rem;margin-bottom:4px}
+  .sidebar-logo h1{font-size:0.95rem}
+  .sidebar-nav{flex:none;display:flex;flex-direction:row;flex-wrap:nowrap;
+    overflow-x:auto;overflow-y:hidden;padding:6px;gap:2px;
+    -webkit-overflow-scrolling:touch;
+    border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+  .sidebar-nav::-webkit-scrollbar{height:3px}
+  .nav-item{white-space:nowrap;padding:9px 14px;border-left:none;
+    border-bottom:2px solid transparent}
+  .nav-item.active{border-left:none;border-bottom-color:var(--cyan);
+    background:linear-gradient(180deg,rgba(0,212,255,0.12),transparent)}
+  .nav-item.active::after{display:none}
+  .sidebar-footer{display:flex;align-items:center;justify-content:space-between;
+    gap:12px;padding:10px 16px}
+  .user-info{margin-bottom:0}
+  .logout-btn{width:auto;white-space:nowrap}
+  .main{flex:none;overflow:visible;height:auto;padding:18px 14px}
+  .page-header h2{font-size:1.3rem}
+  .stats-grid{grid-template-columns:1fr 1fr;gap:12px}
+}
+@media (max-width:420px){
+  .stats-grid{grid-template-columns:1fr}
+}
+
+</style>
+</head>
+<body>
+
+<!-- TOP STATUS BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="sys-tag">■ TAIPEC-MKT-1 ADMIN</span>
+    <span>臺北農產運銷 ／ 第一果菜市場</span>
+  </div>
+  <div class="topbar-right">
+    <span><span class="online-dot"></span>系統連線中</span>
+    <span class="topbar-clock" id="topClock"></span>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="org-label">臺北農產運銷股份有限公司<br>第一果菜市場</div>
+      <h1>⬡ 後台管理系統</h1>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" data-page="dashboard"><span class="nav-icon">◈</span> 總覽</div>
+      <div class="nav-item" data-page="users"><span class="nav-icon">◉</span> 帳號管理</div>
+      <div class="nav-item" data-page="equipment"><span class="nav-icon">◧</span> 設備管理</div>
+      <div class="nav-item" data-page="inspections"><span class="nav-icon">◫</span> 巡檢記錄</div>
+      <div class="nav-item" data-page="repairs"><span class="nav-icon">◪</span> 報修維修</div>
+      <div class="nav-item" data-page="costs"><span class="nav-icon">◬</span> 費用統計</div>
+      <div class="nav-item" data-page="audit"><span class="nav-icon">◭</span> 稽核記錄</div>
+      <div class="nav-item" data-page="cycles"><span class="nav-icon">↻</span> 巡檢週期</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info" id="sidebarUser">LOADING…</div>
+      <button class="logout-btn" onclick="logout()">⏻ 登出</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div class="page-section active" id="page-dashboard">
+      <div class="page-header" style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px">
+        <div>
+          <h2>◈ 系統總覽</h2>
+          <p>SYSTEM STATUS — 上次更新：<span id="lastRefresh" style="color:var(--cyan)">—</span></p>
+        </div>
+        <button onclick="loadDashboard()" style="flex-shrink:0;padding:7px 16px;background:rgba(0,212,255,0.08);border:1px solid var(--border-hi);color:var(--cyan);font-family:var(--font-head);letter-spacing:.08em;text-transform:uppercase;cursor:pointer;border-radius:2px;font-size:0.75rem;font-weight:700;transition:all .2s" onmouseover="this.style.boxShadow='var(--cyan-glow)'" onmouseout="this.style.boxShadow='none'">↻ 重新整理</button>
+      </div>
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div class="stat-val" id="stat-eq">—</div><div class="stat-label">設備總數</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-pending">—</div><div class="stat-label">待處理維修</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-insp-today">—</div><div class="stat-label">今日巡檢</div></div>
+        <div class="stat-card" style="--card-color:var(--red)"><div class="stat-val" id="stat-abnormal" style="color:var(--red);text-shadow:0 0 14px rgba(255,59,59,0.5)">—</div><div class="stat-label">今日異常</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-users">—</div><div class="stat-label">啟用帳號</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">最新維修單</div>
+        <div id="dashboardOrders"><div style="color:var(--text-dim);font-size:.85rem;font-family:var(--font-mono)">LOADING…</div></div>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div class="page-section" id="page-users">
+      <div class="page-header"><h2>◉ 帳號管理</h2><p>USER ACCOUNT &amp; ROLE ADMINISTRATION</p></div>
+      <div class="panel">
+        <div class="panel-title">新增帳號</div>
+        <div class="form-grid">
+          <div class="field"><label>姓名</label><input id="u-name" type="text" placeholder="姓名"></div>
+          <div class="field"><label>電子郵件（登入帳號）</label><input id="u-email" type="email" placeholder="user@example.com"></div>
+          <div class="field"><label>初始密碼</label><input id="u-pass" type="password" placeholder="至少 6 碼"></div>
+          <div class="field"><label>電話</label><input id="u-phone" type="text" placeholder="聯絡電話"></div>
+          <div class="field"><label>部門</label><input id="u-dept" type="text" placeholder="部門"></div>
+          <div class="field"><label>角色</label>
+            <select id="u-role">
+              <option value="inspector">巡檢人員</option>
+              <option value="maintenance">維修人員</option>
+              <option value="supervisor">主管／查詢</option>
+              <option value="admin">系統管理者</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:14px"><button class="btn btn-primary" onclick="createUser()">+ 建立帳號</button></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">帳號清單</div>
+        <div class="search-bar">
+          <input class="search-input" id="userSearch" placeholder="搜尋姓名或部門…" oninput="filterUsers()">
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table" id="usersTable">
+            <thead><tr><th>姓名</th><th>電話</th><th>部門</th><th>角色</th><th>狀態</th><th>操作</th></tr></thead>
+            <tbody id="usersTbody"><tr><td colspan="6" style="color:var(--text-dim);font-family:var(--font-mono)">LOADING…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- EQUIPMENT -->
+    <div class="page-section" id="page-equipment">
+      <div class="page-header"><h2>◧ 設備管理</h2><p>EQUIPMENT REGISTRY &amp; MAINTENANCE</p></div>
+      <div class="panel">
+        <div class="panel-title">新增設備</div>
+        <div class="form-grid">
+          <div class="field"><label>設備名稱</label><input id="eq-name" type="text" placeholder="設備名稱"></div>
+          <div class="field"><label>位置</label><input id="eq-loc" type="text" placeholder="廠區 / 樓層 / 位置"></div>
+          <div class="field"><label>購置費用（元）</label><input id="eq-cost" type="number" min="0" placeholder="0"></div>
+          <div class="field"><label>購置日期</label><input id="eq-date" type="date"></div>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="createEquipment()">+ 新增設備</button>
+        </div>
+        <div id="qrPreview"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">設備清單</div>
+        <div class="search-bar">
+          <input class="search-input" id="eqSearch" placeholder="搜尋設備名稱或位置…" oninput="filterEquipment()">
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table" id="eqTable">
+            <thead><tr><th>設備名稱</th><th>位置</th><th>購置費</th><th>狀態</th><th>QR Code</th><th>操作</th></tr></thead>
+            <tbody id="eqTbody"><tr><td colspan="6" style="color:var(--text-dim);font-family:var(--font-mono)">LOADING…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- INSPECTIONS -->
+    <div class="page-section" id="page-inspections">
+      <div class="page-header"><h2>◫ 巡檢記錄</h2><p>INSPECTION LOG — READ ONLY</p></div>
+      <div class="panel">
+        <div class="search-bar">
+          <select id="inspEqFilter" onchange="loadInspections()">
+            <option value="">全部設備</option>
+          </select>
+          <select id="inspStatusFilter" onchange="loadInspections()">
+            <option value="">全部狀態</option>
+            <option value="normal">正常</option>
+            <option value="abnormal">異常</option>
+          </select>
+          <input type="date" id="inspDateFrom" onchange="loadInspections()" style="padding:9px 13px;background:rgba(2,8,20,0.8);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-size:.88rem;outline:none" title="起始日期">
+          <input type="date" id="inspDateTo" onchange="loadInspections()" style="padding:9px 13px;background:rgba(2,8,20,0.8);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-size:.88rem;outline:none" title="結束日期">
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead><tr><th>設備</th><th>巡檢人</th><th>時間</th><th>狀態</th><th>說明</th></tr></thead>
+            <tbody id="inspTbody"><tr><td colspan="5" style="color:var(--text-dim);font-family:var(--font-mono)">LOADING…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- REPAIRS -->
+    <div class="page-section" id="page-repairs">
+      <div class="page-header"><h2>◪ 報修 &amp; 維修</h2><p>REPAIR &amp; MAINTENANCE ORDERS</p></div>
+      <div class="panel">
+        <div class="search-bar">
+          <select id="repairStatusFilter" onchange="loadRepairs()">
+            <option value="">全部狀態</option>
+            <option value="pending">待處理</option>
+            <option value="transferred">已轉維修</option>
+            <option value="closed">已結案</option>
+          </select>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead><tr><th>報修單編號</th><th>設備</th><th>報修人</th><th>故障說明</th><th>來源</th><th>報修狀態</th><th>維修狀態</th><th>建立時間</th></tr></thead>
+            <tbody id="repairsTbody"><tr><td colspan="8" style="color:var(--text-dim);font-family:var(--font-mono)">LOADING…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- COSTS -->
+    <div class="page-section" id="page-costs">
+      <div class="page-header"><h2>◬ 費用統計</h2><p>LIFECYCLE COST ANALYSIS</p></div>
+      <div class="panel">
+        <div class="panel-title">費用明細</div>
+        <div class="search-bar">
+          <select id="costEqFilter" onchange="loadCostAdmin()">
+            <option value="">全部設備</option>
+          </select>
+          <select id="costTypeFilter" onchange="loadCostAdmin()">
+            <option value="">全部類型</option>
+            <option value="purchase">購置費</option>
+            <option value="outsource">委外維修</option>
+            <option value="parts">零件費</option>
+            <option value="labor">工時費</option>
+            <option value="other">其他</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="exportCostCsv()">↓ CSV</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead><tr><th>設備</th><th>類型</th><th>廠商</th><th>日期</th><th>說明</th><th style="text-align:right">金額</th></tr></thead>
+            <tbody id="costTbody"><tr><td colspan="6" style="color:var(--text-dim);font-family:var(--font-mono)">LOADING…</td></tr></tbody>
+          </table>
+        </div>
+        <div style="text-align:right;padding:12px 14px 0;font-size:.88rem;color:var(--cyan);font-weight:700;font-family:var(--font-mono)" id="costTotalDisplay"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">各設備費用排名</div>
+        <div id="costByEq"><div style="color:var(--text-dim);font-size:.85rem;font-family:var(--font-mono)">LOADING…</div></div>
+      </div>
+    </div>
+
+    <!-- AUDIT -->
+    <div class="page-section" id="page-audit">
+      <div class="page-header"><h2>◭ 稽核記錄</h2><p>AUDIT LOG — PERMANENT / IMMUTABLE</p></div>
+      <div class="panel">
+        <div class="search-bar">
+          <select id="auditTableFilter" onchange="loadAudit()">
+            <option value="">全部資料表</option>
+            <option value="users">帳號</option>
+            <option value="equipment">設備</option>
+            <option value="inspection_records">巡檢記錄</option>
+            <option value="repair_requests">報修單</option>
+            <option value="maintenance_orders">維修單</option>
+            <option value="cost_records">費用</option>
+          </select>
+          <select id="auditActionFilter" onchange="loadAudit()">
+            <option value="">全部動作</option>
+            <option value="insert">新增</option>
+            <option value="update">修改</option>
+            <option value="status_change">狀態變更</option>
+          </select>
+        </div>
+        <div id="auditList"><div style="color:var(--text-dim);font-size:.85rem;font-family:var(--font-mono)">LOADING…</div></div>
+      </div>
+    </div>
+
+    <!-- CYCLES -->
+    <div class="page-section" id="page-cycles">
+      <div class="page-header"><h2>↻ 巡檢週期管理</h2><p>INSPECTION CYCLE CONTROL</p></div>
+      <div class="panel">
+        <div class="panel-title">建立新週期</div>
+        <div class="form-grid">
+          <div class="field">
+            <label>週期類型</label>
+            <select id="cycleType">
+              <option value="daily">每日</option>
+              <option value="shift">每班</option>
+              <option value="weekly">每週</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:14px" onclick="createCycle()">⟳ 開啟新週期（結束現有週期）</button>
+      </div>
+      <div class="panel">
+        <div class="panel-title">週期歷史</div>
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead><tr><th>類型</th><th>開始時間</th><th>結束時間</th><th>狀態</th></tr></thead>
+            <tbody id="cyclesTbody"><tr><td colspan="4" style="color:var(--text-dim);font-family:var(--font-mono)">LOADING…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- EDIT EQUIPMENT MODAL -->
+<div class="modal-bg" id="editEqModal">
+  <div class="modal">
+    <div class="modal-title">◧ 修改設備資料</div>
+    <input type="hidden" id="edit-eq-id">
+    <div class="form-grid">
+      <div class="field"><label>設備名稱</label><input id="edit-eq-name" type="text"></div>
+      <div class="field"><label>位置</label><input id="edit-eq-loc" type="text"></div>
+      <div class="field"><label>購置費用</label><input id="edit-eq-cost" type="number" min="0"></div>
+      <div class="field"><label>購置日期</label><input id="edit-eq-date" type="date"></div>
+      <div class="field"><label>狀態</label>
+        <select id="edit-eq-status">
+          <option value="active">運轉中</option>
+          <option value="inactive">停用</option>
+          <option value="retired">關閉報廢</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-sm" style="background:rgba(12,40,64,0.6);color:var(--text-dim);border:1px solid var(--border)" onclick="closeModal('editEqModal')">取消</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEquipment()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- QR MODAL -->
+<div class="modal-bg" id="qrModal">
+  <div class="modal" style="text-align:center">
+    <div class="modal-title" id="qrModalTitle">設備 QR CODE</div>
+    <div id="qrModalCode" style="display:inline-block;background:#fff;padding:12px;border-radius:2px;margin:16px 0;border:1px solid var(--cyan);box-shadow:var(--cyan-glow)"></div>
+    <div style="font-size:.75rem;color:var(--text-dim);margin-bottom:16px;font-family:var(--font-mono)" id="qrModalId"></div>
+    <button class="btn btn-primary" onclick="closeModal('qrModal')">關閉</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== REAL-TIME CLOCK =====
+(function tick(){
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  document.getElementById('topClock').textContent=
+    `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  setTimeout(tick,1000);
+})();
+</script>
+
+<script>
+const SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+let allUsers = [], allEquipment = [], userMap = {}, eqMap = {};
+const ROLE_LABEL = { admin:'管理者', inspector:'巡檢人員', maintenance:'維修人員', supervisor:'主管' };
+const STATUS_LABEL = { pending:'待處理', transferred:'已轉維修', closed:'已結案' };
+const ORDER_STATUS_LABEL = { pending:'待處理', in_progress:'處理中', pending_review:'待驗收', completed:'已完成', closed:'結案' };
+const COST_TYPE_LABEL = { purchase:'購置費', outsource:'委外維修', parts:'零件費', labor:'工時費', other:'其他' };
+
+(async () => {
+  const { data: profile } = await db.from('users').select('*').eq('auth_id', 'eb771a87-aa4d-4066-b23d-9b810a5c00bd').single();
+  currentUser = profile || { user_id: 'eb771a87-aa4d-4066-b23d-9b810a5c00bd', name: '系統管理者', role: 'admin', status: 'active' };
+  document.getElementById('sidebarUser').textContent = `${currentUser.name} [${ROLE_LABEL[currentUser.role] || 'ADMIN'}]`;
+
+  setupNav();
+  await loadAll();
+  loadDashboard();
+  // 自動刷新儀表板每 60 秒
+  setInterval(async () => {
+    const activePage = document.querySelector('.page-section.active');
+    if (activePage && activePage.id === 'page-dashboard') {
+      await loadAll();
+      loadDashboard();
+    }
+  }, 60000);
+})();
+
+function setupNav() {
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+      item.classList.add('active');
+      document.getElementById('page-' + item.dataset.page).classList.add('active');
+      const page = item.dataset.page;
+      if (page === 'users') loadUsers();
+      else if (page === 'equipment') loadEquipmentList();
+      else if (page === 'inspections') { populateEqFilter('inspEqFilter'); loadInspections(); }
+      else if (page === 'repairs') loadRepairs();
+      else if (page === 'costs') { populateEqFilter('costEqFilter'); loadCostAdmin(); loadCostByEq(); }
+      else if (page === 'audit') loadAudit();
+      else if (page === 'cycles') loadCycles();
+      else if (page === 'dashboard') loadDashboard();
+    });
+  });
+}
+
+async function loadAll() {
+  const [{ data: us }, { data: eqs }] = await Promise.all([
+    db.from('users').select('*').order('name'),
+    db.from('equipment').select('*').order('name'),
+  ]);
+  allUsers = us || []; allEquipment = eqs || [];
+  allUsers.forEach(u => userMap[u.user_id] = u);
+  allEquipment.forEach(e => eqMap[e.equipment_id] = e);
+}
+
+function populateEqFilter(selectId) {
+  const el = document.getElementById(selectId);
+  if (!el) return;
+  const current = el.value;
+  el.innerHTML = '<option value="">全部設備</option>' + allEquipment.map(e => `<option value="${e.equipment_id}" ${e.equipment_id === current ? 'selected':''}>${e.name}</option>`).join('');
+}
+
+async function loadDashboard() {
+  const today = new Date().toISOString().split('T')[0];
+  const [{ data: orders }, { count: inspCount }, { count: pendingCount }, { count: abnormalCount }] = await Promise.all([
+    db.from('maintenance_orders').select('*,equipment(name),repair_requests(reporter,fault_desc)').order('created_at',{ascending:false}).limit(10),
+    db.from('inspection_records').select('*', { count: 'exact', head: true }).gte('inspect_time', today + 'T00:00:00'),
+    db.from('maintenance_orders').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    db.from('inspection_records').select('*', { count: 'exact', head: true }).eq('run_status','abnormal').gte('inspect_time', today + 'T00:00:00'),
+  ]);
+  document.getElementById('stat-eq').textContent = allEquipment.filter(e => e.status === 'active').length;
+  document.getElementById('stat-pending').textContent = pendingCount || 0;
+  document.getElementById('stat-insp-today').textContent = inspCount || 0;
+  document.getElementById('stat-abnormal').textContent = abnormalCount || 0;
+  document.getElementById('stat-users').textContent = allUsers.filter(u => u.status === 'active').length;
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  document.getElementById('lastRefresh').textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+  document.getElementById('dashboardOrders').innerHTML = (orders || []).length ? `
+    <div style="overflow-x:auto"><table class="data-table">
+      <thead><tr><th>設備</th><th>報修人</th><th>故障說明</th><th>狀態</th><th>建立時間</th></tr></thead>
+      <tbody>${(orders || []).map(o => `<tr>
+        <td>${o.equipment?.name || '—'}</td>
+        <td>${o.repair_requests?.reporter || '—'}</td>
+        <td>${(o.repair_requests?.fault_desc || '—').substring(0,40)}</td>
+        <td><span class="badge ${o.status === 'closed' ? 'badge-active' : 'badge-inactive'}">${ORDER_STATUS_LABEL[o.status] || o.status}</span></td>
+        <td style="font-family:var(--font-mono);font-size:.75rem">${new Date(o.created_at).toLocaleDateString('zh-TW')}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>` : '<div style="color:var(--text-dim);font-size:.85rem;font-family:var(--font-mono)">NO MAINTENANCE ORDERS</div>';
+}
+
+async function loadUsers() {
+  await loadAll();
+  renderUsers(allUsers);
+}
+
+function renderUsers(users) {
+  document.getElementById('usersTbody').innerHTML = users.map(u => `<tr>
+    <td>${u.name}</td>
+    <td style="font-family:var(--font-mono);font-size:.8rem">${u.phone || '—'}</td>
+    <td>${u.department || '—'}</td>
+    <td><span class="role-badge">${ROLE_LABEL[u.role] || u.role}</span></td>
+    <td><span class="badge ${u.status === 'active' ? 'badge-active' : 'badge-inactive'}">${u.status === 'active' ? 'ACTIVE' : 'INACTIVE'}</span></td>
+    <td>
+      ${u.status === 'active' && u.user_id !== currentUser.user_id ? `<button class="btn btn-warn btn-sm" onclick="toggleUserStatus('${u.user_id}','inactive')">停用</button>` : ''}
+      ${u.status === 'inactive' ? `<button class="btn btn-primary btn-sm" onclick="toggleUserStatus('${u.user_id}','active')">啟用</button>` : ''}
+    </td>
+  </tr>`).join('');
+}
+
+function filterUsers() {
+  const q = document.getElementById('userSearch').value.toLowerCase();
+  renderUsers(allUsers.filter(u => u.name.toLowerCase().includes(q) || (u.department || '').toLowerCase().includes(q)));
+}
+
+async function createUser() {
+  const name = document.getElementById('u-name').value.trim();
+  const email = document.getElementById('u-email').value.trim();
+  const pass = document.getElementById('u-pass').value;
+  const phone = document.getElementById('u-phone').value.trim();
+  const dept = document.getElementById('u-dept').value.trim();
+  const role = document.getElementById('u-role').value;
+  if (!name || !email || !pass) { showToast('請填寫姓名、郵件與密碼', true); return; }
+
+  const { data: authData, error: authErr } = await db.auth.signUp({ email, password: pass });
+  if (authErr) { showToast('建立帳號失敗：' + authErr.message, true); return; }
+
+  const profile = { auth_id: authData.user.id, name, phone: phone || null, department: dept || null, role, status: 'active', created_by: currentUser.user_id };
+  const { error: profErr } = await db.from('users').insert(profile);
+  if (profErr) { showToast('建立使用者資料失敗', true); return; }
+
+  await writeAudit('users', authData.user.id, 'insert', null, profile);
+  showToast(`帳號「${name}」已建立`);
+  ['u-name','u-email','u-pass','u-phone','u-dept'].forEach(id => document.getElementById(id).value = '');
+  await loadUsers();
+}
+
+async function toggleUserStatus(userId, status) {
+  const before = userMap[userId];
+  const { error } = await db.from('users').update({ status }).eq('user_id', userId);
+  if (error) { showToast('操作失敗', true); return; }
+  await writeAudit('users', userId, 'status_change', { status: before?.status }, { status });
+  showToast(status === 'inactive' ? '帳號已停用' : '帳號已啟用');
+  await loadUsers();
+}
+
+async function loadEquipmentList() {
+  await loadAll();
+  renderEquipment(allEquipment);
+}
+
+function renderEquipment(list) {
+  document.getElementById('eqTbody').innerHTML = list.map(e => `<tr>
+    <td>${e.name}</td>
+    <td>${e.location || '—'}</td>
+    <td style="font-family:var(--font-mono)">${e.purchase_cost ? Number(e.purchase_cost).toLocaleString() + ' 元' : '—'}</td>
+    <td><span class="badge badge-${e.status}">${e.status === 'active' ? 'ACTIVE' : e.status === 'inactive' ? 'INACTIVE' : 'RETIRED'}</span></td>
+    <td><button class="btn btn-sm" style="background:rgba(12,40,64,0.5);border:1px solid var(--border-hi);color:var(--text-dim)" onclick="showQr('${e.equipment_id}','${e.name.replace(/'/g,"\\'")}','${e.qr_code}')">QR ↗</button></td>
+    <td>${currentUser.role === 'admin' ? `<button class="btn btn-primary btn-sm" onclick="openEditEq('${e.equipment_id}')">編輯</button>` : '—'}</td>
+  </tr>`).join('');
+}
+
+function filterEquipment() {
+  const q = document.getElementById('eqSearch').value.toLowerCase();
+  renderEquipment(allEquipment.filter(e => e.name.toLowerCase().includes(q) || (e.location || '').toLowerCase().includes(q)));
+}
+
+async function createEquipment() {
+  if (currentUser.role !== 'admin') { showToast('無權限', true); return; }
+  const name = document.getElementById('eq-name').value.trim();
+  const loc = document.getElementById('eq-loc').value.trim();
+  const cost = parseFloat(document.getElementById('eq-cost').value) || null;
+  const date = document.getElementById('eq-date').value || null;
+  if (!name) { showToast('請填寫設備名稱', true); return; }
+
+  const qrCode = 'EQ-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7).toUpperCase();
+  const eq = { name, location: loc || null, qr_code: qrCode, purchase_cost: cost, purchase_date: date, status: 'active', created_by: currentUser.user_id };
+  const { data, error } = await db.from('equipment').insert(eq).select().single();
+  if (error) { showToast('新增失敗：' + error.message, true); return; }
+
+  if (cost) {
+    await db.from('cost_records').insert({ equipment_id: data.equipment_id, cost_type: 'purchase', amount: cost, cost_date: date || new Date().toISOString().split('T')[0], note: '初始購置費', created_by: currentUser.user_id });
+  }
+  await writeAudit('equipment', data.equipment_id, 'insert', null, eq);
+  showToast(`設備「${name}」已新增`);
+
+  const preview = document.getElementById('qrPreview');
+  preview.innerHTML = '<div style="font-size:.72rem;color:var(--text-dim);margin-bottom:8px;font-family:var(--font-mono)">NEW EQUIPMENT QR:</div>';
+  const qrDiv = document.createElement('div');
+  qrDiv.style.display = 'inline-block';
+  preview.appendChild(qrDiv);
+  new QRCode(qrDiv, { text: qrCode, width: 100, height: 100, colorDark: '#020b18', colorLight: '#ffffff' });
+
+  ['eq-name','eq-loc','eq-cost','eq-date'].forEach(id => document.getElementById(id).value = '');
+  await loadAll(); renderEquipment(allEquipment);
+}
+
+function openEditEq(eqId) {
+  const eq = eqMap[eqId];
+  if (!eq) return;
+  document.getElementById('edit-eq-id').value = eqId;
+  document.getElementById('edit-eq-name').value = eq.name;
+  document.getElementById('edit-eq-loc').value = eq.location || '';
+  document.getElementById('edit-eq-cost').value = eq.purchase_cost || '';
+  document.getElementById('edit-eq-date').value = eq.purchase_date || '';
+  document.getElementById('edit-eq-status').value = eq.status;
+  document.getElementById('editEqModal').classList.add('show');
+}
+
+async function saveEquipment() {
+  const eqId = document.getElementById('edit-eq-id').value;
+  const before = { ...eqMap[eqId] };
+  const updates = {
+    name: document.getElementById('edit-eq-name').value.trim(),
+    location: document.getElementById('edit-eq-loc').value.trim() || null,
+    purchase_cost: parseFloat(document.getElementById('edit-eq-cost').value) || null,
+    purchase_date: document.getElementById('edit-eq-date').value || null,
+    status: document.getElementById('edit-eq-status').value,
+  };
+  if (!updates.name) { showToast('設備名稱不可為空', true); return; }
+  const { error } = await db.from('equipment').update(updates).eq('equipment_id', eqId);
+  if (error) { showToast('儲存失敗', true); return; }
+  await writeAudit('equipment', eqId, 'update', before, updates);
+  showToast('設備資料已更新');
+  closeModal('editEqModal');
+  await loadAll(); renderEquipment(allEquipment);
+}
+
+function showQr(eqId, name, qrCode) {
+  document.getElementById('qrModalTitle').textContent = name + ' — QR CODE';
+  document.getElementById('qrModalId').textContent = 'ID: ' + qrCode;
+  const container = document.getElementById('qrModalCode');
+  container.innerHTML = '';
+  new QRCode(container, { text: qrCode, width: 200, height: 200, colorDark: '#020b18', colorLight: '#ffffff' });
+  document.getElementById('qrModal').classList.add('show');
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+async function loadInspections() {
+  const eqFilter = document.getElementById('inspEqFilter').value;
+  const statusFilter = document.getElementById('inspStatusFilter').value;
+  const dateFrom = document.getElementById('inspDateFrom').value;
+  const dateTo = document.getElementById('inspDateTo').value;
+  let query = db.from('inspection_records').select('*,equipment(name),users(name)').order('inspect_time', { ascending: false }).limit(300);
+  if (eqFilter) query = query.eq('equipment_id', eqFilter);
+  if (statusFilter) query = query.eq('run_status', statusFilter);
+  if (dateFrom) query = query.gte('inspect_time', dateFrom + 'T00:00:00');
+  if (dateTo) query = query.lte('inspect_time', dateTo + 'T23:59:59');
+  const { data } = await query;
+  const rows = data || [];
+  document.getElementById('inspTbody').innerHTML = rows.length ? rows.map(r => `<tr>
+    <td>${r.equipment?.name || '—'}</td>
+    <td>${r.users?.name || '—'}</td>
+    <td style="font-family:var(--font-mono);font-size:.78rem">${new Date(r.inspect_time).toLocaleString('zh-TW')}</td>
+    <td><span class="badge ${r.run_status === 'normal' ? 'badge-active' : 'badge-retired'}">${r.run_status === 'normal' ? 'NORMAL' : 'ABNORMAL'}</span></td>
+    <td>${r.abnormal_note || '—'}</td>
+  </tr>`).join('') : '<tr><td colspan="5" style="color:var(--text-dim);font-family:var(--font-mono)">NO RECORDS</td></tr>';
+}
+
+async function loadRepairs() {
+  const statusFilter = document.getElementById('repairStatusFilter').value;
+  let query = db.from('repair_requests').select('*,equipment(name),maintenance_orders(status)').order('created_at',{ascending:false}).limit(200);
+  if (statusFilter) query = query.eq('status', statusFilter);
+  const { data } = await query;
+  const rows = data || [];
+  document.getElementById('repairsTbody').innerHTML = rows.length ? rows.map(r => {
+    const ordStatus = r.maintenance_orders?.[0]?.status;
+    return `<tr>
+      <td style="font-family:var(--font-mono);font-size:.72rem;color:var(--text-dim)">${r.request_id.substring(0,8)}…</td>
+      <td>${r.equipment?.name || '—'}</td>
+      <td>${r.reporter || '—'}</td>
+      <td>${(r.fault_desc || '').substring(0,40)}</td>
+      <td style="font-family:var(--font-mono);font-size:.78rem">${r.source === 'inspection' ? '巡檢' : '直接通報'}</td>
+      <td><span class="badge badge-${r.status === 'closed' ? 'active' : 'inactive'}">${STATUS_LABEL[r.status] || r.status}</span></td>
+      <td>${ordStatus ? `<span class="badge badge-inactive">${ORDER_STATUS_LABEL[ordStatus] || ordStatus}</span>` : '—'}</td>
+      <td style="font-family:var(--font-mono);font-size:.75rem">${new Date(r.created_at).toLocaleDateString('zh-TW')}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="8" style="color:var(--text-dim);font-family:var(--font-mono)">NO RECORDS</td></tr>';
+}
+
+async function loadCostAdmin() {
+  const eqFilter = document.getElementById('costEqFilter').value;
+  const typeFilter = document.getElementById('costTypeFilter').value;
+  let query = db.from('cost_records').select('*,equipment(name)').order('cost_date',{ascending:false}).limit(500);
+  if (eqFilter) query = query.eq('equipment_id', eqFilter);
+  if (typeFilter) query = query.eq('cost_type', typeFilter);
+  const { data } = await query;
+  const costs = data || [];
+  const total = costs.reduce((s, c) => s + Number(c.amount), 0);
+  document.getElementById('costTbody').innerHTML = costs.length ? costs.map(c => `<tr>
+    <td>${c.equipment?.name || '—'}</td>
+    <td>${COST_TYPE_LABEL[c.cost_type] || c.cost_type}</td>
+    <td>${c.vendor || '—'}</td>
+    <td style="font-family:var(--font-mono);font-size:.78rem">${c.cost_date || '—'}</td>
+    <td>${c.note || '—'}</td>
+    <td style="text-align:right;font-family:var(--font-mono)">${Number(c.amount).toLocaleString()}</td>
+  </tr>`).join('') : '<tr><td colspan="6" style="color:var(--text-dim);font-family:var(--font-mono)">NO COST RECORDS</td></tr>';
+  document.getElementById('costTotalDisplay').textContent = costs.length ? `TOTAL：${total.toLocaleString()} 元` : '';
+}
+
+async function loadCostByEq() {
+  const { data } = await db.from('cost_records').select('equipment_id,amount,equipment(name)');
+  const byEq = {};
+  (data || []).forEach(c => {
+    if (!byEq[c.equipment_id]) byEq[c.equipment_id] = { name: c.equipment?.name || '—', total: 0 };
+    byEq[c.equipment_id].total += Number(c.amount);
+  });
+  const sorted = Object.values(byEq).sort((a, b) => b.total - a.total);
+  document.getElementById('costByEq').innerHTML = sorted.length ? sorted.map((r,i) => `<div class="cost-eq-row">
+    <span class="cost-eq-name"><span style="font-family:var(--font-mono);color:var(--text-dim);margin-right:10px">${String(i+1).padStart(2,'0')}</span>${r.name}</span>
+    <span class="cost-eq-amount">${r.total.toLocaleString()} 元</span>
+  </div>`).join('') : '<div style="color:var(--text-dim);font-size:.85rem;font-family:var(--font-mono)">NO COST RECORDS</div>';
+}
+
+function exportCostCsv() {
+  const rows = document.getElementById('costTbody').querySelectorAll('tr');
+  let csv = '設備,費用類型,廠商,日期,說明,金額\n';
+  rows.forEach(r => {
+    const cells = r.querySelectorAll('td');
+    if (cells.length >= 6) csv += Array.from(cells).map(c => `"${c.textContent.trim()}"`).join(',') + '\n';
+  });
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `費用報表_${new Date().toLocaleDateString('zh-TW').replace(/\//g,'-')}.csv`; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function loadAudit() {
+  const tableFilter = document.getElementById('auditTableFilter').value;
+  const actionFilter = document.getElementById('auditActionFilter').value;
+  let query = db.from('audit_logs').select('*,users(name)').order('operated_at',{ascending:false}).limit(200);
+  if (tableFilter) query = query.eq('table_name', tableFilter);
+  if (actionFilter) query = query.eq('action', actionFilter);
+  const { data } = await query;
+  const rows = data || [];
+  const ACTION_LABEL = { insert:'INSERT', update:'UPDATE', status_change:'STATUS_CHANGE' };
+  document.getElementById('auditList').innerHTML = rows.length ? rows.map(r => `<div class="audit-row">
+    <span class="audit-action-${r.action}">[${ACTION_LABEL[r.action] || r.action}]</span>
+    <span style="color:var(--text-dim);margin:0 8px">${r.table_name}</span>
+    <span style="color:var(--text-dim);opacity:0.6">BY ${r.users?.name || 'SYSTEM'} · ${new Date(r.operated_at).toLocaleString('zh-TW')}</span>
+    ${r.changes ? `<div style="margin-top:4px;font-size:.72rem;color:var(--text-dim);font-family:var(--font-mono);white-space:pre-wrap;opacity:0.7">${JSON.stringify(r.changes, null, 2).substring(0,200)}</div>` : ''}
+  </div>`).join('') : '<div style="color:var(--text-dim);font-size:.85rem;font-family:var(--font-mono)">NO AUDIT LOGS</div>';
+}
+
+async function loadCycles() {
+  const { data } = await db.from('inspection_cycles').select('*,users(name)').order('started_at',{ascending:false});
+  const CYCLE_LABEL = { daily:'每日', shift:'每班', weekly:'每週' };
+  document.getElementById('cyclesTbody').innerHTML = (data || []).map(c => `<tr>
+    <td>${CYCLE_LABEL[c.cycle_type] || c.cycle_type}</td>
+    <td style="font-family:var(--font-mono);font-size:.78rem">${new Date(c.started_at).toLocaleString('zh-TW')}</td>
+    <td style="font-family:var(--font-mono);font-size:.78rem">${c.ended_at ? new Date(c.ended_at).toLocaleString('zh-TW') : '—'}</td>
+    <td><span class="badge ${c.ended_at ? 'badge-inactive' : 'badge-active'}">${c.ended_at ? 'CLOSED' : 'ACTIVE'}</span></td>
+  </tr>`).join('') || '<tr><td colspan="4" style="color:var(--text-dim);font-family:var(--font-mono)">NO CYCLE RECORDS</td></tr>';
+}
+
+async function createCycle() {
+  if (currentUser.role !== 'admin') { showToast('無權限', true); return; }
+  if (!confirm('確定要開啟新巡檢週期？所有設備將重置為未巡檢（紅燈）。')) return;
+
+  await db.from('inspection_cycles').update({ ended_at: new Date().toISOString() }).is('ended_at', null);
+
+  const cycleType = document.getElementById('cycleType').value;
+  const { error } = await db.from('inspection_cycles').insert({ cycle_type: cycleType, started_at: new Date().toISOString(), created_by: currentUser.user_id });
+  if (error) { showToast('建立失敗', true); return; }
+  await writeAudit('inspection_cycles', 'new', 'insert', null, { cycle_type: cycleType });
+  showToast('新巡檢週期已開啟');
+  await loadCycles();
+}
+
+async function writeAudit(table, recordId, action, before, after) {
+  if (!currentUser) return;
+  await db.from('audit_logs').insert({ table_name: table, record_id: String(recordId), action, changes: { before, after }, operator_id: currentUser.user_id });
+}
+
+async function logout() { await db.auth.signOut(); window.location.href = 'login.html'; }
+
+function showToast(msg, isErr = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (isErr ? ' err' : '');
+  setTimeout(() => { t.className = 'toast'; }, 2500);
+}
+</script>
+</body>
+</html>
