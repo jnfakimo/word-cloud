@@ -469,6 +469,13 @@ let currentFilter = '';
 const STATUS_LABEL = { pending:'待處理', in_progress:'處理中', pending_review:'待驗收', completed:'已完成', closed:'結案' };
 const STATUS_NEXT = { pending:'in_progress', in_progress:'pending_review', pending_review:'completed', completed:'closed' };
 const STATUS_NEXT_LABEL = { pending:'開始處理', in_progress:'送交驗收', pending_review:'驗收通過', completed:'結案' };
+
+function fmtLoc(loc) {
+  if (!loc) return '—';
+  const parts = [loc.markets?.name, loc.floor, loc.area];
+  if (loc.detail) parts.push(loc.detail);
+  return parts.filter(Boolean).join(' › ');
+}
 const COST_TYPE_LABEL = { purchase:'購置費', outsource:'委外維修', parts:'零件費', labor:'工時費', other:'其他' };
 
 (async () => {
@@ -507,7 +514,7 @@ async function loadOrdersForCostDropdown() {
 
 async function loadOrders() {
   const { data } = await db.from('maintenance_orders')
-    .select('*,repair_requests(reporter,fault_desc,source),equipment(name,location)')
+    .select('*,repair_requests(reporter,fault_desc,source,locations(floor,area,detail,markets(name))),equipment(name,location)')
     .order('created_at', { ascending: false });
   allOrders = data || [];
   updateStatusCounts();
@@ -602,6 +609,7 @@ async function openOrder(orderId) {
       <span class="status-badge s-${order.status}">${STATUS_LABEL[order.status]}</span>
     </div>
     <div class="detail-row"><span class="detail-label">設備位置</span><span class="detail-value">${eq.location || '—'}</span></div>
+    <div class="detail-row"><span class="detail-label">發生位置</span><span class="detail-value">${fmtLoc(req.locations)}</span></div>
     <div class="detail-row"><span class="detail-label">故障說明</span><span class="detail-value">${req.fault_desc || '—'}</span></div>
     <div class="detail-row"><span class="detail-label">報修人</span><span class="detail-value">${req.reporter || '—'}</span></div>
     <div class="detail-row"><span class="detail-label">負責維修員</span><span class="detail-value">${assignee?.name || '未指派'}</span></div>
