@@ -2,7 +2,7 @@
 -- Org structure update (idempotent / re-runnable)
 --   - add username/email to users
 --   - rename + extend departments to match new org structure
--- Department codes match the seed in locations_schema.sql
+-- Department codes below match the seed in locations_schema.sql
 -- ============================================================
 
 -- 1. Add username and email columns to users
