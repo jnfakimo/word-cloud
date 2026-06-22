@@ -479,11 +479,19 @@ function fmtLoc(loc) {
 const COST_TYPE_LABEL = { purchase:'購置費', outsource:'委外維修', parts:'零件費', labor:'工時費', other:'其他' };
 
 (async () => {
+  // 登入驗證已關閉：有 session 用 session 帳號，否則自動套用預設帳號
+  let profile = null;
   const { data: { session } } = await db.auth.getSession();
-  if (!session) { window.location.href = 'login.html'; return; }
-  const { data: profile } = await db.from('users').select('*').eq('auth_id', session.user.id).single();
-  if (!profile) { await db.auth.signOut(); window.location.href = 'login.html'; return; }
-  currentUser = profile;
+  if (session) {
+    const { data } = await db.from('users').select('*').eq('auth_id', session.user.id).single();
+    profile = data;
+  }
+  if (!profile) {
+    let { data } = await db.from('users').select('*').eq('role', 'maintenance').eq('status', 'active').limit(1).maybeSingle();
+    if (!data) ({ data } = await db.from('users').select('*').eq('status', 'active').limit(1).maybeSingle());
+    profile = data;
+  }
+  currentUser = profile || { user_id: null, name: '維修人員', role: 'maintenance' };
   document.getElementById('navUser').textContent = currentUser.name;
 
   const [{ data: eqs }, { data: users }] = await Promise.all([
