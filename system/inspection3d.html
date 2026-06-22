@@ -390,51 +390,111 @@ function updateCam(){
   camera.lookAt(orb.tx,orb.ty,orb.tz);
 }
 
+// ── Hull scan helpers ──
+function hullXRange(z){
+  let mn=200,mx=-200;
+  for(let x=-55;x<=55;x+=.5) if(inHull(x,z)){mn=Math.min(mn,x);mx=Math.max(mx,x);}
+  return mn<=mx?[mn,mx]:null;
+}
+function hullZRange(x){
+  let mn=200,mx=-200;
+  for(let z=-42;z<=37;z+=.5) if(inHull(x,z)){mn=Math.min(mn,z);mx=Math.max(mx,z);}
+  return mn<=mx?[mn,mx]:null;
+}
+
+// ── Structural geometry helpers ──
+function addHullSlab(y,depth,fillCol,fillOp,edgeCol){
+  const shape=new THREE.Shape(HULL.map(p=>new THREE.Vector2(p[0],p[1])));
+  const geo=new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:false});
+  const mat=new THREE.MeshBasicMaterial({color:fillCol,transparent:true,opacity:fillOp,side:THREE.DoubleSide,depthWrite:false});
+  const mesh=new THREE.Mesh(geo,mat);
+  mesh.rotation.x=-Math.PI/2;
+  mesh.position.y=y;
+  mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:edgeCol})));
+  scene.add(mesh);
+}
+
+function addWall3D(x1,z1,x2,z2,yBase,h,thick,fillCol,fillOp,edgeCol){
+  const len=Math.sqrt((x2-x1)**2+(z2-z1)**2);
+  if(len<.5) return;
+  const geo=new THREE.BoxGeometry(len,h,thick);
+  const mat=new THREE.MeshBasicMaterial({color:fillCol,transparent:true,opacity:fillOp,depthWrite:false,side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(geo,mat);
+  mesh.position.set((x1+x2)/2,yBase+h/2,(z1+z2)/2);
+  mesh.rotation.y=-Math.atan2(z2-z1,x2-x1);
+  mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:edgeCol})));
+  scene.add(mesh);
+}
+
+function addBeam3D(x1,z1,x2,z2,y,bw,bh,fillCol,fillOp,edgeCol){
+  const len=Math.sqrt((x2-x1)**2+(z2-z1)**2);
+  if(len<1) return;
+  const geo=new THREE.BoxGeometry(len,bh,bw);
+  const mat=new THREE.MeshBasicMaterial({color:fillCol,transparent:true,opacity:fillOp,depthWrite:false});
+  const mesh=new THREE.Mesh(geo,mat);
+  mesh.position.set((x1+x2)/2,y-bh/2,(z1+z2)/2);
+  mesh.rotation.y=-Math.atan2(z2-z1,x2-x1);
+  mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:edgeCol})));
+  scene.add(mesh);
+}
+
+function addCol3D(x,z,yBase,h,size,fillCol,fillOp,edgeCol){
+  const geo=new THREE.BoxGeometry(size,h,size);
+  const mat=new THREE.MeshBasicMaterial({color:fillCol,transparent:true,opacity:fillOp,depthWrite:false});
+  const mesh=new THREE.Mesh(geo,mat);
+  mesh.position.set(x,yBase+h/2,z);
+  mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:edgeCol})));
+  scene.add(mesh);
+}
+
 // ── Build 3D scene ──
 function build3D(){
-  // Ground
-  const gg=new THREE.PlaneGeometry(350,350);
-  const ground=new THREE.Mesh(gg,new THREE.MeshBasicMaterial({color:0x010810}));
+  // Ground plane
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(400,400),new THREE.MeshBasicMaterial({color:0x010810}));
   ground.rotation.x=-Math.PI/2; ground.position.y=-5;
   scene.add(ground);
 
   const topElev=FLOORS[FLOORS.length-1].elev+FH;
-  const hullPts=HULL.map(p=>new THREE.Vector2(p[0],p[1]));
-  const shape=new THREE.Shape(hullPts);
-
-  // Structural column positions
-  const cols=[];
-  for(let x=-45;x<=45;x+=10)
-    for(let z=-33;z<=30;z+=9)
-      if(inHull(x,z)) cols.push([x,z]);
 
   FLOORS.forEach(fl=>{
     const y0=fl.elev, y1=fl.elev+FH;
 
-    // Floor slab (filled shape)
-    const slabGeo=new THREE.ShapeGeometry(shape);
-    const slabMesh=new THREE.Mesh(slabGeo,new THREE.MeshBasicMaterial({color:0x001833,transparent:true,opacity:.22,side:THREE.DoubleSide,depthWrite:false}));
-    slabMesh.rotation.x=-Math.PI/2; slabMesh.position.y=y0;
-    scene.add(slabMesh);
+    // ── Floor slab (0.3 m thick, extruded hull) ──
+    addHullSlab(y0-0.3, 0.3, 0x001a33,0.22, 0x00a8cc);
 
-    // Floor outline (bright)
-    const fPts=HULL.map(p=>new THREE.Vector3(p[0],y0,p[1]));fPts.push(fPts[0].clone());
-    scene.add(makeLine(fPts,0x00d4ff));
-
-    // Ceiling outline (dim)
-    const cPts=HULL.map(p=>new THREE.Vector3(p[0],y1,p[1]));cPts.push(cPts[0].clone());
-    scene.add(makeLine(cPts,0x003355));
-
-    // Vertical perimeter edges
-    HULL.forEach(p=>scene.add(makeLine([new THREE.Vector3(p[0],y0,p[1]),new THREE.Vector3(p[0],y1,p[1])],0x004466)));
-
-    // Zone dividers (horizontal lines on floor)
-    fl.walls.forEach(w=>{
-      scene.add(makeLine([new THREE.Vector3(w[0],y0+.1,w[1]),new THREE.Vector3(w[2],y0+.1,w[3])],0x003a55,0.7));
+    // ── Outer perimeter walls (full floor height) ──
+    HULL.forEach((p,i)=>{
+      const np=HULL[(i+1)%HULL.length];
+      addWall3D(p[0],p[1],np[0],np[1], y0,FH, 0.45, 0x001a33,0.28, 0x00d4ff);
     });
 
-    // Interior grid
-    const gmat=new THREE.LineBasicMaterial({color:0x071a28,transparent:true,opacity:.55});
+    // ── Main zone-divider walls ──
+    fl.walls.forEach(w=>{
+      addWall3D(w[0],w[1],w[2],w[3], y0,FH*0.95, 0.22, 0x001122,0.18, 0x004f88);
+    });
+
+    // ── Sub-zone partition walls (lighter) ──
+    fl.sub&&fl.sub.forEach(sz=>{
+      const {x,z,w,d}=sz;
+      addWall3D(x,   z,   x+w, z,   y0,FH*0.85,0.14,0x001122,0.10,0x003344);
+      addWall3D(x+w, z,   x+w, z+d, y0,FH*0.85,0.14,0x001122,0.10,0x003344);
+      addWall3D(x+w, z+d, x,   z+d, y0,FH*0.85,0.14,0x001122,0.10,0x003344);
+      addWall3D(x,   z+d, x,   z,   y0,FH*0.85,0.14,0x001122,0.10,0x003344);
+    });
+
+    // ── Structural beams at ceiling — X direction ──
+    for(let gz=-36;gz<=32;gz+=9){
+      const xr=hullXRange(gz);
+      if(xr) addBeam3D(xr[0],gz,xr[1],gz, y1, 0.45,0.55, 0x001122,0.25, 0x004466);
+    }
+    // ── Structural beams at ceiling — Z direction ──
+    for(let gx=-45;gx<=45;gx+=10){
+      const zr=hullZRange(gx);
+      if(zr) addBeam3D(gx,zr[0],gx,zr[1], y1, 0.45,0.55, 0x001122,0.25, 0x004466);
+    }
+
+    // ── Subtle floor reference grid ──
+    const gmat=new THREE.LineBasicMaterial({color:0x071a28,transparent:true,opacity:.42});
     for(let gx=-48;gx<=48;gx+=10){
       const pts=[new THREE.Vector3(gx,y0+.05,-35),new THREE.Vector3(gx,y0+.05,30)];
       scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),gmat));
@@ -445,28 +505,21 @@ function build3D(){
     }
   });
 
-  // Structural columns (full height wireframe boxes)
+  // ── Structural columns — full building height ──
   const totalH=topElev-FLOORS[0].elev;
-  const colMat=new THREE.LineBasicMaterial({color:0x005577,transparent:true,opacity:.8});
-  cols.forEach(([cx,cz])=>{
-    const geo=new THREE.EdgesGeometry(new THREE.BoxGeometry(.9,totalH,.9));
-    const mesh=new THREE.LineSegments(geo,colMat);
-    mesh.position.set(cx,FLOORS[0].elev+totalH/2,cz);
-    scene.add(mesh);
+  const yBase=FLOORS[0].elev;
+  for(let x=-45;x<=45;x+=10)
+    for(let z=-33;z<=30;z+=9)
+      if(inHull(x,z)) addCol3D(x,z,yBase,totalH,0.85, 0x001122,0.40, 0x00aabb);
+
+  // ── Roof slab (0.35 m thick) ──
+  addHullSlab(topElev-0.35, 0.35, 0x002244,0.20, 0x00d4ff);
+
+  // ── Parapet walls ──
+  HULL.forEach((p,i)=>{
+    const np=HULL[(i+1)%HULL.length];
+    addWall3D(p[0],p[1],np[0],np[1], topElev,1.3, 0.35, 0x002244,0.22, 0x00ccee);
   });
-
-  // Roof slab
-  const rSlabGeo=new THREE.ShapeGeometry(shape);
-  const rSlab=new THREE.Mesh(rSlabGeo,new THREE.MeshBasicMaterial({color:0x002244,transparent:true,opacity:.18,side:THREE.DoubleSide,depthWrite:false}));
-  rSlab.rotation.x=-Math.PI/2; rSlab.position.y=topElev;
-  scene.add(rSlab);
-
-  // Roof outline strong
-  const rPts=HULL.map(p=>new THREE.Vector3(p[0],topElev,p[1]));rPts.push(rPts[0].clone());
-  scene.add(makeLine(rPts,0x00d4ff));
-
-  // Parapet walls
-  HULL.forEach(p=>scene.add(makeLine([new THREE.Vector3(p[0],topElev,p[1]),new THREE.Vector3(p[0],topElev+1.2,p[1])],0x00a0cc,0.6)));
 }
 
 function makeLine(pts,color,opacity=1){
