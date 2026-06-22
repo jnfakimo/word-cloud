@@ -557,6 +557,21 @@ body{
       <input id="repairDept" type="text" placeholder="部門名稱">
     </div>
     <div class="field">
+      <label>發生位置 <span style="color:var(--text-dim);font-size:.72rem">（選填）</span></label>
+      <select id="lp-r-market" onchange="lpFloors('r')" style="margin-bottom:4px">
+        <option value="">-- 選擇市場 --</option>
+      </select>
+      <select id="lp-r-floor" onchange="lpAreas('r')" style="margin-bottom:4px" disabled>
+        <option value="">-- 選擇樓層 --</option>
+      </select>
+      <select id="lp-r-area" onchange="lpDetails('r')" style="margin-bottom:4px" disabled>
+        <option value="">-- 選擇區域 --</option>
+      </select>
+      <select id="lp-r-detail" onchange="lpSelect('r')" disabled>
+        <option value="">-- 選擇細部位置（選填）--</option>
+      </select>
+    </div>
+    <div class="field">
       <label>故障說明</label>
       <textarea id="repairFault" placeholder="請描述故障情形…"></textarea>
     </div>
@@ -585,6 +600,21 @@ body{
     <div class="modal-handle"></div>
     <div class="form-title" id="modal-eq-name">確認設備</div>
     <div style="font-size:.75rem;color:var(--text-dim);margin-bottom:16px;font-family:var(--font-mono)" id="modal-eq-loc"></div>
+    <div class="field">
+      <label>發生位置 <span style="color:var(--text-dim);font-size:.72rem">（選填）</span></label>
+      <select id="lp-i-market" onchange="lpFloors('i')" style="margin-bottom:4px">
+        <option value="">-- 選擇市場 --</option>
+      </select>
+      <select id="lp-i-floor" onchange="lpAreas('i')" style="margin-bottom:4px" disabled>
+        <option value="">-- 選擇樓層 --</option>
+      </select>
+      <select id="lp-i-area" onchange="lpDetails('i')" style="margin-bottom:4px" disabled>
+        <option value="">-- 選擇區域 --</option>
+      </select>
+      <select id="lp-i-detail" onchange="lpSelect('i')" disabled>
+        <option value="">-- 選擇細部位置（選填）--</option>
+      </select>
+    </div>
     <div class="field">
       <label>運轉狀態</label>
       <div class="radio-group">
@@ -633,6 +663,91 @@ const OFFLINE_KEY = 'insp_offline_queue';
 function getOfflineQueue() { try { return JSON.parse(localStorage.getItem(OFFLINE_KEY) || '[]'); } catch { return []; } }
 function saveOfflineQueue(q) { localStorage.setItem(OFFLINE_KEY, JSON.stringify(q)); }
 
+// ── Location Picker ─────────────────────────────────────────
+let _lpMarkets = [], _lpLocs = [], _lpSelected = { i: null, r: null };
+
+async function lpLoadData() {
+  if (_lpMarkets.length) return;
+  const [{ data: mkt }, { data: locs }] = await Promise.all([
+    db.from('markets').select('market_id,name').eq('status','active').order('sort_order'),
+    db.from('locations').select('location_id,market_id,floor,floor_order,area,area_order,detail,detail_order').eq('status','active').order('floor_order').order('area_order').order('detail_order')
+  ]);
+  _lpMarkets = mkt || [];
+  _lpLocs    = locs || [];
+}
+
+function lpInit(sfx) {
+  const sel = document.getElementById(`lp-${sfx}-market`);
+  sel.innerHTML = '<option value="">-- 選擇市場 --</option>';
+  _lpMarkets.forEach(m => {
+    const o = document.createElement('option');
+    o.value = m.market_id; o.textContent = m.name; sel.appendChild(o);
+  });
+  lpReset(sfx, 'floor');
+}
+
+function lpReset(sfx, from) {
+  const levels = ['floor','area','detail'], labels = ['樓層','區域','細部位置'];
+  const idx = levels.indexOf(from);
+  for (let i = idx; i < levels.length; i++) {
+    const el = document.getElementById(`lp-${sfx}-${levels[i]}`);
+    el.innerHTML = `<option value="">-- 選擇${labels[i]} --</option>`;
+    el.disabled = true;
+  }
+  if (from === 'floor') _lpSelected[sfx] = null;
+}
+
+function lpFloors(sfx) {
+  const mid = document.getElementById(`lp-${sfx}-market`).value;
+  lpReset(sfx, 'floor');
+  if (!mid) return;
+  const floors = [...new Map(_lpLocs.filter(l => l.market_id === mid).map(l => [l.floor, l.floor_order])).entries()]
+    .sort((a,b) => a[1]-b[1]).map(e => e[0]);
+  const sel = document.getElementById(`lp-${sfx}-floor`);
+  sel.innerHTML = '<option value="">-- 選擇樓層 --</option>';
+  floors.forEach(f => { const o = document.createElement('option'); o.value = f; o.textContent = f; sel.appendChild(o); });
+  sel.disabled = false;
+}
+
+function lpAreas(sfx) {
+  const mid = document.getElementById(`lp-${sfx}-market`).value;
+  const fl  = document.getElementById(`lp-${sfx}-floor`).value;
+  lpReset(sfx, 'area');
+  if (!fl) return;
+  const areas = [...new Map(_lpLocs.filter(l => l.market_id === mid && l.floor === fl).map(l => [l.area, l.area_order])).entries()]
+    .sort((a,b) => a[1]-b[1]).map(e => e[0]);
+  const sel = document.getElementById(`lp-${sfx}-area`);
+  sel.innerHTML = '<option value="">-- 選擇區域 --</option>';
+  areas.forEach(a => { const o = document.createElement('option'); o.value = a; o.textContent = a; sel.appendChild(o); });
+  sel.disabled = false;
+}
+
+function lpDetails(sfx) {
+  const mid = document.getElementById(`lp-${sfx}-market`).value;
+  const fl  = document.getElementById(`lp-${sfx}-floor`).value;
+  const ar  = document.getElementById(`lp-${sfx}-area`).value;
+  lpReset(sfx, 'detail');
+  if (!ar) return;
+  const rows = _lpLocs.filter(l => l.market_id === mid && l.floor === fl && l.area === ar)
+    .sort((a,b) => a.detail_order - b.detail_order);
+  const sel = document.getElementById(`lp-${sfx}-detail`);
+  sel.innerHTML = '<option value="">-- 選擇細部位置（選填）--</option>';
+  rows.filter(r => r.detail).forEach(r => {
+    const o = document.createElement('option'); o.value = r.location_id; o.textContent = r.detail; sel.appendChild(o);
+  });
+  sel.disabled = false;
+  const areaLoc = rows.find(r => !r.detail);
+  _lpSelected[sfx] = areaLoc ? areaLoc.location_id : null;
+}
+
+function lpSelect(sfx) {
+  const val = document.getElementById(`lp-${sfx}-detail`).value;
+  if (val) _lpSelected[sfx] = val;
+}
+
+function lpGetId(sfx) { return _lpSelected[sfx] || null; }
+// ────────────────────────────────────────────────────────────
+
 (async () => {
   const showInitErr = msg => {
     document.getElementById('eqList').innerHTML =
@@ -658,6 +773,9 @@ function saveOfflineQueue(q) { localStorage.setItem(OFFLINE_KEY, JSON.stringify(
 
     setStatus('載入設備…');
     await loadEquipment();
+    await lpLoadData();
+    lpInit('i');
+    lpInit('r');
     setupTabs();
     setupOfflineDetect();
     checkOfflineQueue();
@@ -878,6 +996,8 @@ function openInspectModal(eqId) {
   document.getElementById('modalAbnormalNote').value = '';
   document.getElementById('modalPhotoInput').value = '';
   document.getElementById('modalPhotoPreview').innerHTML = '點此拍照或選擇圖片';
+  document.getElementById('lp-i-market').value = '';
+  lpReset('i', 'floor');
   document.getElementById('inspectModal').classList.add('show');
 }
 
@@ -918,6 +1038,7 @@ async function doSaveInspection(eq, status, note, photoFile) {
     run_status: status,
     abnormal_note: note || null,
     light_status: status === 'normal' ? 'green' : 'red',
+    location_id: lpGetId('i'),
   };
 
   if (navigator.onLine) {
@@ -967,6 +1088,7 @@ async function createRepairFromInspection(eq, faultDesc) {
     fault_desc: faultDesc,
     status: 'pending',
     created_by: currentUser.user_id,
+    location_id: lpGetId('i'),
   };
   const { data: repairData, error } = await db.from('repair_requests').insert(repair).select().single();
   if (!error && repairData) {
@@ -993,6 +1115,7 @@ async function submitRepair() {
     equipment_id: eqId,
     reporter, phone, department: dept, fault_desc: fault, status: 'pending',
     created_by: currentUser.user_id,
+    location_id: lpGetId('r'),
   };
   const { data, error } = await db.from('repair_requests').insert(repair).select().single();
   if (error) { showToast('送出失敗', true); return; }
@@ -1004,6 +1127,8 @@ async function submitRepair() {
   document.getElementById('repairPhone').value = '';
   document.getElementById('repairDept').value = '';
   document.getElementById('repairFault').value = '';
+  document.getElementById('lp-r-market').value = '';
+  lpReset('r', 'floor');
 }
 
 async function writeAudit(table, recordId, action, before, after) {
