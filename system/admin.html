@@ -553,6 +553,7 @@ body{
     </nav>
     <div class="sidebar-footer">
       <div class="user-info" id="sidebarUser">LOADING…</div>
+      <button class="logout-btn" style="margin-bottom:6px;background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.3);color:var(--cyan)" onclick="openChangePwModal()">🔑 更改密碼</button>
       <button class="logout-btn" onclick="logout()">⏻ 登出</button>
     </div>
   </aside>
@@ -903,6 +904,19 @@ body{
 
         <div id="deptTree"></div>
       </div>
+
+      <!-- 班別設定 -->
+      <div class="panel">
+        <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>班別設定</span>
+          <button class="btn btn-primary btn-sm" onclick="addShiftRow()">+ 新增班別</button>
+        </div>
+        <div id="shiftList"></div>
+        <div style="margin-top:12px">
+          <button class="btn btn-primary" onclick="saveShifts()">儲存班別設定</button>
+        </div>
+        <p style="margin-top:10px;font-size:.72rem;color:var(--text-dim);font-family:var(--font-mono)">設定各班別名稱與時段，電子交接簿等系統將自動套用。班別 ID 僅限小寫英文字母、數字、底線。</p>
+      </div>
     </div>
 
   </main>
@@ -977,6 +991,33 @@ body{
   </div>
 </div>
 
+<!-- 首次登入提醒 -->
+<div class="modal-bg" id="firstLoginModal">
+  <div class="modal">
+    <div class="modal-title">⚠ 初次登入提醒</div>
+    <p style="margin-bottom:16px;color:var(--text-hi);line-height:1.7;font-size:.9rem">您尚未更改預設密碼，為保障帳號安全，建議立即更改密碼。</p>
+    <div class="modal-actions">
+      <button class="btn btn-sm" style="background:rgba(12,40,64,0.6);color:var(--text-dim);border:1px solid var(--border)" onclick="dismissFirstLoginModal()">稍後再說</button>
+      <button class="btn btn-primary btn-sm" onclick="openChangePwModal()">前往更改</button>
+    </div>
+  </div>
+</div>
+
+<!-- 更改密碼 -->
+<div class="modal-bg" id="changePwModal">
+  <div class="modal">
+    <div class="modal-title">◉ 更改密碼</div>
+    <div class="form-grid">
+      <div class="field"><label>新密碼</label><input id="new-pw" type="password" placeholder="至少 8 個字元" autocomplete="new-password"></div>
+      <div class="field"><label>確認新密碼</label><input id="new-pw2" type="password" placeholder="再輸入一次" autocomplete="new-password"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-sm" style="background:rgba(12,40,64,0.6);color:var(--text-dim);border:1px solid var(--border)" onclick="closeModal('changePwModal')">取消</button>
+      <button class="btn btn-primary btn-sm" onclick="changePassword()">確認更改</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1047,6 +1088,7 @@ function fmtLoc(loc) {
   document.getElementById('sidebarUser').textContent = `${currentUser.name} [${ROLE_LABEL[currentUser.role] || 'ADMIN'}]`;
 
   setupNav();
+  checkFirstLogin();
   DTP.init('eq-date-dtp','date');
   DTP.init('inspDateFrom-dtp','date',loadInspections);
   DTP.init('inspDateTo-dtp','date',loadInspections);
@@ -1211,6 +1253,7 @@ async function saveEditUser() {
   const role   = document.getElementById('edit-u-role').value;
   const deptId = document.getElementById('edit-u-dept-l2').value || document.getElementById('edit-u-dept-l1').value || null;
   if (!name) { showToast('請填寫姓名', true); return; }
+  if (!/^[一-龥]{2,10}$/.test(name)) { showToast('姓名格式錯誤，請輸入 2~10 個中文字', true); return; }
   const before = userMap[userId];
   const updates = { name, phone: phone || null, role, dept_id: deptId };
   const { error } = await db.from('users').update(updates).eq('user_id', userId);
@@ -1298,6 +1341,8 @@ async function createUser() {
   const deptId   = getAdminDeptId();
   const role     = document.getElementById('u-role').value;
   if (!name || !username || !email || !pass) { showToast('請填寫姓名、帳號、郵件與密碼', true); return; }
+  if (!/^[一-龥]{2,10}$/.test(name)) { showToast('姓名格式錯誤，請輸入 2~10 個中文字', true); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('Email 格式不正確', true); return; }
   if (!/^[A-Za-z0-9_]+$/.test(username)) { showToast('帳號僅限英文、數字、底線', true); return; }
 
   const { data: authData, error: authErr } = await db.auth.signUp({ email, password: pass });
@@ -1590,6 +1635,11 @@ async function createCycle() {
 // ─── SETTINGS PAGE ────────────────────────────────────────────────────────────
 
 let sysSettings = {};
+let _shifts = [
+  {id:'morning',  label:'早班', start:'06:00', end:'14:00'},
+  {id:'afternoon',label:'中班', start:'14:00', end:'22:00'},
+  {id:'night',    label:'夜班', start:'22:00', end:'06:00'},
+];
 
 async function loadSettings() {
   const { data } = await db.from('system_settings').select('*');
@@ -1597,7 +1647,52 @@ async function loadSettings() {
   (data || []).forEach(s => sysSettings[s.key] = s.value);
   document.getElementById('set-org-name').value  = sysSettings.org_name  || '臺北農產運銷股份有限公司';
   document.getElementById('set-site-name').value = sysSettings.site_name || '第一果菜市場';
+  try { const p = JSON.parse(sysSettings.shifts || ''); if (Array.isArray(p) && p.length) _shifts = p; } catch(e) {}
+  renderShiftList();
   renderDeptTree();
+}
+
+function renderShiftList() {
+  const container = document.getElementById('shiftList');
+  if (!container) return;
+  if (!_shifts.length) {
+    container.innerHTML = '<div style="color:var(--text-dim);font-size:.82rem;font-family:var(--font-mono);padding:8px 0">尚無班別設定，請點「+ 新增班別」。</div>';
+    return;
+  }
+  container.innerHTML = _shifts.map((s, i) => `
+    <div style="display:flex;gap:8px;align-items:center;padding:8px;margin-bottom:6px;border:1px solid rgba(0,212,255,.2);border-radius:2px;background:rgba(0,212,255,.03)">
+      <input type="text" placeholder="班別名稱" value="${escHtml(s.label)}" oninput="_shifts[${i}].label=this.value" style="flex:2;padding:6px 8px;background:rgba(2,8,20,.8);border:1px solid var(--border);color:var(--text-hi);font-size:.82rem;border-radius:2px" title="班別名稱">
+      <input type="text" placeholder="ID（英文）" value="${escHtml(s.id)}" oninput="_shifts[${i}].id=this.value" style="flex:1;max-width:110px;padding:6px 8px;background:rgba(2,8,20,.8);border:1px solid var(--border);color:var(--text-hi);font-size:.82rem;border-radius:2px;font-family:var(--font-mono)" title="識別ID（小寫英數）">
+      <input type="text" placeholder="HH:MM" value="${escHtml(s.start)}" oninput="_shifts[${i}].start=this.value" style="width:70px;padding:6px 8px;background:rgba(2,8,20,.8);border:1px solid var(--border);color:var(--text-hi);font-size:.82rem;border-radius:2px;font-family:var(--font-mono)" title="開始時間">
+      <span style="color:var(--text-dim);font-size:.8rem">–</span>
+      <input type="text" placeholder="HH:MM" value="${escHtml(s.end)}" oninput="_shifts[${i}].end=this.value" style="width:70px;padding:6px 8px;background:rgba(2,8,20,.8);border:1px solid var(--border);color:var(--text-hi);font-size:.82rem;border-radius:2px;font-family:var(--font-mono)" title="結束時間">
+      <button class="dept-btn-del" onclick="deleteShiftRow(${i})">刪除</button>
+    </div>
+  `).join('');
+}
+
+function addShiftRow() {
+  _shifts.push({id:'', label:'', start:'', end:''});
+  renderShiftList();
+}
+
+function deleteShiftRow(i) {
+  _shifts.splice(i, 1);
+  renderShiftList();
+}
+
+async function saveShifts() {
+  for (const s of _shifts) {
+    if (!s.id || !s.label || !s.start || !s.end) { showToast('請完整填寫所有班別欄位', true); return; }
+    if (!/^[a-z_][a-z0-9_]*$/.test(s.id)) { showToast('班別 ID 僅限小寫英文、數字、底線，且以英文開頭', true); return; }
+    if (!/^\d{2}:\d{2}$/.test(s.start) || !/^\d{2}:\d{2}$/.test(s.end)) { showToast('時間格式須為 HH:MM（例：06:00）', true); return; }
+  }
+  const { error } = await db.from('system_settings').upsert([
+    { key: 'shifts', value: JSON.stringify(_shifts) }
+  ], { onConflict: 'key' });
+  if (error) { showToast('儲存失敗：' + translateError(error.message), true); return; }
+  sysSettings.shifts = JSON.stringify(_shifts);
+  showToast('班別設定已儲存');
 }
 
 async function saveSystemName() {
@@ -1775,6 +1870,39 @@ function cancelAllDeptForms() {
 function cancelDeptForm(id) {
   const el = document.getElementById(id);
   if (el) { el.style.display = 'none'; }
+}
+
+// ─── FIRST LOGIN & PASSWORD CHANGE ───────────────────────────────────────────
+
+function checkFirstLogin() {
+  if (!currentUser?.user_id) return;
+  if (!localStorage.getItem('pw_noted_' + currentUser.user_id)) {
+    document.getElementById('firstLoginModal').classList.add('show');
+  }
+}
+
+function dismissFirstLoginModal() {
+  if (currentUser?.user_id) localStorage.setItem('pw_noted_' + currentUser.user_id, '1');
+  closeModal('firstLoginModal');
+}
+
+function openChangePwModal() {
+  closeModal('firstLoginModal');
+  document.getElementById('new-pw').value = '';
+  document.getElementById('new-pw2').value = '';
+  document.getElementById('changePwModal').classList.add('show');
+}
+
+async function changePassword() {
+  const pw  = document.getElementById('new-pw').value;
+  const pw2 = document.getElementById('new-pw2').value;
+  if (pw.length < 8) { showToast('密碼至少需要 8 個字元', true); return; }
+  if (pw !== pw2) { showToast('兩次密碼不一致', true); return; }
+  const { error } = await db.auth.updateUser({ password: pw });
+  if (error) { showToast('更改失敗：' + translateError(error.message), true); return; }
+  if (currentUser?.user_id) localStorage.setItem('pw_noted_' + currentUser.user_id, '1');
+  showToast('密碼已更改');
+  closeModal('changePwModal');
 }
 
 // ─── END SETTINGS PAGE ────────────────────────────────────────────────────────

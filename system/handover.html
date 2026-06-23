@@ -446,18 +446,21 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <div class="field"><label>建立日期</label><input id="caseCreatedAt" type="text" readonly></div>
       </div>
       <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:12px">
-        <div class="field"><label>通報人</label>
-          <select id="caseReporter" onchange="onCaseReporterChange()">
-            <option value="">— 選擇通報人 —</option>
+        <div class="field"><label>所屬單位</label>
+          <select id="caseUnitSel" onchange="filterCaseReporter()">
+            <option value="">— 選擇單位 —</option>
           </select>
         </div>
-        <div class="field"><label>所屬單位</label>
-          <input id="caseReporterUnit" type="text" readonly style="opacity:.65;cursor:default">
+        <div class="field"><label>通報人</label>
+          <select id="caseReporter">
+            <option value="">— 選擇通報人 —</option>
+          </select>
         </div>
         <div class="field"><label>發生地點</label>
           <input id="caseLocation" type="text" placeholder="發生地點">
         </div>
       </div>
+      <input type="hidden" id="caseReporterUnit">
       <div class="field" style="margin-bottom:12px">
         <label>發生時間</label>
         <div id="caseIncidentPicker"></div>
@@ -538,6 +541,33 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
   </div>
 </div>
 
+<!-- 首次登入提醒 -->
+<div class="modal-bg" id="firstLoginModal">
+  <div class="modal">
+    <div class="modal-title">⚠ 初次登入提醒</div>
+    <p style="margin-bottom:16px;color:var(--text-hi);line-height:1.7;font-size:.9rem">您尚未更改預設密碼，為保障帳號安全，建議立即更改密碼。</p>
+    <div class="modal-actions">
+      <button class="btn btn-sm" onclick="dismissFirstLogin()">稍後再說</button>
+      <button class="btn btn-primary btn-sm" onclick="openChangePwModal()">前往更改</button>
+    </div>
+  </div>
+</div>
+
+<!-- 更改密碼 -->
+<div class="modal-bg" id="changePwModal">
+  <div class="modal">
+    <div class="modal-title">◉ 更改密碼</div>
+    <div class="form-grid">
+      <div class="field"><label>新密碼</label><input id="new-pw" type="password" placeholder="至少 8 個字元" autocomplete="new-password"></div>
+      <div class="field"><label>確認新密碼</label><input id="new-pw2" type="password" placeholder="再輸入一次" autocomplete="new-password"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-sm" onclick="closeThisModal('changePwModal')">取消</button>
+      <button class="btn btn-primary btn-sm" onclick="changePassword()">確認更改</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -566,9 +596,51 @@ const SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const SHIFT_LABEL = { morning:'早班', afternoon:'中班', night:'夜班' };
-const SHIFT_HOURS = { morning:[6,14], afternoon:[14,22], night:[22,30] };
-const SHIFT_CLASS = { morning:'shift-morning', afternoon:'shift-afternoon', night:'shift-night' };
+let _shifts = [
+  {id:'morning',  label:'早班', start:'06:00', end:'14:00'},
+  {id:'afternoon',label:'中班', start:'14:00', end:'22:00'},
+  {id:'night',    label:'夜班', start:'22:00', end:'06:00'},
+];
+let SHIFT_LABEL = { morning:'早班', afternoon:'中班', night:'夜班' };
+let SHIFT_HOURS = { morning:[6,14], afternoon:[14,22], night:[22,30] };
+let SHIFT_CLASS = { morning:'shift-morning', afternoon:'shift-afternoon', night:'shift-night' };
+
+async function loadShiftsFromSettings() {
+  const { data } = await db.from('system_settings').select('value').eq('key','shifts').maybeSingle();
+  if (data?.value) {
+    try {
+      const parsed = JSON.parse(data.value);
+      if (Array.isArray(parsed) && parsed.length) {
+        _shifts = parsed;
+        SHIFT_LABEL = {}; SHIFT_HOURS = {}; SHIFT_CLASS = {};
+        _shifts.forEach(s => {
+          SHIFT_LABEL[s.id] = s.label;
+          const sh = parseInt(s.start.split(':')[0]);
+          const eh = parseInt(s.end.split(':')[0]);
+          SHIFT_HOURS[s.id] = [sh, eh < sh ? eh + 24 : eh];
+          SHIFT_CLASS[s.id] = 'shift-' + s.id;
+        });
+      }
+    } catch(e) {}
+  }
+  rebuildShiftSelects();
+}
+
+function rebuildShiftSelects() {
+  const selects = [
+    { id:'hShift',   addAll: false },
+    { id:'caseShift',addAll: false },
+    { id:'fShift',   addAll: true  },
+  ];
+  selects.forEach(({ id, addAll }) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const cur = el.value;
+    el.innerHTML = (addAll ? '<option value="">全部班別</option>' : '') +
+      _shifts.map(s => `<option value="${s.id}">${s.label} ${s.start}–${s.end}</option>`).join('');
+    if (_shifts.find(s => s.id === cur)) el.value = cur;
+  });
+}
 
 const CASE_STATUS = {
   open:        { label:'待處理', cls:'badge-open' },
@@ -615,6 +687,7 @@ let currentCaseId = null;
     document.querySelectorAll('[data-sysname="org"]').forEach(el => { if (s.org_name) el.textContent = s.org_name; });
     document.querySelectorAll('[data-sysname="site"]').forEach(el => { if (s.site_name) el.textContent = s.site_name; });
   });
+  await loadShiftsFromSettings();
 
   const [{ data: depts }, { data: users }] = await Promise.all([
     db.from('departments').select('*').order('sort_order'),
@@ -648,7 +721,13 @@ let currentCaseId = null;
   DTP.init('fDateFrom-dtp', 'date', loadHistory);
   DTP.init('fDateTo-dtp', 'date', loadHistory);
   const h = new Date().getHours();
-  document.getElementById('hShift').value = h>=6&&h<14 ? 'morning' : h>=14&&h<22 ? 'afternoon' : 'night';
+  const autoShift = _shifts.find(s => {
+    const sh = parseInt(s.start.split(':')[0]);
+    const eh = parseInt(s.end.split(':')[0]);
+    return eh > sh ? (h >= sh && h < eh) : (h >= sh || h < eh);
+  });
+  if (autoShift) document.getElementById('hShift').value = autoShift.id;
+  checkFirstLogin();
 
   await fetchEqStatus();
   await loadHistory();
@@ -695,11 +774,28 @@ function fillPersonSelect(selId, deptId) {
 }
 
 
-function onCaseReporterChange() {
-  const name = document.getElementById('caseReporter').value;
-  const user = allUsers.find(u => u.name === name);
-  const dept = user?.dept_id ? allDepts.find(d => d.dept_id === user.dept_id) : null;
-  document.getElementById('caseReporterUnit').value = dept ? dept.name : '';
+function filterCaseReporter() {
+  const deptId = document.getElementById('caseUnitSel')?.value || null;
+  let filtered;
+  if (deptId) {
+    const dept = allDepts.find(d => d.dept_id === deptId);
+    if (dept && !dept.parent_id) {
+      // 選了 L1：包含本身及所有下級
+      const childIds = allDepts.filter(d => d.parent_id === deptId).map(d => d.dept_id);
+      filtered = allUsers.filter(u => u.dept_id === deptId || childIds.includes(u.dept_id));
+    } else {
+      filtered = allUsers.filter(u => u.dept_id === deptId);
+    }
+  } else {
+    filtered = allUsers;
+  }
+  const cur = document.getElementById('caseReporter').value;
+  document.getElementById('caseReporter').innerHTML =
+    '<option value="">— 選擇通報人 —</option>' +
+    filtered.map(u => `<option value="${u.name}">${u.name}</option>`).join('');
+  if (filtered.find(u => u.name === cur)) document.getElementById('caseReporter').value = cur;
+  const unitDept = allDepts.find(d => d.dept_id === deptId);
+  document.getElementById('caseReporterUnit').value = unitDept?.name || '';
 }
 
 function onHandoverL1Change() {
@@ -946,12 +1042,13 @@ function openCaseForm() {
     if (el) el.value = '';
   });
   DTP.setValue('caseIncidentPicker', null);
-  // 通報人由系統帶入，以 select 選單呈現
-  document.getElementById('caseReporter').innerHTML =
-    '<option value="">— 選擇通報人 —</option>' +
-    allUsers.map(u => `<option value="${u.name}">${u.name}</option>`).join('');
+
+  // 所屬單位：建立帶層級縮排的單一選單
+  document.getElementById('caseUnitSel').innerHTML =
+    '<option value="">— 選擇單位 —</option>' + buildFlatDeptOpts();
+  if (currentUser?.dept_id) document.getElementById('caseUnitSel').value = currentUser.dept_id;
+  filterCaseReporter();
   document.getElementById('caseReporter').value = currentUser.name || '';
-  onCaseReporterChange();
   pendingAttachments = [];
   renderPendingAttachments();
   document.getElementById('caseFormModal').classList.add('show');
@@ -1370,6 +1467,42 @@ function showToast(msg, isErr = false) {
   t.textContent = msg;
   t.className = 'toast show' + (isErr ? ' err' : '');
   setTimeout(() => { t.className = 'toast'; }, 2800);
+}
+
+function closeThisModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('show');
+}
+
+function checkFirstLogin() {
+  if (!currentUser?.user_id) return;
+  if (!localStorage.getItem('pw_noted_' + currentUser.user_id)) {
+    document.getElementById('firstLoginModal').classList.add('show');
+  }
+}
+
+function dismissFirstLogin() {
+  if (currentUser?.user_id) localStorage.setItem('pw_noted_' + currentUser.user_id, '1');
+  closeThisModal('firstLoginModal');
+}
+
+function openChangePwModal() {
+  closeThisModal('firstLoginModal');
+  document.getElementById('new-pw').value = '';
+  document.getElementById('new-pw2').value = '';
+  document.getElementById('changePwModal').classList.add('show');
+}
+
+async function changePassword() {
+  const pw  = document.getElementById('new-pw').value;
+  const pw2 = document.getElementById('new-pw2').value;
+  if (pw.length < 8) { showToast('密碼至少需要 8 個字元', true); return; }
+  if (pw !== pw2) { showToast('兩次密碼不一致', true); return; }
+  const { error } = await db.auth.updateUser({ password: pw });
+  if (error) { showToast('更改失敗：' + error.message, true); return; }
+  if (currentUser?.user_id) localStorage.setItem('pw_noted_' + currentUser.user_id, '1');
+  showToast('密碼已更改');
+  closeThisModal('changePwModal');
 }
 </script>
 </body>

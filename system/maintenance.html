@@ -453,6 +453,37 @@ body{
   </div>
 </div>
 
+<!-- 首次登入提醒 -->
+<div class="modal-bg" id="firstLoginModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div id="firstLoginContent" style="padding:24px">
+      <div style="font-size:1rem;font-weight:700;color:var(--cyan);margin-bottom:12px;letter-spacing:.06em">⚠ 初次登入提醒</div>
+      <p style="margin-bottom:16px;color:var(--text-hi);line-height:1.7;font-size:.9rem">您尚未更改預設密碼，為保障帳號安全，建議立即更改密碼。</p>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button style="padding:8px 16px;background:rgba(12,40,64,0.6);color:var(--text-dim,#4a7a8a);border:1px solid var(--border,#1a3a4a);border-radius:2px;cursor:pointer;font-size:.82rem" onclick="dismissFirstLogin()">稍後再說</button>
+        <button style="padding:8px 16px;background:var(--cyan,#00d4ff);color:#000;border:none;border-radius:2px;cursor:pointer;font-size:.82rem;font-weight:600" onclick="openChangePwModal()">前往更改</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 更改密碼 -->
+<div class="modal-bg" id="changePwModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div style="padding:24px">
+      <div style="font-size:1rem;font-weight:700;color:var(--cyan);margin-bottom:16px;letter-spacing:.06em">◉ 更改密碼</div>
+      <div style="margin-bottom:12px"><label style="font-size:.82rem;color:var(--text-dim)">新密碼</label><input id="new-pw" type="password" placeholder="至少 8 個字元" autocomplete="new-password" style="width:100%;margin-top:6px;padding:10px 12px;background:rgba(2,8,20,.8);border:1px solid var(--border);color:var(--text-hi);font-size:.9rem;border-radius:2px"></div>
+      <div style="margin-bottom:16px"><label style="font-size:.82rem;color:var(--text-dim)">確認新密碼</label><input id="new-pw2" type="password" placeholder="再輸入一次" autocomplete="new-password" style="width:100%;margin-top:6px;padding:10px 12px;background:rgba(2,8,20,.8);border:1px solid var(--border);color:var(--text-hi);font-size:.9rem;border-radius:2px"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button style="padding:8px 16px;background:rgba(12,40,64,0.6);color:var(--text-dim,#4a7a8a);border:1px solid var(--border,#1a3a4a);border-radius:2px;cursor:pointer;font-size:.82rem" onclick="closeThisModal('changePwModal')">取消</button>
+        <button style="padding:8px 16px;background:var(--cyan,#00d4ff);color:#000;border:none;border-radius:2px;cursor:pointer;font-size:.82rem;font-weight:600" onclick="changePassword()">確認更改</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -514,6 +545,7 @@ const COST_TYPE_LABEL = { purchase:'購置費', outsource:'委外維修', parts:
   }
   currentUser = profile || { user_id: null, name: '維修人員', role: 'maintenance' };
   document.getElementById('navUser').textContent = currentUser.name;
+  checkFirstLogin();
   db.from('system_settings').select('key,value').then(({ data }) => {
     if (!data) return;
     const s = Object.fromEntries(data.map(r => [r.key, r.value]));
@@ -790,6 +822,42 @@ function showToast(msg, isErr = false) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.className = 'toast show' + (isErr ? ' err' : '');
   setTimeout(() => { t.className = 'toast'; }, 2500);
+}
+
+function closeThisModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('show');
+}
+
+function checkFirstLogin() {
+  if (!currentUser?.user_id) return;
+  if (!localStorage.getItem('pw_noted_' + currentUser.user_id)) {
+    document.getElementById('firstLoginModal').classList.add('show');
+  }
+}
+
+function dismissFirstLogin() {
+  if (currentUser?.user_id) localStorage.setItem('pw_noted_' + currentUser.user_id, '1');
+  closeThisModal('firstLoginModal');
+}
+
+function openChangePwModal() {
+  closeThisModal('firstLoginModal');
+  document.getElementById('new-pw').value = '';
+  document.getElementById('new-pw2').value = '';
+  document.getElementById('changePwModal').classList.add('show');
+}
+
+async function changePassword() {
+  const pw  = document.getElementById('new-pw').value;
+  const pw2 = document.getElementById('new-pw2').value;
+  if (pw.length < 8) { showToast('密碼至少需要 8 個字元', true); return; }
+  if (pw !== pw2) { showToast('兩次密碼不一致', true); return; }
+  const { error } = await db.auth.updateUser({ password: pw });
+  if (error) { showToast('更改失敗：' + error.message, true); return; }
+  if (currentUser?.user_id) localStorage.setItem('pw_noted_' + currentUser.user_id, '1');
+  showToast('密碼已更改');
+  closeThisModal('changePwModal');
 }
 </script>
 </body>
