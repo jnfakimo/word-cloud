@@ -593,7 +593,8 @@ body{
           <div class="field"><label>電子郵件（密碼找回用）</label><input id="u-email" type="email" placeholder="user@example.com"></div>
           <div class="field"><label>初始密碼</label><input id="u-pass" type="password" placeholder="至少 6 碼"></div>
           <div class="field"><label>電話</label><input id="u-phone" type="text" placeholder="聯絡電話"></div>
-          <div class="field"><label>部門</label><select id="u-dept-id"><option value="">-- 選擇部門 --</option></select></div>
+          <div class="field"><label>第一層部門</label><select id="u-dept-l1" onchange="onAdminDeptL1Change()"><option value="">-- 選擇第一層 --</option></select></div>
+          <div class="field"><label>第二層（課）</label><select id="u-dept-l2" disabled><option value="">-- 無下級單位 --</option></select></div>
           <div class="field"><label>角色</label>
             <select id="u-role">
               <option value="inspector">巡檢人員</option>
@@ -1039,25 +1040,49 @@ async function loadAll() {
   allUsers.forEach(u => userMap[u.user_id] = u);
   allEquipment.forEach(e => eqMap[e.equipment_id] = e);
   allDepts.forEach(d => deptMap[d.dept_id] = d);
-  populateDeptSelect('u-dept-id');
+  populateAdminDeptSelects();
   populateEqFilter('cost-eq');
 }
 
-function buildDeptOpts(el, selectedId) {
-  const l1 = allDepts.filter(d => !d.parent_id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
-  let html = '<option value="">-- 選擇部門 --</option>';
-  for (const d of l1) {
-    html += `<option value="${d.dept_id}" ${d.dept_id===selectedId?'selected':''}>◈ ${d.name}</option>`;
-    allDepts.filter(c=>c.parent_id===d.dept_id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).forEach(c=>{
-      html += `<option value="${c.dept_id}" ${c.dept_id===selectedId?'selected':''}>  └ ${c.name}</option>`;
-    });
+function populateAdminDeptSelects(selectedDeptId) {
+  const l1Sel = document.getElementById('u-dept-l1');
+  const l2Sel = document.getElementById('u-dept-l2');
+  if (!l1Sel) return;
+  const l1Depts = allDepts.filter(d => !d.parent_id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+  l1Sel.innerHTML = '<option value="">-- 選擇第一層 --</option>' +
+    l1Depts.map(d => `<option value="${d.dept_id}">${d.name}</option>`).join('');
+  if (selectedDeptId) {
+    const dept = deptMap[selectedDeptId];
+    if (dept?.parent_id) {
+      l1Sel.value = dept.parent_id;
+      onAdminDeptL1Change();
+      l2Sel.value = selectedDeptId;
+    } else if (dept) {
+      l1Sel.value = selectedDeptId;
+      onAdminDeptL1Change();
+    }
+  } else {
+    l2Sel.innerHTML = '<option value="">-- 無下級單位 --</option>';
+    l2Sel.disabled = true;
   }
-  el.innerHTML = html;
 }
 
-function populateDeptSelect(id) {
-  const el = document.getElementById(id);
-  if (el) buildDeptOpts(el, el.value);
+function onAdminDeptL1Change() {
+  const l1Id = document.getElementById('u-dept-l1').value;
+  const l2Sel = document.getElementById('u-dept-l2');
+  const children = allDepts.filter(d => d.parent_id === l1Id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+  if (!l1Id || children.length === 0) {
+    l2Sel.innerHTML = '<option value="">-- 無下級單位 --</option>';
+    l2Sel.disabled = true;
+  } else {
+    l2Sel.innerHTML = '<option value="">-- 選擇課別（選填）--</option>' +
+      children.map(c => `<option value="${c.dept_id}">${c.name}</option>`).join('');
+    l2Sel.disabled = false;
+  }
+}
+
+function getAdminDeptId() {
+  return document.getElementById('u-dept-l2')?.value || document.getElementById('u-dept-l1')?.value || null;
 }
 
 function populateEqFilter(selectId) {
@@ -1133,7 +1158,7 @@ async function createUser() {
   const email    = document.getElementById('u-email').value.trim();
   const pass     = document.getElementById('u-pass').value;
   const phone    = document.getElementById('u-phone').value.trim();
-  const deptId   = document.getElementById('u-dept-id').value || null;
+  const deptId   = getAdminDeptId();
   const role     = document.getElementById('u-role').value;
   if (!name || !username || !email || !pass) { showToast('請填寫姓名、帳號、郵件與密碼', true); return; }
   if (!/^[A-Za-z0-9_]+$/.test(username)) { showToast('帳號僅限英文、數字、底線', true); return; }
@@ -1148,7 +1173,9 @@ async function createUser() {
   await writeAudit('users', authData.user.id, 'insert', null, profile);
   showToast(`帳號「${name}」已建立`);
   ['u-name','u-username','u-email','u-pass','u-phone'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('u-dept-id').value = '';
+  document.getElementById('u-dept-l1').value = '';
+  document.getElementById('u-dept-l2').innerHTML = '<option value="">-- 無下級單位 --</option>';
+  document.getElementById('u-dept-l2').disabled = true;
   await loadUsers();
 }
 
@@ -1589,7 +1616,7 @@ async function reloadDepts() {
   const { data } = await db.from('departments').select('*').order('sort_order');
   allDepts = data || [];
   allDepts.forEach(d => deptMap[d.dept_id] = d);
-  populateDeptSelect('u-dept-id');
+  populateAdminDeptSelects();
   renderDeptTree();
 }
 

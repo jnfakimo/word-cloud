@@ -210,9 +210,15 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
             <input type="date" id="hDate" onchange="onShiftChange()">
           </div>
           <div class="field">
-            <label>部門 <span style="color:var(--text-dim);font-size:.7rem">（組織架構）</span></label>
-            <select id="hDept" onchange="onDeptChange()">
-              <option value="">— 選擇部門 —</option>
+            <label>第一層部門 <span style="color:var(--text-dim);font-size:.7rem">（組織架構）</span></label>
+            <select id="hDeptL1" onchange="onHDeptL1Change()">
+              <option value="">— 選擇第一層 —</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>第二層（課）</label>
+            <select id="hDeptL2" onchange="onHDeptChange()" disabled>
+              <option value="">— 無下級單位 —</option>
             </select>
           </div>
         </div>
@@ -420,35 +426,44 @@ let editingId = null;
 
 // ── DEPT DROPDOWNS ───────────────────────────────────────────
 function buildDeptSelects() {
-  const opts = buildDeptOpts(allDepts);
-  ['hDept','fDept'].forEach(id => {
-    const sel = document.getElementById(id);
-    const first = id === 'hDept' ? '<option value="">— 選擇部門 —</option>' : '<option value="">全部部門</option>';
-    sel.innerHTML = first + opts;
-  });
+  const l1Depts = allDepts.filter(d => !d.parent_id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+  // 新增表單：第一層選單
+  document.getElementById('hDeptL1').innerHTML = '<option value="">— 選擇第一層 —</option>' +
+    l1Depts.map(d => `<option value="${d.dept_id}">${d.name}</option>`).join('');
+  // 歷史篩選：平面階層選單
+  document.getElementById('fDept').innerHTML = '<option value="">全部部門</option>' + buildFlatDeptOpts();
 }
 
-function buildDeptOpts(depts) {
-  // Build tree
-  const roots = depts.filter(d => !d.parent_id);
-  const children = {};
-  depts.filter(d => d.parent_id).forEach(d => {
-    if (!children[d.parent_id]) children[d.parent_id] = [];
-    children[d.parent_id].push(d);
-  });
+function buildFlatDeptOpts() {
+  const roots = allDepts.filter(d => !d.parent_id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
   let html = '';
   for (const r of roots) {
     html += `<option value="${r.dept_id}">${r.name}</option>`;
-    for (const c of (children[r.dept_id] || [])) {
+    allDepts.filter(d => d.parent_id === r.dept_id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0)).forEach(c => {
       html += `<option value="${c.dept_id}">&nbsp;&nbsp;└ ${c.name}</option>`;
-    }
+    });
   }
   return html;
 }
 
+function onHDeptL1Change() {
+  const l1Id = document.getElementById('hDeptL1').value;
+  const l2Sel = document.getElementById('hDeptL2');
+  const children = allDepts.filter(d => d.parent_id === l1Id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+  if (!l1Id || children.length === 0) {
+    l2Sel.innerHTML = '<option value="">— 無下級單位 —</option>';
+    l2Sel.disabled = true;
+  } else {
+    l2Sel.innerHTML = '<option value="">— 選擇課別（選填）—</option>' +
+      children.map(c => `<option value="${c.dept_id}">${c.name}</option>`).join('');
+    l2Sel.disabled = false;
+  }
+  onHDeptChange();
+}
+
 // ── DEPT → USERS ─────────────────────────────────────────────
-function onDeptChange() {
-  const deptId = document.getElementById('hDept').value;
+function onHDeptChange() {
+  const deptId = document.getElementById('hDeptL2').value || document.getElementById('hDeptL1').value;
   const filtered = deptId ? allUsers.filter(u => u.dept_id === deptId) : allUsers;
   const opts = '<option value="">— 選擇 —</option>' +
     filtered.map(u => `<option value="${u.user_id}">${u.name}</option>`).join('');
@@ -544,7 +559,7 @@ async function confirmHandover() {
 async function doSave(status) {
   const shift     = document.getElementById('hShift').value;
   const date      = document.getElementById('hDate').value;
-  const deptId    = document.getElementById('hDept').value || null;
+  const deptId    = document.getElementById('hDeptL2').value || document.getElementById('hDeptL1').value || null;
   const handoverBy = document.getElementById('hHandoverBy').value || null;
   const takeoverBy = document.getElementById('hTakeoverBy').value || null;
   const notes     = document.getElementById('hNotes').value.trim();

@@ -554,8 +554,12 @@ body{
       <input id="repairPhone" type="tel" placeholder="0912-345-678">
     </div>
     <div class="field">
-      <label>部門</label>
-      <select id="repairDept"><option value="">-- 選擇部門 --</option></select>
+      <label>第一層部門</label>
+      <select id="repairDeptL1" onchange="onRepairDeptL1Change()"><option value="">-- 選擇第一層 --</option></select>
+    </div>
+    <div class="field">
+      <label>第二層（課）</label>
+      <select id="repairDeptL2" disabled><option value="">-- 無下級單位 --</option></select>
     </div>
     <div class="field">
       <label>發生位置 <span style="color:var(--text-dim);font-size:.72rem">（選填）</span></label>
@@ -677,17 +681,11 @@ async function lpLoadData() {
   _lpMarkets = mkt || [];
   _lpLocs    = locs || [];
   _appDepts  = depts || [];
-  const dSel = document.getElementById('repairDept');
-  if (dSel && _appDepts.length) {
-    const l1 = _appDepts.filter(d => !d.parent_id);
-    let html = '<option value="">-- 選擇部門 --</option>';
-    for (const d of l1) {
-      html += `<option value="${d.name}">◈ ${d.name}</option>`;
-      _appDepts.filter(c => c.parent_id === d.dept_id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0)).forEach(c => {
-        html += `<option value="${c.name}">  └ ${c.name}</option>`;
-      });
-    }
-    dSel.innerHTML = html;
+  const l1Sel = document.getElementById('repairDeptL1');
+  if (l1Sel && _appDepts.length) {
+    const l1 = _appDepts.filter(d => !d.parent_id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+    l1Sel.innerHTML = '<option value="">-- 選擇第一層 --</option>' +
+      l1.map(d => `<option value="${d.dept_id}">${d.name}</option>`).join('');
   }
 }
 
@@ -761,6 +759,27 @@ function lpSelect(sfx) {
 }
 
 function lpGetId(sfx) { return _lpSelected[sfx] || null; }
+
+function onRepairDeptL1Change() {
+  const l1Id = document.getElementById('repairDeptL1').value;
+  const l2Sel = document.getElementById('repairDeptL2');
+  const children = _appDepts.filter(d => d.parent_id === l1Id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+  if (!l1Id || children.length === 0) {
+    l2Sel.innerHTML = '<option value="">-- 無下級單位 --</option>';
+    l2Sel.disabled = true;
+  } else {
+    l2Sel.innerHTML = '<option value="">-- 選擇課別（選填）--</option>' +
+      children.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+    l2Sel.disabled = false;
+  }
+}
+
+function getRepairDeptName() {
+  const l2Val = document.getElementById('repairDeptL2')?.value;
+  if (l2Val) return l2Val;
+  const l1Id = document.getElementById('repairDeptL1')?.value;
+  return _appDepts.find(d => d.dept_id === l1Id)?.name || '';
+}
 // ────────────────────────────────────────────────────────────
 
 (async () => {
@@ -1136,7 +1155,7 @@ async function submitRepair() {
   const eqId = document.getElementById('repairEqId').value;
   const reporter = document.getElementById('repairReporter').value.trim();
   const phone = document.getElementById('repairPhone').value.trim();
-  const dept = document.getElementById('repairDept').value;
+  const dept = getRepairDeptName();
   const fault = document.getElementById('repairFault').value.trim();
   if (!reporter || !fault) { showToast('請填寫報修人與故障說明', true); return; }
 
@@ -1155,7 +1174,9 @@ async function submitRepair() {
   showToast('報修單已送出');
   document.getElementById('repairReporter').value = '';
   document.getElementById('repairPhone').value = '';
-  document.getElementById('repairDept').value = '';
+  document.getElementById('repairDeptL1').value = '';
+  document.getElementById('repairDeptL2').innerHTML = '<option value="">-- 無下級單位 --</option>';
+  document.getElementById('repairDeptL2').disabled = true;
   document.getElementById('repairFault').value = '';
   document.getElementById('lp-r-market').value = '';
   lpReset('r', 'floor');
