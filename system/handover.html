@@ -446,8 +446,8 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <div class="field"><label>建立日期</label><input id="caseCreatedAt" type="text" readonly></div>
       </div>
       <div class="form-grid" style="margin-bottom:12px">
-        <div class="field"><label>通報人 *</label><input id="caseReporter" type="text" placeholder="通報人姓名"></div>
-        <div class="field"><label>所屬單位</label><input id="caseReporterUnit" type="text" placeholder="所屬單位"></div>
+        <div class="field"><label>通報人</label><input id="caseReporter" type="text" readonly style="opacity:.65;cursor:default"></div>
+        <div class="field"><label>所屬單位</label><input id="caseReporterUnit" type="text" readonly style="opacity:.65;cursor:default"></div>
         <div class="field"><label>發生時間</label><input id="caseIncidentTime" type="datetime-local"></div>
         <div class="field"><label>發生地點</label><input id="caseLocation" type="text" placeholder="發生地點"></div>
       </div>
@@ -486,20 +486,11 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <label>後續交接事項</label>
         <textarea id="caseFollowup" placeholder="需交接給下一班的事項…" style="min-height:64px"></textarea>
       </div>
-      <div class="form-grid" style="margin-bottom:12px">
-        <div class="field"><label>負責單位</label><input id="caseResponsibleUnit" type="text" placeholder="負責單位"></div>
-        <div class="field"><label>指派承辦人</label>
-          <select id="caseAssignedTo"><option value="">— 指派承辦人 —</option></select>
-        </div>
-        <div class="field"><label>案件狀態</label>
-          <select id="caseStatus">
-            <option value="open">待處理</option>
-            <option value="in_progress">處理中</option>
-            <option value="pending">待確認</option>
-          </select>
-        </div>
-        <div class="field"><label>到期日</label><input id="caseDueDate" type="date"></div>
-      </div>
+      <!-- 負責單位、指派承辦人、到期日 由主管在案件詳情中指派 -->
+      <input type="hidden" id="caseResponsibleUnit">
+      <input type="hidden" id="caseAssignedTo">
+      <input type="hidden" id="caseDueDate">
+      <input type="hidden" id="caseStatus" value="open">
       <div class="field" style="margin-bottom:16px">
         <label>備註</label>
         <textarea id="caseNote" placeholder="其他備註…" style="min-height:56px"></textarea>
@@ -599,6 +590,20 @@ let currentCaseId = null;
   ]);
   allDepts = depts || [];
   allUsers = users || [];
+
+  // 載入目前登入使用者
+  try {
+    const { data: { session } } = await db.auth.getSession();
+    if (session?.user?.id) {
+      const { data: u } = await db.from('users').select('*').eq('user_id', session.user.id).single();
+      if (u) { currentUser = u; document.getElementById('navUser').textContent = u.name; }
+    } else if (allUsers.length) {
+      currentUser = allUsers[0];
+      document.getElementById('navUser').textContent = allUsers[0].name;
+    }
+  } catch(e) {
+    if (allUsers.length) { currentUser = allUsers[0]; document.getElementById('navUser').textContent = allUsers[0].name; }
+  }
 
   buildDeptSelects();
 
@@ -890,14 +895,15 @@ function openCaseForm() {
   document.getElementById('caseSub').innerHTML = '<option value="">— 請先選擇大類 —</option>';
   document.getElementById('caseSub').disabled = true;
   document.getElementById('caseOtherDiv').style.display = 'none';
-  document.getElementById('caseAssignedTo').innerHTML = '<option value="">— 指派承辦人 —</option>' +
-    allUsers.map(u => `<option value="${u.user_id}">${u.name}</option>`).join('');
-  ['caseTitle','caseReporter','caseReporterUnit','caseLocation','caseDesc','caseAction','caseFollowup','caseResponsibleUnit','caseDueDate','caseNote','caseOther'].forEach(id => {
+  ['caseTitle','caseLocation','caseDesc','caseAction','caseFollowup','caseNote','caseOther'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
   document.getElementById('caseIncidentTime').value = '';
-  document.getElementById('caseStatus').value = 'open';
+  // 通報人由系統自動帶入
+  document.getElementById('caseReporter').value = currentUser.name || '';
+  const _ud = currentUser.dept_id ? allDepts.find(d => d.dept_id === currentUser.dept_id) : null;
+  document.getElementById('caseReporterUnit').value = _ud ? _ud.name : '';
   pendingAttachments = [];
   renderPendingAttachments();
   document.getElementById('caseFormModal').classList.add('show');
@@ -930,9 +936,7 @@ function onCaseCatChange() {
 async function submitCase() {
   const caseNo   = document.getElementById('caseNo').value;
   const cat      = document.getElementById('caseCat').value;
-  const reporter = document.getElementById('caseReporter').value.trim();
-  if (!cat)      { showToast('請選擇異常大類', true); return; }
-  if (!reporter) { showToast('請填寫通報人', true); return; }
+  if (!cat) { showToast('請選擇異常大類', true); return; }
 
   const sub      = document.getElementById('caseSub').value;
   const other    = document.getElementById('caseOther').value.trim();
@@ -944,8 +948,8 @@ async function submitCase() {
     case_no:          caseNo,
     title,
     shift_type:       document.getElementById('caseShift').value,
-    reporter,
-    reporter_unit:    document.getElementById('caseReporterUnit').value.trim() || null,
+    reporter:         document.getElementById('caseReporter').value || null,
+    reporter_unit:    document.getElementById('caseReporterUnit').value || null,
     incident_time:    incTime ? new Date(incTime).toISOString() : null,
     incident_location:document.getElementById('caseLocation').value.trim() || null,
     anomaly_category: cat,
@@ -954,10 +958,7 @@ async function submitCase() {
     description:      document.getElementById('caseDesc').value.trim() || null,
     action_taken:     document.getElementById('caseAction').value.trim() || null,
     followup:         document.getElementById('caseFollowup').value.trim() || null,
-    responsible_unit: document.getElementById('caseResponsibleUnit').value.trim() || null,
-    assigned_to:      document.getElementById('caseAssignedTo').value || null,
-    status:           document.getElementById('caseStatus').value,
-    due_date:         document.getElementById('caseDueDate').value || null,
+    status:           'open',
     note:             document.getElementById('caseNote').value.trim() || null,
     created_by:       currentUser.user_id,
   };
