@@ -1188,7 +1188,7 @@ async function saveEditUser() {
   const before = userMap[userId];
   const updates = { name, phone: phone || null, role, dept_id: deptId };
   const { error } = await db.from('users').update(updates).eq('user_id', userId);
-  if (error) { showToast('儲存失敗：' + error.message, true); return; }
+  if (error) { showToast('儲存失敗：' + translateError(error.message), true); return; }
   await writeAudit('users', userId, 'update', { name: before?.name, phone: before?.phone, role: before?.role, dept_id: before?.dept_id }, updates);
   showToast(`使用者「${name}」已更新`);
   closeModal('editUserModal');
@@ -1279,14 +1279,14 @@ async function createUser() {
     if (authErr.message === 'User already registered') {
       showToast('此 Email 已被註冊，請換一個 Email 或確認帳號是否已存在', true);
     } else {
-      showToast('建立帳號失敗：' + authErr.message, true);
+      showToast('建立帳號失敗：' + translateError(authErr.message), true);
     }
     return;
   }
 
   const profile = { auth_id: authData.user.id, name, username, email, phone: phone || null, dept_id: deptId, role, status: 'active', created_by: currentUser.user_id };
   const { error: profErr } = await db.from('users').insert(profile);
-  if (profErr) { showToast('建立使用者資料失敗：' + profErr.message, true); return; }
+  if (profErr) { showToast('建立使用者資料失敗：' + translateError(profErr.message), true); return; }
 
   await writeAudit('users', authData.user.id, 'insert', null, profile);
   showToast(`帳號「${name}」已建立`);
@@ -1338,7 +1338,7 @@ async function createEquipment() {
   const qrCode = 'EQ-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7).toUpperCase();
   const eq = { name, location: loc || null, qr_code: qrCode, purchase_cost: cost, purchase_date: date, status: 'active', created_by: currentUser.user_id };
   const { data, error } = await db.from('equipment').insert(eq).select().single();
-  if (error) { showToast('新增失敗：' + error.message, true); return; }
+  if (error) { showToast('新增失敗：' + translateError(error.message), true); return; }
 
   if (cost) {
     await db.from('cost_records').insert({ equipment_id: data.equipment_id, cost_type: 'purchase', amount: cost, cost_date: date || new Date().toISOString().split('T')[0], note: '初始購置費', created_by: currentUser.user_id });
@@ -1452,7 +1452,7 @@ async function loadCostAdmin() {
   if (typeFilter) query = query.eq('cost_type', typeFilter);
   const { data, error } = await query;
   if (error) {
-    document.getElementById('costTbody').innerHTML = `<tr><td colspan="6" style="color:var(--red);font-family:var(--font-mono)">ERROR: ${error.message}</td></tr>`;
+    document.getElementById('costTbody').innerHTML = `<tr><td colspan="6" style="color:var(--red);font-family:var(--font-mono)">載入失敗：${translateError(error.message)}</td></tr>`;
     return;
   }
   _lastCosts = data || [];
@@ -1483,7 +1483,7 @@ async function addCostRecord() {
     equipment_id: eqId, cost_type: costType, vendor: vendor || null,
     cost_date: costDate, amount, note: note || null, created_by: currentUser.user_id
   });
-  if (error) { showToast('新增失敗：' + error.message, true); return; }
+  if (error) { showToast('新增失敗：' + translateError(error.message), true); return; }
   showToast('費用記錄已新增');
   document.getElementById('cost-vendor').value = '';
   document.getElementById('cost-amount').value = '';
@@ -1581,7 +1581,7 @@ async function saveSystemName() {
     { key: 'org_name',  value: orgName  },
     { key: 'site_name', value: siteName },
   ], { onConflict: 'key' });
-  if (error) { showToast('儲存失敗：' + error.message, true); return; }
+  if (error) { showToast('儲存失敗：' + translateError(error.message), true); return; }
   sysSettings.org_name = orgName; sysSettings.site_name = siteName;
   showToast('系統名稱已儲存');
   applySystemName();
@@ -1665,7 +1665,7 @@ async function confirmEditDept(deptId) {
   if (!name) { showToast('部門名稱不得為空', true); return; }
   const before = { name: deptMap[deptId]?.name, code: deptMap[deptId]?.code };
   const { error } = await db.from('departments').update({ name, code: code || null }).eq('dept_id', deptId);
-  if (error) { showToast('更新失敗：' + error.message, true); return; }
+  if (error) { showToast('更新失敗：' + translateError(error.message), true); return; }
   await writeAudit('departments', deptId, 'update', before, { name, code });
   showToast('部門已更新');
   await reloadDepts();
@@ -1712,7 +1712,7 @@ async function confirmAddDept(parentId) {
     name, code: code || null, parent_id: parentId || null,
     level, sort_order: maxOrder + 10,
   });
-  if (error) { showToast('新增失敗：' + error.message, true); return; }
+  if (error) { showToast('新增失敗：' + translateError(error.message), true); return; }
   await writeAudit('departments', 'new', 'insert', null, { name, code, parentId });
   showToast('部門已新增');
   await reloadDepts();
@@ -1724,7 +1724,7 @@ async function deleteDept(deptId) {
   if (hasChildren) { showToast('請先刪除下層部門', true); return; }
   if (!confirm(`確定刪除「${dept?.name}」？此操作無法復原。`)) return;
   const { error } = await db.from('departments').delete().eq('dept_id', deptId);
-  if (error) { showToast('刪除失敗：' + error.message, true); return; }
+  if (error) { showToast('刪除失敗：' + translateError(error.message), true); return; }
   await writeAudit('departments', deptId, 'update', { name: dept?.name }, null);
   showToast('部門已刪除');
   await reloadDepts();
@@ -1952,6 +1952,27 @@ function laToggle(key) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function logout() { await db.auth.signOut(); window.location.href = 'login.html'; }
+
+function translateError(msg) {
+  if (!msg) return '未知錯誤';
+  if (msg.includes('User already registered')) return '此 Email 已被註冊';
+  if (msg.includes('Invalid login credentials')) return '帳號或密碼錯誤';
+  if (msg.includes('Email not confirmed')) return 'Email 尚未驗證，請檢查信箱';
+  if (msg.includes('Password should be at least')) return '密碼至少需要 6 個字元';
+  if (msg.includes('Signup requires a valid password')) return '請輸入有效密碼';
+  if (msg.includes('invalid format')) return 'Email 格式不正確';
+  if (msg.includes('duplicate key value')) return '資料重複，請確認是否已存在';
+  if (msg.includes('null value in column')) return '必填欄位不可空白';
+  if (msg.includes('violates foreign key constraint')) return '關聯資料錯誤，無法刪除';
+  if (msg.includes('violates row-level security')) return '無操作權限';
+  if (msg.includes('permission denied')) return '無操作權限';
+  if (msg.includes('JWT expired')) return '登入已過期，請重新整理頁面';
+  if (msg.includes('relation does not exist')) return '資料表不存在，請確認資料庫設定';
+  if (msg.includes('value too long')) return '輸入值過長';
+  if (msg.includes('invalid input syntax')) return '輸入格式不正確';
+  if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) return '網路連線失敗，請稍後再試';
+  return msg;
+}
 
 function showToast(msg, isErr = false) {
   const t = document.getElementById('toast');

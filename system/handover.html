@@ -592,7 +592,7 @@ async function doSave(status) {
   } else {
     ({ error: err } = await db.from('handover_records').insert(record));
   }
-  if (err) { showToast('儲存失敗：' + (err.message || err.code), true); return; }
+  if (err) { showToast('儲存失敗：' + translateError(err.message || err.code), true); return; }
 
   showToast(status === 'confirmed' ? '✓ 交接已確認完成' : '草稿已儲存');
   resetForm();
@@ -739,6 +739,22 @@ function switchTab(name) {
 // ── UTILS ─────────────────────────────────────────────────────
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function translateError(msg) {
+  if (!msg) return '未知錯誤';
+  if (msg.includes('User already registered')) return '此 Email 已被註冊';
+  if (msg.includes('Invalid login credentials')) return '帳號或密碼錯誤';
+  if (msg.includes('Email not confirmed')) return 'Email 尚未驗證，請檢查信箱';
+  if (msg.includes('Password should be at least')) return '密碼至少需要 6 個字元';
+  if (msg.includes('duplicate key value')) return '資料重複，請確認是否已存在';
+  if (msg.includes('null value in column')) return '必填欄位不可空白';
+  if (msg.includes('violates foreign key constraint')) return '關聯資料錯誤，無法刪除';
+  if (msg.includes('violates row-level security')) return '無操作權限';
+  if (msg.includes('permission denied')) return '無操作權限';
+  if (msg.includes('JWT expired')) return '登入已過期，請重新整理頁面';
+  if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) return '網路連線失敗，請稍後再試';
+  return msg;
 }
 
 function showToast(msg, isErr = false) {
