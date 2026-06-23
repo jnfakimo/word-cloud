@@ -629,7 +629,7 @@ body{
           <div class="field"><label>設備名稱</label><input id="eq-name" type="text" placeholder="設備名稱"></div>
           <div class="field"><label>位置</label><input id="eq-loc" type="text" placeholder="廠區 / 樓層 / 位置"></div>
           <div class="field"><label>購置費用（元）</label><input id="eq-cost" type="number" min="0" placeholder="0"></div>
-          <div class="field"><label>購置日期</label><input id="eq-date" type="date"></div>
+          <div class="field"><label>購置日期</label><div id="eq-date-dtp"></div></div>
         </div>
         <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="createEquipment()">+ 新增設備</button>
@@ -663,8 +663,8 @@ body{
             <option value="normal">正常</option>
             <option value="abnormal">異常</option>
           </select>
-          <input type="date" id="inspDateFrom" onchange="loadInspections()" style="padding:9px 13px;background:rgba(2,8,20,0.8);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-size:.88rem;outline:none" title="起始日期">
-          <input type="date" id="inspDateTo" onchange="loadInspections()" style="padding:9px 13px;background:rgba(2,8,20,0.8);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-size:.88rem;outline:none" title="結束日期">
+          <div id="inspDateFrom-dtp" style="min-width:160px" title="起始日期"></div>
+          <div id="inspDateTo-dtp" style="min-width:160px" title="結束日期"></div>
         </div>
         <div style="overflow-x:auto">
           <table class="data-table">
@@ -715,7 +715,7 @@ body{
             </select>
           </div>
           <div class="field"><label>廠商</label><input id="cost-vendor" type="text" placeholder="廠商名稱（選填）"></div>
-          <div class="field"><label>日期</label><input id="cost-date" type="date"></div>
+          <div class="field"><label>日期</label><div id="cost-date-dtp"></div></div>
           <div class="field"><label>金額（元）</label><input id="cost-amount" type="number" min="0" placeholder="0"></div>
           <div class="field"><label>說明</label><input id="cost-note" type="text" placeholder="費用說明（選填）"></div>
         </div>
@@ -951,7 +951,7 @@ body{
       <div class="field"><label>設備名稱</label><input id="edit-eq-name" type="text"></div>
       <div class="field"><label>位置</label><input id="edit-eq-loc" type="text"></div>
       <div class="field"><label>購置費用</label><input id="edit-eq-cost" type="number" min="0"></div>
-      <div class="field"><label>購置日期</label><input id="edit-eq-date" type="date"></div>
+      <div class="field"><label>購置日期</label><div id="edit-eq-date-dtp"></div></div>
       <div class="field"><label>狀態</label>
         <select id="edit-eq-status">
           <option value="active">運轉中</option>
@@ -991,6 +991,27 @@ body{
 </script>
 
 <script>
+// ── DATETIME PICKER COMPONENT ──────────────────────────────────────────────
+const DTP=(()=>{
+  const S={};const _p=n=>String(n).padStart(2,'0');
+  function _days(y,m){return new Date(y,m,0).getDate();}
+  function _fmt(s){if(!s||!s.d)return null;return s.mode==='datetime'?`${s.y}/${_p(s.m)}/${_p(s.d)} ${_p(s.H||0)}:${_p(s.M||0)}`:`${s.y}/${_p(s.m)}/${_p(s.d)}`;}
+  function getValue(id){const s=S[id];if(!s||!s.d)return null;const b=`${s.y}-${_p(s.m)}-${_p(s.d)}`;return s.mode==='datetime'?`${b}T${_p(s.H||0)}:${_p(s.M||0)}:00`:b;}
+  function setValue(id,val){const s=S[id];if(!s)return;if(!val){s.y=s.m=s.d=null;s.H=0;s.M=0;}else{const dt=new Date(typeof val==='string'&&!val.includes('T')?val+'T00:00:00':val);s.y=dt.getFullYear();s.m=dt.getMonth()+1;s.d=dt.getDate();s.H=dt.getHours();s.M=dt.getMinutes();s.vy=s.y;s.vm=s.m;}_rD(id);}
+  function _rD(id){const s=S[id];const f=_fmt(s);const v=document.getElementById(id+'_v');const b=document.getElementById(id+'_b');const p=document.getElementById(id+'_p');if(v)v.textContent=f||'— 點選選擇 —';if(b)b.style.color=f?'var(--text-hi,#e0f0ff)':'var(--text-dim,#4a7a8a)';if(p)p.style.display=s._o?'block':'none';if(s._o)_rP(id);}
+  function _rP(id){const p=document.getElementById(id+'_p');if(!p)return;const s=S[id];const now=new Date();const vy=s.vy||s.y||now.getFullYear();const vm=s.vm||s.m||(now.getMonth()+1);const dim=_days(vy,vm);const fdow=new Date(vy,vm-1,1).getDay();let rows='<tr>';let col=0;for(let i=0;i<fdow;i++,col++)rows+='<td></td>';for(let d=1;d<=dim;d++,col++){if(col&&col%7===0)rows+='</tr><tr>';const sel=s.d===d&&s.m===vm&&s.y===vy;const tod=now.getDate()===d&&now.getMonth()+1===vm&&now.getFullYear()===vy;rows+=`<td onclick="DTP._pd('${id}',${vy},${vm},${d})" style="width:32px;height:26px;text-align:center;cursor:pointer;border-radius:2px;font-size:.76rem;${sel?'background:var(--cyan,#00d4ff);color:#000;font-weight:bold':tod?'color:var(--cyan,#00d4ff);outline:1px solid var(--cyan,#00d4ff)':''}">${d}</td>`;}rows+='</tr>';const th=['日','一','二','三','四','五','六'].map(d=>`<td style="color:var(--text-dim,#4a7a8a);font-size:.7rem;text-align:center;padding-bottom:3px">${d}</td>`).join('');const tH=s.mode==='datetime'?`<div style="display:flex;align-items:center;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border,#1a3a4a)"><span style="color:var(--text-dim,#4a7a8a);font-size:.78rem">時</span><select onchange="DTP._sh('${id}',this.value)" style="flex:1;padding:4px;background:rgba(2,8,20,.9);border:1px solid var(--border,#1a3a4a);color:var(--text-hi,#e0f0ff);font-size:.78rem">${Array.from({length:24},(_,i)=>`<option value="${i}"${(s.H||0)===i?' selected':''}>${_p(i)}</option>`).join('')}</select><span style="color:var(--text-dim,#4a7a8a);font-size:.78rem">分</span><select onchange="DTP._sm('${id}',this.value)" style="flex:1;padding:4px;background:rgba(2,8,20,.9);border:1px solid var(--border,#1a3a4a);color:var(--text-hi,#e0f0ff);font-size:.78rem">${Array.from({length:12},(_,i)=>`<option value="${i*5}"${(s.M||0)===i*5?' selected':''}>${_p(i*5)}</option>`).join('')}</select></div>`:'';p.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><button type="button" onclick="DTP._pm('${id}')" style="background:none;border:none;color:var(--cyan,#00d4ff);cursor:pointer;font-size:1rem;padding:2px 8px">◀</button><span style="font-size:.8rem;color:var(--text-hi,#e0f0ff);font-family:var(--font-head,monospace)">${vy} 年 ${vm} 月</span><button type="button" onclick="DTP._nm('${id}')" style="background:none;border:none;color:var(--cyan,#00d4ff);cursor:pointer;font-size:1rem;padding:2px 8px">▶</button></div><table style="width:100%;border-collapse:collapse"><tr>${th}</tr>${rows}</table>${tH}<div style="display:flex;gap:8px;margin-top:10px"><button type="button" onclick="DTP._cl('${id}')" style="flex:1;background:none;border:1px solid var(--border,#1a3a4a);color:var(--text-dim,#4a7a8a);padding:5px;cursor:pointer;font-size:.75rem;border-radius:2px">清除</button><button type="button" onclick="DTP._ok('${id}')" style="flex:1;background:var(--cyan,#00d4ff);border:none;color:#000;padding:5px;cursor:pointer;font-size:.75rem;font-weight:bold;border-radius:2px">確認</button></div>`;}
+  function init(id,mode,cb){S[id]={mode:mode||'date',y:null,m:null,d:null,H:0,M:0,vy:null,vm:null,_o:false,_cb:cb||null};const el=document.getElementById(id);if(!el)return;el.style.position='relative';el.innerHTML=`<button id="${id}_b" type="button" onclick="DTP._tog('${id}')" style="width:100%;text-align:left;padding:8px 10px;background:rgba(2,8,20,.8);border:1px solid var(--border,#1a3a4a);color:var(--text-dim,#4a7a8a);font-family:var(--font-mono,monospace);font-size:.82rem;cursor:pointer;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;border-radius:2px"><span id="${id}_v">— 點選選擇 —</span><span style="color:var(--cyan,#00d4ff);font-size:.65rem">▾</span></button><div id="${id}_p" style="display:none;position:absolute;z-index:9999;top:calc(100% + 3px);left:0;min-width:240px;background:var(--bg2,#071220);border:1px solid var(--border,#1a3a4a);padding:12px;box-shadow:0 6px 24px rgba(0,212,255,.18);box-sizing:border-box"></div>`;if(!DTP._gl){document.addEventListener('click',e=>{const path=e.composedPath?e.composedPath():[];Object.keys(S).forEach(pid=>{if(!S[pid]._o)return;const el=document.getElementById(pid);if(el&&!path.includes(el)){S[pid]._o=false;_rD(pid);}});});DTP._gl=true;}}
+  function _tog(id){Object.keys(S).forEach(pid=>{if(pid!==id&&S[pid]._o){S[pid]._o=false;_rD(pid);}});S[id]._o=!S[id]._o;_rD(id);}
+  function _pm(id){const s=S[id];const now=new Date();let y=s.vy||s.y||now.getFullYear();let m=s.vm||s.m||(now.getMonth()+1);if(--m<1){m=12;y--;}s.vy=y;s.vm=m;_rP(id);}
+  function _nm(id){const s=S[id];const now=new Date();let y=s.vy||s.y||now.getFullYear();let m=s.vm||s.m||(now.getMonth()+1);if(++m>12){m=1;y++;}s.vy=y;s.vm=m;_rP(id);}
+  function _pd(id,y,m,d){const s=S[id];s.y=y;s.m=m;s.d=d;s.vy=y;s.vm=m;if(s.mode==='date'){s._o=false;_rD(id);if(s._cb)s._cb(getValue(id));}else _rP(id);}
+  function _sh(id,h){S[id].H=parseInt(h);}
+  function _sm(id,m){S[id].M=parseInt(m);}
+  function _cl(id){const s=S[id];s.y=s.m=s.d=null;s.H=0;s.M=0;s._o=false;_rD(id);if(s._cb)s._cb(null);}
+  function _ok(id){S[id]._o=false;_rD(id);if(S[id]._cb)S[id]._cb(getValue(id));}
+  return{init,getValue,setValue,_tog,_pm,_nm,_pd,_sh,_sm,_cl,_ok};
+})();
+// ─────────────────────────────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -1026,6 +1047,11 @@ function fmtLoc(loc) {
   document.getElementById('sidebarUser').textContent = `${currentUser.name} [${ROLE_LABEL[currentUser.role] || 'ADMIN'}]`;
 
   setupNav();
+  DTP.init('eq-date-dtp','date');
+  DTP.init('inspDateFrom-dtp','date',loadInspections);
+  DTP.init('inspDateTo-dtp','date',loadInspections);
+  DTP.init('cost-date-dtp','date');
+  DTP.init('edit-eq-date-dtp','date');
   await loadAll();
   loadDashboard();
   // 載入系統設定並套用名稱
@@ -1332,7 +1358,7 @@ async function createEquipment() {
   const name = document.getElementById('eq-name').value.trim();
   const loc = document.getElementById('eq-loc').value.trim();
   const cost = parseFloat(document.getElementById('eq-cost').value) || null;
-  const date = document.getElementById('eq-date').value || null;
+  const date = DTP.getValue('eq-date-dtp');
   if (!name) { showToast('請填寫設備名稱', true); return; }
 
   const qrCode = 'EQ-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7).toUpperCase();
@@ -1353,7 +1379,8 @@ async function createEquipment() {
   preview.appendChild(qrDiv);
   new QRCode(qrDiv, { text: qrCode, width: 100, height: 100, colorDark: '#020b18', colorLight: '#ffffff' });
 
-  ['eq-name','eq-loc','eq-cost','eq-date'].forEach(id => document.getElementById(id).value = '');
+  ['eq-name','eq-loc','eq-cost'].forEach(id => document.getElementById(id).value = '');
+  DTP.setValue('eq-date-dtp', null);
   await loadAll(); renderEquipment(allEquipment);
 }
 
@@ -1364,7 +1391,7 @@ function openEditEq(eqId) {
   document.getElementById('edit-eq-name').value = eq.name;
   document.getElementById('edit-eq-loc').value = eq.location || '';
   document.getElementById('edit-eq-cost').value = eq.purchase_cost || '';
-  document.getElementById('edit-eq-date').value = eq.purchase_date || '';
+  DTP.setValue('edit-eq-date-dtp', eq.purchase_date || null);
   document.getElementById('edit-eq-status').value = eq.status;
   document.getElementById('editEqModal').classList.add('show');
 }
@@ -1376,7 +1403,7 @@ async function saveEquipment() {
     name: document.getElementById('edit-eq-name').value.trim(),
     location: document.getElementById('edit-eq-loc').value.trim() || null,
     purchase_cost: parseFloat(document.getElementById('edit-eq-cost').value) || null,
-    purchase_date: document.getElementById('edit-eq-date').value || null,
+    purchase_date: DTP.getValue('edit-eq-date-dtp'),
     status: document.getElementById('edit-eq-status').value,
   };
   if (!updates.name) { showToast('設備名稱不可為空', true); return; }
@@ -1402,8 +1429,8 @@ function closeModal(id) { document.getElementById(id).classList.remove('show'); 
 async function loadInspections() {
   const eqFilter = document.getElementById('inspEqFilter').value;
   const statusFilter = document.getElementById('inspStatusFilter').value;
-  const dateFrom = document.getElementById('inspDateFrom').value;
-  const dateTo = document.getElementById('inspDateTo').value;
+  const dateFrom = DTP.getValue('inspDateFrom-dtp');
+  const dateTo = DTP.getValue('inspDateTo-dtp');
   let query = db.from('inspection_records').select('*,equipment(name),users(name),locations(floor,area,detail,markets(name))').order('inspect_time', { ascending: false }).limit(300);
   if (eqFilter) query = query.eq('equipment_id', eqFilter);
   if (statusFilter) query = query.eq('run_status', statusFilter);
@@ -1473,7 +1500,7 @@ async function addCostRecord() {
   const eqId = document.getElementById('cost-eq').value;
   const costType = document.getElementById('cost-type').value;
   const vendor = document.getElementById('cost-vendor').value.trim();
-  const costDate = document.getElementById('cost-date').value;
+  const costDate = DTP.getValue('cost-date-dtp');
   const amount = parseFloat(document.getElementById('cost-amount').value);
   const note = document.getElementById('cost-note').value.trim();
   if (!eqId) { showToast('請選擇設備', true); return; }

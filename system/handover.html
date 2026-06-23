@@ -214,7 +214,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
           </div>
           <div class="field">
             <label>交接日期</label>
-            <input type="date" id="hDate" onchange="onShiftChange()">
+            <div id="hDate-dtp"></div>
           </div>
         </div>
       </div>
@@ -350,8 +350,8 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <option value="市場營運類">市場營運類</option>
         <option value="其他">其他</option>
       </select>
-      <input type="date" id="cfDateFrom" onchange="loadCases()" title="起始日期">
-      <input type="date" id="cfDateTo" onchange="loadCases()" title="結束日期">
+      <div id="cfDateFrom-dtp" style="min-width:150px" title="起始日期"></div>
+      <div id="cfDateTo-dtp" style="min-width:150px" title="結束日期"></div>
       <button class="btn-secondary btn-sm" onclick="loadCases()">↻ 重整</button>
       <button class="btn-primary" style="width:auto;padding:7px 18px;font-size:.84rem;margin-top:0" onclick="openCaseForm()">＋ 新增案件</button>
     </div>
@@ -390,8 +390,8 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <option value="draft">草稿</option>
         <option value="confirmed">已確認</option>
       </select>
-      <input type="date" id="fDateFrom" onchange="loadHistory()" title="起始日期">
-      <input type="date" id="fDateTo" onchange="loadHistory()" title="結束日期">
+      <div id="fDateFrom-dtp" style="min-width:150px" title="起始日期"></div>
+      <div id="fDateTo-dtp" style="min-width:150px" title="結束日期"></div>
       <button class="btn-secondary btn-sm" onclick="loadHistory()">↻ 重整</button>
     </div>
     <div class="panel">
@@ -460,19 +460,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       </div>
       <div class="field" style="margin-bottom:12px">
         <label>發生時間</label>
-        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
-          <select id="incYear" style="min-width:78px"></select>
-          <span style="color:var(--text-dim);font-size:.8rem">年</span>
-          <select id="incMonth" style="min-width:56px"></select>
-          <span style="color:var(--text-dim);font-size:.8rem">月</span>
-          <select id="incDay" style="min-width:56px"></select>
-          <span style="color:var(--text-dim);font-size:.8rem">日</span>
-          <span style="color:var(--border);margin:0 6px">│</span>
-          <select id="incHour" style="min-width:56px"></select>
-          <span style="color:var(--text-dim);font-size:.8rem">時</span>
-          <select id="incMinute" style="min-width:56px"></select>
-          <span style="color:var(--text-dim);font-size:.8rem">分</span>
-        </div>
+        <div id="caseIncidentPicker"></div>
       </div>
       <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
         <div class="field"><label>異常大類 *</label>
@@ -553,6 +541,27 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 <div class="toast" id="toast"></div>
 
 <script>
+// ── DATETIME PICKER COMPONENT ──────────────────────────────────────────────
+const DTP=(()=>{
+  const S={};const _p=n=>String(n).padStart(2,'0');
+  function _days(y,m){return new Date(y,m,0).getDate();}
+  function _fmt(s){if(!s||!s.d)return null;return s.mode==='datetime'?`${s.y}/${_p(s.m)}/${_p(s.d)} ${_p(s.H||0)}:${_p(s.M||0)}`:`${s.y}/${_p(s.m)}/${_p(s.d)}`;}
+  function getValue(id){const s=S[id];if(!s||!s.d)return null;const b=`${s.y}-${_p(s.m)}-${_p(s.d)}`;return s.mode==='datetime'?`${b}T${_p(s.H||0)}:${_p(s.M||0)}:00`:b;}
+  function setValue(id,val){const s=S[id];if(!s)return;if(!val){s.y=s.m=s.d=null;s.H=0;s.M=0;}else{const dt=new Date(typeof val==='string'&&!val.includes('T')?val+'T00:00:00':val);s.y=dt.getFullYear();s.m=dt.getMonth()+1;s.d=dt.getDate();s.H=dt.getHours();s.M=dt.getMinutes();s.vy=s.y;s.vm=s.m;}_rD(id);}
+  function _rD(id){const s=S[id];const f=_fmt(s);const v=document.getElementById(id+'_v');const b=document.getElementById(id+'_b');const p=document.getElementById(id+'_p');if(v)v.textContent=f||'— 點選選擇 —';if(b)b.style.color=f?'var(--text-hi,#e0f0ff)':'var(--text-dim,#4a7a8a)';if(p)p.style.display=s._o?'block':'none';if(s._o)_rP(id);}
+  function _rP(id){const p=document.getElementById(id+'_p');if(!p)return;const s=S[id];const now=new Date();const vy=s.vy||s.y||now.getFullYear();const vm=s.vm||s.m||(now.getMonth()+1);const dim=_days(vy,vm);const fdow=new Date(vy,vm-1,1).getDay();let rows='<tr>';let col=0;for(let i=0;i<fdow;i++,col++)rows+='<td></td>';for(let d=1;d<=dim;d++,col++){if(col&&col%7===0)rows+='</tr><tr>';const sel=s.d===d&&s.m===vm&&s.y===vy;const tod=now.getDate()===d&&now.getMonth()+1===vm&&now.getFullYear()===vy;rows+=`<td onclick="DTP._pd('${id}',${vy},${vm},${d})" style="width:32px;height:26px;text-align:center;cursor:pointer;border-radius:2px;font-size:.76rem;${sel?'background:var(--cyan,#00d4ff);color:#000;font-weight:bold':tod?'color:var(--cyan,#00d4ff);outline:1px solid var(--cyan,#00d4ff)':''}">${d}</td>`;}rows+='</tr>';const th=['日','一','二','三','四','五','六'].map(d=>`<td style="color:var(--text-dim,#4a7a8a);font-size:.7rem;text-align:center;padding-bottom:3px">${d}</td>`).join('');const tH=s.mode==='datetime'?`<div style="display:flex;align-items:center;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border,#1a3a4a)"><span style="color:var(--text-dim,#4a7a8a);font-size:.78rem">時</span><select onchange="DTP._sh('${id}',this.value)" style="flex:1;padding:4px;background:rgba(2,8,20,.9);border:1px solid var(--border,#1a3a4a);color:var(--text-hi,#e0f0ff);font-size:.78rem">${Array.from({length:24},(_,i)=>`<option value="${i}"${(s.H||0)===i?' selected':''}>${_p(i)}</option>`).join('')}</select><span style="color:var(--text-dim,#4a7a8a);font-size:.78rem">分</span><select onchange="DTP._sm('${id}',this.value)" style="flex:1;padding:4px;background:rgba(2,8,20,.9);border:1px solid var(--border,#1a3a4a);color:var(--text-hi,#e0f0ff);font-size:.78rem">${Array.from({length:12},(_,i)=>`<option value="${i*5}"${(s.M||0)===i*5?' selected':''}>${_p(i*5)}</option>`).join('')}</select></div>`:'';p.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><button type="button" onclick="DTP._pm('${id}')" style="background:none;border:none;color:var(--cyan,#00d4ff);cursor:pointer;font-size:1rem;padding:2px 8px">◀</button><span style="font-size:.8rem;color:var(--text-hi,#e0f0ff);font-family:var(--font-head,monospace)">${vy} 年 ${vm} 月</span><button type="button" onclick="DTP._nm('${id}')" style="background:none;border:none;color:var(--cyan,#00d4ff);cursor:pointer;font-size:1rem;padding:2px 8px">▶</button></div><table style="width:100%;border-collapse:collapse"><tr>${th}</tr>${rows}</table>${tH}<div style="display:flex;gap:8px;margin-top:10px"><button type="button" onclick="DTP._cl('${id}')" style="flex:1;background:none;border:1px solid var(--border,#1a3a4a);color:var(--text-dim,#4a7a8a);padding:5px;cursor:pointer;font-size:.75rem;border-radius:2px">清除</button><button type="button" onclick="DTP._ok('${id}')" style="flex:1;background:var(--cyan,#00d4ff);border:none;color:#000;padding:5px;cursor:pointer;font-size:.75rem;font-weight:bold;border-radius:2px">確認</button></div>`;}
+  function init(id,mode,cb){S[id]={mode:mode||'date',y:null,m:null,d:null,H:0,M:0,vy:null,vm:null,_o:false,_cb:cb||null};const el=document.getElementById(id);if(!el)return;el.style.position='relative';el.innerHTML=`<button id="${id}_b" type="button" onclick="DTP._tog('${id}')" style="width:100%;text-align:left;padding:8px 10px;background:rgba(2,8,20,.8);border:1px solid var(--border,#1a3a4a);color:var(--text-dim,#4a7a8a);font-family:var(--font-mono,monospace);font-size:.82rem;cursor:pointer;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;border-radius:2px"><span id="${id}_v">— 點選選擇 —</span><span style="color:var(--cyan,#00d4ff);font-size:.65rem">▾</span></button><div id="${id}_p" style="display:none;position:absolute;z-index:9999;top:calc(100% + 3px);left:0;min-width:240px;background:var(--bg2,#071220);border:1px solid var(--cyan,#00d4ff);padding:12px;box-shadow:0 6px 24px rgba(0,212,255,.18);box-sizing:border-box"></div>`;if(!DTP._gl){document.addEventListener('click',e=>{const path=e.composedPath?e.composedPath():[];Object.keys(S).forEach(pid=>{if(!S[pid]._o)return;const el=document.getElementById(pid);if(el&&!path.includes(el)){S[pid]._o=false;_rD(pid);}});});DTP._gl=true;}}
+  function _tog(id){Object.keys(S).forEach(pid=>{if(pid!==id&&S[pid]._o){S[pid]._o=false;_rD(pid);}});S[id]._o=!S[id]._o;_rD(id);}
+  function _pm(id){const s=S[id];const now=new Date();let y=s.vy||s.y||now.getFullYear();let m=s.vm||s.m||(now.getMonth()+1);if(--m<1){m=12;y--;}s.vy=y;s.vm=m;_rP(id);}
+  function _nm(id){const s=S[id];const now=new Date();let y=s.vy||s.y||now.getFullYear();let m=s.vm||s.m||(now.getMonth()+1);if(++m>12){m=1;y++;}s.vy=y;s.vm=m;_rP(id);}
+  function _pd(id,y,m,d){const s=S[id];s.y=y;s.m=m;s.d=d;s.vy=y;s.vm=m;if(s.mode==='date'){s._o=false;_rD(id);if(s._cb)s._cb(getValue(id));}else _rP(id);}
+  function _sh(id,h){S[id].H=parseInt(h);}
+  function _sm(id,m){S[id].M=parseInt(m);}
+  function _cl(id){const s=S[id];s.y=s.m=s.d=null;s.H=0;s.M=0;s._o=false;_rD(id);if(s._cb)s._cb(null);}
+  function _ok(id){S[id]._o=false;_rD(id);if(S[id]._cb)S[id]._cb(getValue(id));}
+  return{init,getValue,setValue,_tog,_pm,_nm,_pd,_sh,_sm,_cl,_ok};
+})();
+// ─────────────────────────────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -629,10 +638,15 @@ let currentCaseId = null;
   }
 
   buildDeptSelects();
-  buildIncidentTimeSelects();
+  DTP.init('caseIncidentPicker', 'datetime');
 
   const today = new Date().toISOString().split('T')[0];
-  document.getElementById('hDate').value = today;
+  DTP.init('hDate-dtp', 'date', onShiftChange);
+  DTP.setValue('hDate-dtp', today);
+  DTP.init('cfDateFrom-dtp', 'date', loadCases);
+  DTP.init('cfDateTo-dtp', 'date', loadCases);
+  DTP.init('fDateFrom-dtp', 'date', loadHistory);
+  DTP.init('fDateTo-dtp', 'date', loadHistory);
   const h = new Date().getHours();
   document.getElementById('hShift').value = h>=6&&h<14 ? 'morning' : h>=14&&h<22 ? 'afternoon' : 'night';
 
@@ -680,19 +694,6 @@ function fillPersonSelect(selId, deptId) {
     filtered.map(u => `<option value="${u.user_id}">${u.name}</option>`).join('');
 }
 
-function buildIncidentTimeSelects() {
-  const y = new Date().getFullYear();
-  document.getElementById('incYear').innerHTML =
-    '<option value="">年</option>' + [y-1,y,y+1].map(yr=>`<option value="${yr}">${yr}</option>`).join('');
-  document.getElementById('incMonth').innerHTML =
-    '<option value="">月</option>' + Array.from({length:12},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('');
-  document.getElementById('incDay').innerHTML =
-    '<option value="">日</option>' + Array.from({length:31},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('');
-  document.getElementById('incHour').innerHTML =
-    '<option value="">時</option>' + Array.from({length:24},(_,i)=>`<option value="${i}">${String(i).padStart(2,'0')}</option>`).join('');
-  document.getElementById('incMinute').innerHTML =
-    '<option value="">分</option>' + Array.from({length:12},(_,i)=>`<option value="${i*5}">${String(i*5).padStart(2,'0')}</option>`).join('');
-}
 
 function onCaseReporterChange() {
   const name = document.getElementById('caseReporter').value;
@@ -734,7 +735,7 @@ function shiftRange(dateStr, type) {
 
 // ── FETCH EQ STATUS ────────────────────────────────
 async function fetchEqStatus() {
-  const date = document.getElementById('hDate').value;
+  const date = DTP.getValue('hDate-dtp');
   const shift = document.getElementById('hShift').value;
   if (!date || !shift) return;
   const { from, to } = shiftRange(date, shift);
@@ -793,7 +794,7 @@ async function confirmHandover() {
 
 async function doSave(status) {
   const shift     = document.getElementById('hShift').value;
-  const date      = document.getElementById('hDate').value;
+  const date      = DTP.getValue('hDate-dtp');
   const deptId    = document.getElementById('hHandoverL2').value || document.getElementById('hHandoverL1').value || null;
   const handoverBy = document.getElementById('hHandoverBy').value || null;
   const takeoverBy = document.getElementById('hTakeoverBy').value || null;
@@ -840,8 +841,8 @@ async function loadHistory() {
   const deptFilter   = document.getElementById('fDept').value;
   const shiftFilter  = document.getElementById('fShift').value;
   const statusFilter = document.getElementById('fStatus').value;
-  const dateFrom     = document.getElementById('fDateFrom').value;
-  const dateTo       = document.getElementById('fDateTo').value;
+  const dateFrom     = DTP.getValue('fDateFrom-dtp');
+  const dateTo       = DTP.getValue('fDateTo-dtp');
   let q = db.from('handover_records')
     .select('*,departments(name),handover_user:users!handover_by(name),takeover_user:users!takeover_by(name)')
     .order('shift_date',{ascending:false}).order('shift_type').limit(200);
@@ -944,10 +945,7 @@ function openCaseForm() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  // 發生時間 selects 重置
-  ['incYear','incMonth','incDay','incHour','incMinute'].forEach(id => {
-    document.getElementById(id).value = '';
-  });
+  DTP.setValue('caseIncidentPicker', null);
   // 通報人由系統帶入，以 select 選單呈現
   document.getElementById('caseReporter').innerHTML =
     '<option value="">— 選擇通報人 —</option>' +
@@ -992,14 +990,7 @@ async function submitCase() {
   const other    = document.getElementById('caseOther').value.trim();
   const title    = document.getElementById('caseTitle').value.trim() ||
                    (cat + (sub ? ' – ' + sub : '') + (other ? ' – ' + other : ''));
-  const incY = document.getElementById('incYear').value;
-  const incMo = document.getElementById('incMonth').value;
-  const incD = document.getElementById('incDay').value;
-  const incH = document.getElementById('incHour').value || '0';
-  const incMin = document.getElementById('incMinute').value || '0';
-  const incTime = (incY && incMo && incD)
-    ? `${incY}-${String(incMo).padStart(2,'0')}-${String(incD).padStart(2,'0')}T${String(incH).padStart(2,'0')}:${String(incMin).padStart(2,'0')}`
-    : null;
+  const incTime = DTP.getValue('caseIncidentPicker');
 
   const newCase = {
     case_no:          caseNo,
@@ -1039,8 +1030,8 @@ async function submitCase() {
 async function loadCases() {
   const statusFilter = document.getElementById('cfStatus').value;
   const catFilter    = document.getElementById('cfCat').value;
-  const dateFrom     = document.getElementById('cfDateFrom').value;
-  const dateTo       = document.getElementById('cfDateTo').value;
+  const dateFrom     = DTP.getValue('cfDateFrom-dtp');
+  const dateTo       = DTP.getValue('cfDateTo-dtp');
 
   let q = db.from('handover_cases')
     .select('*,assigned_user:users!assigned_to(name)')
