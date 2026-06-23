@@ -445,19 +445,29 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         </div>
         <div class="field"><label>建立日期</label><input id="caseCreatedAt" type="text" readonly></div>
       </div>
-      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:12px">
-        <div class="field"><label>通報人</label>
-          <select id="caseReporter" onchange="onCaseReporterChange()">
-            <option value="">— 選擇通報人 —</option>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="field"><label>所屬單位（第一層）</label>
+          <select id="caseUnitL1" onchange="onCaseUnitL1Change()">
+            <option value="">— 選擇部門 —</option>
           </select>
         </div>
-        <div class="field"><label>所屬單位</label>
-          <input id="caseReporterUnit" type="text" readonly style="opacity:.65;cursor:default">
+        <div class="field"><label>所屬單位（第二層）</label>
+          <select id="caseUnitL2" disabled onchange="onCaseUnitL2Change()">
+            <option value="">— 無下級單位 —</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="field"><label>通報人</label>
+          <select id="caseReporter">
+            <option value="">— 選擇通報人 —</option>
+          </select>
         </div>
         <div class="field"><label>發生地點</label>
           <input id="caseLocation" type="text" placeholder="發生地點">
         </div>
       </div>
+      <input type="hidden" id="caseReporterUnit">
       <div class="field" style="margin-bottom:12px">
         <label>發生時間</label>
         <div id="caseIncidentPicker"></div>
@@ -771,11 +781,29 @@ function fillPersonSelect(selId, deptId) {
 }
 
 
-function onCaseReporterChange() {
-  const name = document.getElementById('caseReporter').value;
-  const user = allUsers.find(u => u.name === name);
-  const dept = user?.dept_id ? allDepts.find(d => d.dept_id === user.dept_id) : null;
-  document.getElementById('caseReporterUnit').value = dept ? dept.name : '';
+function onCaseUnitL1Change() {
+  const l1Id = document.getElementById('caseUnitL1').value;
+  fillL2(l1Id, 'caseUnitL2');
+  filterCaseReporter();
+}
+
+function onCaseUnitL2Change() {
+  filterCaseReporter();
+}
+
+function filterCaseReporter() {
+  const l2Id = document.getElementById('caseUnitL2')?.value;
+  const l1Id = document.getElementById('caseUnitL1')?.value;
+  const deptId = l2Id || l1Id || null;
+  const filtered = deptId ? allUsers.filter(u => u.dept_id === deptId) : allUsers;
+  const cur = document.getElementById('caseReporter').value;
+  document.getElementById('caseReporter').innerHTML =
+    '<option value="">— 選擇通報人 —</option>' +
+    filtered.map(u => `<option value="${u.name}">${u.name}</option>`).join('');
+  if (filtered.find(u => u.name === cur)) document.getElementById('caseReporter').value = cur;
+  // sync hidden unit name
+  const unitDept = allDepts.find(d => d.dept_id === (deptId));
+  document.getElementById('caseReporterUnit').value = unitDept?.name || '';
 }
 
 function onHandoverL1Change() {
@@ -1022,12 +1050,29 @@ function openCaseForm() {
     if (el) el.value = '';
   });
   DTP.setValue('caseIncidentPicker', null);
-  // 通報人由系統帶入，以 select 選單呈現
-  document.getElementById('caseReporter').innerHTML =
-    '<option value="">— 選擇通報人 —</option>' +
-    allUsers.map(u => `<option value="${u.name}">${u.name}</option>`).join('');
+
+  // 所屬單位：重建 L1 選單
+  const l1Depts = allDepts.filter(d => !d.parent_id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+  document.getElementById('caseUnitL1').innerHTML =
+    '<option value="">— 選擇部門 —</option>' +
+    l1Depts.map(d => `<option value="${d.dept_id}">${d.name}</option>`).join('');
+  document.getElementById('caseUnitL2').innerHTML = '<option value="">— 無下級單位 —</option>';
+  document.getElementById('caseUnitL2').disabled = true;
+
+  // 預填目前使用者的所屬單位
+  if (currentUser?.dept_id) {
+    const dept = allDepts.find(d => d.dept_id === currentUser.dept_id);
+    if (dept?.parent_id) {
+      document.getElementById('caseUnitL1').value = dept.parent_id;
+      fillL2(dept.parent_id, 'caseUnitL2');
+      document.getElementById('caseUnitL2').value = currentUser.dept_id;
+    } else if (dept) {
+      document.getElementById('caseUnitL1').value = currentUser.dept_id;
+      fillL2(currentUser.dept_id, 'caseUnitL2');
+    }
+  }
+  filterCaseReporter();
   document.getElementById('caseReporter').value = currentUser.name || '';
-  onCaseReporterChange();
   pendingAttachments = [];
   renderPendingAttachments();
   document.getElementById('caseFormModal').classList.add('show');
