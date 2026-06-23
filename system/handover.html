@@ -445,11 +445,34 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         </div>
         <div class="field"><label>建立日期</label><input id="caseCreatedAt" type="text" readonly></div>
       </div>
-      <div class="form-grid" style="margin-bottom:12px">
-        <div class="field"><label>通報人</label><input id="caseReporter" type="text" readonly style="opacity:.65;cursor:default"></div>
-        <div class="field"><label>所屬單位</label><input id="caseReporterUnit" type="text" readonly style="opacity:.65;cursor:default"></div>
-        <div class="field"><label>發生時間</label><input id="caseIncidentTime" type="datetime-local"></div>
-        <div class="field"><label>發生地點</label><input id="caseLocation" type="text" placeholder="發生地點"></div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:12px">
+        <div class="field"><label>通報人</label>
+          <select id="caseReporter" onchange="onCaseReporterChange()">
+            <option value="">— 選擇通報人 —</option>
+          </select>
+        </div>
+        <div class="field"><label>所屬單位</label>
+          <input id="caseReporterUnit" type="text" readonly style="opacity:.65;cursor:default">
+        </div>
+        <div class="field"><label>發生地點</label>
+          <input id="caseLocation" type="text" placeholder="發生地點">
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:12px">
+        <label>發生時間</label>
+        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+          <select id="incYear" style="min-width:78px"></select>
+          <span style="color:var(--text-dim);font-size:.8rem">年</span>
+          <select id="incMonth" style="min-width:56px"></select>
+          <span style="color:var(--text-dim);font-size:.8rem">月</span>
+          <select id="incDay" style="min-width:56px"></select>
+          <span style="color:var(--text-dim);font-size:.8rem">日</span>
+          <span style="color:var(--border);margin:0 6px">│</span>
+          <select id="incHour" style="min-width:56px"></select>
+          <span style="color:var(--text-dim);font-size:.8rem">時</span>
+          <select id="incMinute" style="min-width:56px"></select>
+          <span style="color:var(--text-dim);font-size:.8rem">分</span>
+        </div>
       </div>
       <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
         <div class="field"><label>異常大類 *</label>
@@ -606,6 +629,7 @@ let currentCaseId = null;
   }
 
   buildDeptSelects();
+  buildIncidentTimeSelects();
 
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('hDate').value = today;
@@ -654,6 +678,27 @@ function fillPersonSelect(selId, deptId) {
   const filtered = deptId ? allUsers.filter(u => u.dept_id === deptId) : allUsers;
   document.getElementById(selId).innerHTML = '<option value="">— 選擇人員 —</option>' +
     filtered.map(u => `<option value="${u.user_id}">${u.name}</option>`).join('');
+}
+
+function buildIncidentTimeSelects() {
+  const y = new Date().getFullYear();
+  document.getElementById('incYear').innerHTML =
+    '<option value="">年</option>' + [y-1,y,y+1].map(yr=>`<option value="${yr}">${yr}</option>`).join('');
+  document.getElementById('incMonth').innerHTML =
+    '<option value="">月</option>' + Array.from({length:12},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('');
+  document.getElementById('incDay').innerHTML =
+    '<option value="">日</option>' + Array.from({length:31},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('');
+  document.getElementById('incHour').innerHTML =
+    '<option value="">時</option>' + Array.from({length:24},(_,i)=>`<option value="${i}">${String(i).padStart(2,'0')}</option>`).join('');
+  document.getElementById('incMinute').innerHTML =
+    '<option value="">分</option>' + Array.from({length:12},(_,i)=>`<option value="${i*5}">${String(i*5).padStart(2,'0')}</option>`).join('');
+}
+
+function onCaseReporterChange() {
+  const name = document.getElementById('caseReporter').value;
+  const user = allUsers.find(u => u.name === name);
+  const dept = user?.dept_id ? allDepts.find(d => d.dept_id === user.dept_id) : null;
+  document.getElementById('caseReporterUnit').value = dept ? dept.name : '';
 }
 
 function onHandoverL1Change() {
@@ -899,11 +944,16 @@ function openCaseForm() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  document.getElementById('caseIncidentTime').value = '';
-  // 通報人由系統自動帶入
+  // 發生時間 selects 重置
+  ['incYear','incMonth','incDay','incHour','incMinute'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  // 通報人由系統帶入，以 select 選單呈現
+  document.getElementById('caseReporter').innerHTML =
+    '<option value="">— 選擇通報人 —</option>' +
+    allUsers.map(u => `<option value="${u.name}">${u.name}</option>`).join('');
   document.getElementById('caseReporter').value = currentUser.name || '';
-  const _ud = currentUser.dept_id ? allDepts.find(d => d.dept_id === currentUser.dept_id) : null;
-  document.getElementById('caseReporterUnit').value = _ud ? _ud.name : '';
+  onCaseReporterChange();
   pendingAttachments = [];
   renderPendingAttachments();
   document.getElementById('caseFormModal').classList.add('show');
@@ -942,7 +992,14 @@ async function submitCase() {
   const other    = document.getElementById('caseOther').value.trim();
   const title    = document.getElementById('caseTitle').value.trim() ||
                    (cat + (sub ? ' – ' + sub : '') + (other ? ' – ' + other : ''));
-  const incTime  = document.getElementById('caseIncidentTime').value;
+  const incY = document.getElementById('incYear').value;
+  const incMo = document.getElementById('incMonth').value;
+  const incD = document.getElementById('incDay').value;
+  const incH = document.getElementById('incHour').value || '0';
+  const incMin = document.getElementById('incMinute').value || '0';
+  const incTime = (incY && incMo && incD)
+    ? `${incY}-${String(incMo).padStart(2,'0')}-${String(incD).padStart(2,'0')}T${String(incH).padStart(2,'0')}:${String(incMin).padStart(2,'0')}`
+    : null;
 
   const newCase = {
     case_no:          caseNo,
