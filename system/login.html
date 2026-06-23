@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>臺北農產運銷股份有限公司 第一果菜市場 設備巡檢維修系統</title>
-<!-- 登入驗證已關閉：直接導向系統入口，不需帳號密碼 -->
-<script>window.location.replace('index.html');</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -20,12 +18,18 @@ input:focus{border-color:#6366f1}
 .btn{width:100%;padding:13px;background:#6366f1;color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;transition:background .2s;margin-top:8px}
 .btn:hover{background:#4f46e5}
 .btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{background:transparent;border:1px solid #334155;color:#94a3b8;font-size:.85rem;padding:10px;margin-top:6px}
+.btn-ghost:hover{background:rgba(255,255,255,.05)}
 .err{color:#f87171;font-size:.83rem;margin-top:10px;text-align:center;min-height:20px}
+.ok{color:#4ade80;font-size:.83rem;margin-top:10px;text-align:center;min-height:20px}
 .logo{text-align:center;font-size:2.5rem;margin-bottom:16px}
+.forgot-link{display:block;text-align:center;margin-top:14px;color:#6366f1;font-size:.83rem;cursor:pointer;text-decoration:underline}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;align-items:center;justify-content:center;padding:24px}
+.overlay.show{display:flex}
 </style>
 </head>
 <body>
-<div class="card">
+<div class="card" id="loginCard">
   <div class="logo">🔧</div>
   <h1>臺北農產運銷股份有限公司</h1>
   <div class="subtitle" style="font-size:.95rem;color:#94a3b8;margin-bottom:4px">第一果菜市場 設備巡檢維修系統</div>
@@ -39,21 +43,82 @@ input:focus{border-color:#6366f1}
     <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
   </div>
   <button class="btn" id="loginBtn">登入</button>
+  <a class="forgot-link" id="forgotLink">忘記密碼？</a>
   <div class="err" id="errMsg"></div>
 </div>
+
+<!-- 忘記密碼 modal -->
+<div class="overlay" id="forgotOverlay">
+  <div class="card" style="max-width:380px">
+    <div class="logo" style="font-size:1.8rem;margin-bottom:12px">✉</div>
+    <h1 style="font-size:1.2rem;margin-bottom:6px">重設密碼</h1>
+    <div class="subtitle" style="margin-bottom:24px">請輸入您帳號對應的 Email，系統將寄送重設連結</div>
+    <div class="field">
+      <label>Email</label>
+      <input id="forgotEmail" type="email" placeholder="your@email.com" autocomplete="email">
+    </div>
+    <button class="btn" id="forgotSendBtn">寄送重設連結</button>
+    <button class="btn btn-ghost" id="forgotBackBtn">返回登入</button>
+    <div class="err" id="forgotErr"></div>
+    <div class="ok" id="forgotOk"></div>
+  </div>
+</div>
+
+<!-- 設定新密碼 modal（從 Email 連結進入） -->
+<div class="overlay" id="resetOverlay">
+  <div class="card" style="max-width:380px">
+    <div class="logo" style="font-size:1.8rem;margin-bottom:12px">🔑</div>
+    <h1 style="font-size:1.2rem;margin-bottom:6px">設定新密碼</h1>
+    <div class="subtitle" style="margin-bottom:24px">請輸入您的新密碼（至少 8 個字元）</div>
+    <div class="field">
+      <label>新密碼</label>
+      <input id="resetPw" type="password" placeholder="••••••••" autocomplete="new-password">
+    </div>
+    <div class="field">
+      <label>確認新密碼</label>
+      <input id="resetPw2" type="password" placeholder="••••••••" autocomplete="new-password">
+    </div>
+    <button class="btn" id="resetSaveBtn">設定新密碼</button>
+    <div class="err" id="resetErr"></div>
+    <div class="ok" id="resetOk"></div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const ROLE_ROUTES = {
-  admin:       '../system/admin.html',
-  supervisor:  '../system/admin.html',
-  inspector:   '../system/app.html',
-  maintenance: '../system/maintenance.html',
+  admin:       'admin.html',
+  supervisor:  'admin.html',
+  inspector:   'app.html',
+  maintenance: 'maintenance.html',
 };
 
-document.getElementById('loginBtn').addEventListener('click', async () => {
+// ── Handle password-reset link (#type=recovery) ───────────────────────────────
+(async () => {
+  const hash = window.location.hash;
+  if (hash.includes('type=recovery')) {
+    document.getElementById('loginCard').style.display = 'none';
+    document.getElementById('resetOverlay').classList.add('show');
+    return;
+  }
+
+  // Already logged in?
+  const { data: { session } } = await db.auth.getSession();
+  if (session) {
+    const { data: profile } = await db.from('users').select('role').eq('auth_id', session.user.id).single();
+    if (profile) { window.location.href = ROLE_ROUTES[profile.role] || 'app.html'; return; }
+  }
+})();
+
+// ── Login ─────────────────────────────────────────────────────────────────────
+document.getElementById('loginBtn').addEventListener('click', doLogin);
+document.getElementById('username').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('password').focus(); });
+document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+async function doLogin() {
   const username = document.getElementById('username').value.trim();
   const password = document.getElementById('password').value;
   const btn = document.getElementById('loginBtn');
@@ -86,25 +151,65 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
 
   sessionStorage.setItem('user_role', profile.role);
   sessionStorage.setItem('user_name', profile.name);
-  const dest = ROLE_ROUTES[profile.role] || '../system/app.html';
-  window.location.href = dest;
+  window.location.href = ROLE_ROUTES[profile.role] || 'app.html';
+}
+
+// ── 忘記密碼 ──────────────────────────────────────────────────────────────────
+document.getElementById('forgotLink').addEventListener('click', () => {
+  document.getElementById('forgotEmail').value = '';
+  document.getElementById('forgotErr').textContent = '';
+  document.getElementById('forgotOk').textContent = '';
+  document.getElementById('forgotOverlay').classList.add('show');
 });
 
-document.getElementById('username').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('password').focus();
-});
-document.getElementById('password').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('loginBtn').click();
+document.getElementById('forgotBackBtn').addEventListener('click', () => {
+  document.getElementById('forgotOverlay').classList.remove('show');
 });
 
-// Already logged in?
-(async () => {
-  const { data: { session } } = await db.auth.getSession();
-  if (session) {
-    const { data: profile } = await db.from('users').select('role').eq('auth_id', session.user.id).single();
-    if (profile) window.location.href = ROLE_ROUTES[profile.role] || '../system/app.html';
+document.getElementById('forgotSendBtn').addEventListener('click', async () => {
+  const email = document.getElementById('forgotEmail').value.trim();
+  const btn = document.getElementById('forgotSendBtn');
+  const err = document.getElementById('forgotErr');
+  const ok  = document.getElementById('forgotOk');
+  err.textContent = ''; ok.textContent = '';
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    err.textContent = '請輸入有效的 Email 地址'; return;
   }
-})();
+  btn.disabled = true; btn.textContent = '寄送中…';
+  const redirectTo = window.location.origin + window.location.pathname;
+  const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo });
+  btn.disabled = false; btn.textContent = '寄送重設連結';
+  if (error) {
+    err.textContent = '寄送失敗：' + error.message;
+  } else {
+    ok.textContent = '重設連結已寄出，請檢查您的信箱（含垃圾郵件）';
+    btn.disabled = true;
+  }
+});
+
+// ── 設定新密碼 ────────────────────────────────────────────────────────────────
+document.getElementById('resetSaveBtn').addEventListener('click', async () => {
+  const pw  = document.getElementById('resetPw').value;
+  const pw2 = document.getElementById('resetPw2').value;
+  const btn = document.getElementById('resetSaveBtn');
+  const err = document.getElementById('resetErr');
+  const ok  = document.getElementById('resetOk');
+  err.textContent = ''; ok.textContent = '';
+  if (pw.length < 8) { err.textContent = '密碼至少需要 8 個字元'; return; }
+  if (pw !== pw2) { err.textContent = '兩次密碼不一致'; return; }
+  btn.disabled = true; btn.textContent = '儲存中…';
+  const { error } = await db.auth.updateUser({ password: pw });
+  btn.disabled = false; btn.textContent = '設定新密碼';
+  if (error) {
+    err.textContent = '設定失敗：' + error.message;
+  } else {
+    ok.textContent = '密碼已更新！即將跳轉至登入頁面…';
+    setTimeout(() => {
+      window.location.hash = '';
+      window.location.reload();
+    }, 2000);
+  }
+});
 </script>
 </body>
 </html>
