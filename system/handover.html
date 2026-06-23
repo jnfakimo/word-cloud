@@ -445,19 +445,12 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         </div>
         <div class="field"><label>建立日期</label><input id="caseCreatedAt" type="text" readonly></div>
       </div>
-      <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
-        <div class="field"><label>所屬單位（第一層）</label>
-          <select id="caseUnitL1" onchange="onCaseUnitL1Change()">
-            <option value="">— 選擇部門 —</option>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:12px">
+        <div class="field"><label>所屬單位</label>
+          <select id="caseUnitSel" onchange="filterCaseReporter()">
+            <option value="">— 選擇單位 —</option>
           </select>
         </div>
-        <div class="field"><label>所屬單位（第二層）</label>
-          <select id="caseUnitL2" disabled onchange="onCaseUnitL2Change()">
-            <option value="">— 無下級單位 —</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
         <div class="field"><label>通報人</label>
           <select id="caseReporter">
             <option value="">— 選擇通報人 —</option>
@@ -781,28 +774,27 @@ function fillPersonSelect(selId, deptId) {
 }
 
 
-function onCaseUnitL1Change() {
-  const l1Id = document.getElementById('caseUnitL1').value;
-  fillL2(l1Id, 'caseUnitL2');
-  filterCaseReporter();
-}
-
-function onCaseUnitL2Change() {
-  filterCaseReporter();
-}
-
 function filterCaseReporter() {
-  const l2Id = document.getElementById('caseUnitL2')?.value;
-  const l1Id = document.getElementById('caseUnitL1')?.value;
-  const deptId = l2Id || l1Id || null;
-  const filtered = deptId ? allUsers.filter(u => u.dept_id === deptId) : allUsers;
+  const deptId = document.getElementById('caseUnitSel')?.value || null;
+  let filtered;
+  if (deptId) {
+    const dept = allDepts.find(d => d.dept_id === deptId);
+    if (dept && !dept.parent_id) {
+      // 選了 L1：包含本身及所有下級
+      const childIds = allDepts.filter(d => d.parent_id === deptId).map(d => d.dept_id);
+      filtered = allUsers.filter(u => u.dept_id === deptId || childIds.includes(u.dept_id));
+    } else {
+      filtered = allUsers.filter(u => u.dept_id === deptId);
+    }
+  } else {
+    filtered = allUsers;
+  }
   const cur = document.getElementById('caseReporter').value;
   document.getElementById('caseReporter').innerHTML =
     '<option value="">— 選擇通報人 —</option>' +
     filtered.map(u => `<option value="${u.name}">${u.name}</option>`).join('');
   if (filtered.find(u => u.name === cur)) document.getElementById('caseReporter').value = cur;
-  // sync hidden unit name
-  const unitDept = allDepts.find(d => d.dept_id === (deptId));
+  const unitDept = allDepts.find(d => d.dept_id === deptId);
   document.getElementById('caseReporterUnit').value = unitDept?.name || '';
 }
 
@@ -1051,26 +1043,10 @@ function openCaseForm() {
   });
   DTP.setValue('caseIncidentPicker', null);
 
-  // 所屬單位：重建 L1 選單
-  const l1Depts = allDepts.filter(d => !d.parent_id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
-  document.getElementById('caseUnitL1').innerHTML =
-    '<option value="">— 選擇部門 —</option>' +
-    l1Depts.map(d => `<option value="${d.dept_id}">${d.name}</option>`).join('');
-  document.getElementById('caseUnitL2').innerHTML = '<option value="">— 無下級單位 —</option>';
-  document.getElementById('caseUnitL2').disabled = true;
-
-  // 預填目前使用者的所屬單位
-  if (currentUser?.dept_id) {
-    const dept = allDepts.find(d => d.dept_id === currentUser.dept_id);
-    if (dept?.parent_id) {
-      document.getElementById('caseUnitL1').value = dept.parent_id;
-      fillL2(dept.parent_id, 'caseUnitL2');
-      document.getElementById('caseUnitL2').value = currentUser.dept_id;
-    } else if (dept) {
-      document.getElementById('caseUnitL1').value = currentUser.dept_id;
-      fillL2(currentUser.dept_id, 'caseUnitL2');
-    }
-  }
+  // 所屬單位：建立帶層級縮排的單一選單
+  document.getElementById('caseUnitSel').innerHTML =
+    '<option value="">— 選擇單位 —</option>' + buildFlatDeptOpts();
+  if (currentUser?.dept_id) document.getElementById('caseUnitSel').value = currentUser.dept_id;
   filterCaseReporter();
   document.getElementById('caseReporter').value = currentUser.name || '';
   pendingAttachments = [];
