@@ -908,6 +908,40 @@ body{
   </main>
 </div>
 
+<!-- EDIT USER MODAL -->
+<div class="modal-bg" id="editUserModal">
+  <div class="modal">
+    <div class="modal-title">◉ 編輯使用者</div>
+    <input type="hidden" id="edit-u-id">
+    <div class="form-grid">
+      <div class="field"><label>姓名</label><input id="edit-u-name" type="text" placeholder="姓名"></div>
+      <div class="field"><label>電話</label><input id="edit-u-phone" type="text" placeholder="聯絡電話"></div>
+      <div class="field"><label>第一層部門</label>
+        <select id="edit-u-dept-l1" onchange="onEditUserDeptL1Change()">
+          <option value="">-- 選擇第一層 --</option>
+        </select>
+      </div>
+      <div class="field"><label>第二層（課）</label>
+        <select id="edit-u-dept-l2" disabled>
+          <option value="">-- 無下級單位 --</option>
+        </select>
+      </div>
+      <div class="field"><label>角色</label>
+        <select id="edit-u-role">
+          <option value="inspector">巡檢人員</option>
+          <option value="maintenance">維修人員</option>
+          <option value="supervisor">主管／查詢</option>
+          <option value="admin">系統管理者</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-sm" style="background:rgba(12,40,64,0.6);color:var(--text-dim);border:1px solid var(--border)" onclick="closeModal('editUserModal')">取消</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEditUser()">儲存</button>
+    </div>
+  </div>
+</div>
+
 <!-- EDIT EQUIPMENT MODAL -->
 <div class="modal-bg" id="editEqModal">
   <div class="modal">
@@ -1085,6 +1119,82 @@ function getAdminDeptId() {
   return document.getElementById('u-dept-l2')?.value || document.getElementById('u-dept-l1')?.value || null;
 }
 
+function getDeptPath(deptId) {
+  if (!deptId) return '—';
+  const dept = deptMap[deptId];
+  if (!dept) return '—';
+  if (dept.parent_id) {
+    const parent = deptMap[dept.parent_id];
+    return parent ? `${parent.name} › ${dept.name}` : dept.name;
+  }
+  return dept.name;
+}
+
+function populateEditUserDeptSelects(selectedDeptId) {
+  const l1Sel = document.getElementById('edit-u-dept-l1');
+  const l2Sel = document.getElementById('edit-u-dept-l2');
+  if (!l1Sel) return;
+  const l1Depts = allDepts.filter(d => !d.parent_id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+  l1Sel.innerHTML = '<option value="">-- 選擇第一層 --</option>' +
+    l1Depts.map(d => `<option value="${d.dept_id}">${d.name}</option>`).join('');
+  if (selectedDeptId) {
+    const dept = deptMap[selectedDeptId];
+    if (dept?.parent_id) {
+      l1Sel.value = dept.parent_id;
+      onEditUserDeptL1Change();
+      l2Sel.value = selectedDeptId;
+    } else if (dept) {
+      l1Sel.value = selectedDeptId;
+      onEditUserDeptL1Change();
+    }
+  } else {
+    l2Sel.innerHTML = '<option value="">-- 無下級單位 --</option>';
+    l2Sel.disabled = true;
+  }
+}
+
+function onEditUserDeptL1Change() {
+  const l1Id = document.getElementById('edit-u-dept-l1').value;
+  const l2Sel = document.getElementById('edit-u-dept-l2');
+  const children = allDepts.filter(d => d.parent_id === l1Id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+  if (!l1Id || children.length === 0) {
+    l2Sel.innerHTML = '<option value="">-- 無下級單位 --</option>';
+    l2Sel.disabled = true;
+  } else {
+    l2Sel.innerHTML = '<option value="">-- 選擇課別（選填）--</option>' +
+      children.map(c => `<option value="${c.dept_id}">${c.name}</option>`).join('');
+    l2Sel.disabled = false;
+  }
+}
+
+function editUser(userId) {
+  const u = userMap[userId];
+  if (!u) return;
+  document.getElementById('edit-u-id').value = u.user_id;
+  document.getElementById('edit-u-name').value = u.name || '';
+  document.getElementById('edit-u-phone').value = u.phone || '';
+  document.getElementById('edit-u-role').value = u.role || 'inspector';
+  populateEditUserDeptSelects(u.dept_id || null);
+  document.getElementById('editUserModal').classList.add('show');
+}
+
+async function saveEditUser() {
+  const userId = document.getElementById('edit-u-id').value;
+  const name   = document.getElementById('edit-u-name').value.trim();
+  const phone  = document.getElementById('edit-u-phone').value.trim();
+  const role   = document.getElementById('edit-u-role').value;
+  const deptId = document.getElementById('edit-u-dept-l2').value || document.getElementById('edit-u-dept-l1').value || null;
+  if (!name) { showToast('請填寫姓名', true); return; }
+  const before = userMap[userId];
+  const updates = { name, phone: phone || null, role, dept_id: deptId };
+  const { error } = await db.from('users').update(updates).eq('user_id', userId);
+  if (error) { showToast('儲存失敗：' + error.message, true); return; }
+  await writeAudit('users', userId, 'update', { name: before?.name, phone: before?.phone, role: before?.role, dept_id: before?.dept_id }, updates);
+  showToast(`使用者「${name}」已更新`);
+  closeModal('editUserModal');
+  await loadUsers();
+}
+
 function populateEqFilter(selectId) {
   const el = document.getElementById(selectId);
   if (!el) return;
@@ -1133,10 +1243,11 @@ function renderUsers(users) {
   document.getElementById('usersTbody').innerHTML = users.map(u => `<tr>
     <td>${u.name}</td>
     <td style="font-family:var(--font-mono);font-size:.8rem">${u.username || '—'}</td>
-    <td>${(deptMap[u.dept_id]?.name) || u.department || '—'}</td>
+    <td>${getDeptPath(u.dept_id)}</td>
     <td><span class="role-badge">${ROLE_LABEL[u.role] || u.role}</span></td>
     <td><span class="badge ${u.status === 'active' ? 'badge-active' : 'badge-inactive'}">${u.status === 'active' ? 'ACTIVE' : 'INACTIVE'}</span></td>
-    <td>
+    <td style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" onclick="editUser('${u.user_id}')">編輯</button>
       ${u.status === 'active' && u.user_id !== currentUser.user_id ? `<button class="btn btn-warn btn-sm" onclick="toggleUserStatus('${u.user_id}','inactive')">停用</button>` : ''}
       ${u.status === 'inactive' ? `<button class="btn btn-primary btn-sm" onclick="toggleUserStatus('${u.user_id}','active')">啟用</button>` : ''}
     </td>
@@ -1148,7 +1259,7 @@ function filterUsers() {
   renderUsers(allUsers.filter(u =>
     u.name.toLowerCase().includes(q) ||
     (u.username || '').toLowerCase().includes(q) ||
-    ((deptMap[u.dept_id]?.name) || u.department || '').toLowerCase().includes(q)
+    getDeptPath(u.dept_id).toLowerCase().includes(q)
   ));
 }
 
