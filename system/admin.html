@@ -522,7 +522,7 @@ body{
 <div class="topbar">
   <div class="topbar-left">
     <span class="sys-tag">■ TAIPEC-MKT-1 ADMIN</span>
-    <span>臺北農產運銷 ／ 第一果菜市場</span>
+    <span data-sysname="org">臺北農產運銷股份有限公司</span> ／ <span data-sysname="site">第一果菜市場</span>
   </div>
   <div class="topbar-right">
     <span><span class="online-dot"></span>系統連線中</span>
@@ -534,7 +534,7 @@ body{
   <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="sidebar-logo">
-      <div class="org-label">臺北農產運銷股份有限公司<br>第一果菜市場</div>
+      <div class="org-label"><span data-sysname="org">臺北農產運銷股份有限公司</span><br><span data-sysname="site">第一果菜市場</span></div>
       <h1>⬡ 後台管理系統</h1>
     </div>
     <nav class="sidebar-nav">
@@ -993,6 +993,10 @@ function fmtLoc(loc) {
   setupNav();
   await loadAll();
   loadDashboard();
+  // 載入系統設定並套用名稱
+  db.from('system_settings').select('key,value').then(({ data }) => {
+    if (data) { data.forEach(s => sysSettings[s.key] = s.value); applySystemName(); }
+  });
   // 自動刷新儀表板每 60 秒
   setInterval(async () => {
     const activePage = document.querySelector('.page-section.active');

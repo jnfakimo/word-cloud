@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>臺北農產運銷 ｜ 系統入口</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;700&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -262,7 +263,7 @@
         <div class="dot-online"></div>
         <span>SYSTEM ONLINE</span>
       </div>
-      <span style="color:var(--text-dim)">第一果菜市場</span>
+      <span style="color:var(--text-dim)" data-sysname="site">第一果菜市場</span>
     </div>
     <div class="statusbar-right">
       <span id="clock">--:--:--</span>
@@ -272,8 +273,8 @@
   <!-- HEADER -->
   <div class="header">
     <div class="org-badge">TAPMC · FIRST FRUIT &amp; VEGETABLE MARKET</div>
-    <div class="org-name">臺北農產運銷股份有限公司</div>
-    <div class="sub-name">第一果菜市場</div>
+    <div class="org-name" data-sysname="org">臺北農產運銷股份有限公司</div>
+    <div class="sub-name" data-sysname="site">第一果菜市場</div>
     <div class="header-divider"></div>
     <div class="sys-label">INTEGRATED MANAGEMENT SYSTEM PORTAL</div>
   </div>
@@ -321,6 +322,16 @@
   </div>
 
 <script>
+  const SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  db.from('system_settings').select('key,value').then(({ data }) => {
+    if (!data) return;
+    const s = Object.fromEntries(data.map(r => [r.key, r.value]));
+    document.querySelectorAll('[data-sysname="org"]').forEach(el => { if (s.org_name) el.textContent = s.org_name; });
+    document.querySelectorAll('[data-sysname="site"]').forEach(el => { if (s.site_name) el.textContent = s.site_name; });
+  });
+
   // Real-time clock
   function tick() {
     const n = new Date();

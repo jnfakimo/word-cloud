@@ -445,7 +445,7 @@ body{
 
 <nav class="navbar">
   <div class="nav-brand">
-    <div class="nav-org">臺北農產運銷股份有限公司 第一果菜市場</div>
+    <div class="nav-org"><span data-sysname="org">臺北農產運銷股份有限公司</span> <span data-sysname="site">第一果菜市場</span></div>
     <span class="nav-title">⬡ 巡檢系統</span>
   </div>
   <div class="nav-right">
@@ -789,6 +789,12 @@ function lpGetId(sfx) { return _lpSelected[sfx] || null; }
     }
     currentUser = profile || { user_id: null, name: '巡檢人員', role: 'inspector' };
     document.getElementById('navUser').textContent = currentUser.name;
+    db.from('system_settings').select('key,value').then(({ data }) => {
+      if (!data) return;
+      const s = Object.fromEntries(data.map(r => [r.key, r.value]));
+      document.querySelectorAll('[data-sysname="org"]').forEach(el => { if (s.org_name) el.textContent = s.org_name; });
+      document.querySelectorAll('[data-sysname="site"]').forEach(el => { if (s.site_name) el.textContent = s.site_name; });
+    });
 
     setStatus('載入週期…');
     const { data: cycle, error: cErr } = await db.from('inspection_cycles').select('*').is('ended_at', null).order('started_at', { ascending: false }).limit(1).single();
