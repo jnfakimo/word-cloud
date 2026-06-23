@@ -21,7 +21,6 @@ html,body{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--text);font-family:var(--font-mono);display:flex;flex-direction:column}
 body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.018) 1px,transparent 1px);background-size:48px 48px;pointer-events:none}
 
-/* TOPBAR */
 .topbar{position:relative;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:44px;background:rgba(2,8,20,.95);border-bottom:1px solid var(--border-hi);flex-shrink:0}
 .topbar-left{display:flex;gap:14px;align-items:center;font-size:.72rem;letter-spacing:.08em}
 .topbar-org{color:var(--text-dim)}
@@ -30,30 +29,24 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .topbar-right a{color:var(--text-dim);text-decoration:none;padding:3px 8px;border:1px solid var(--border);border-radius:2px;transition:all .2s}
 .topbar-right a:hover{color:var(--cyan);border-color:var(--cyan)}
 .nav-user{color:var(--cyan);font-size:.78rem}
-.logout-btn{background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:3px 10px;cursor:pointer;font-family:var(--font-mono);font-size:.72rem;border-radius:2px;transition:all .2s}
-.logout-btn:hover{border-color:var(--red);color:var(--red)}
 .clock{color:var(--cyan);font-size:.72rem;letter-spacing:.1em;margin-left:6px}
 
-/* TABS */
 .tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);background:rgba(2,8,20,.7);flex-shrink:0;padding:0 20px}
 .tab-btn{padding:10px 20px;cursor:pointer;font-family:var(--font-head);font-size:.88rem;font-weight:700;letter-spacing:.08em;color:var(--text-dim);border:none;background:transparent;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
 .tab-btn.active{color:var(--cyan);border-bottom-color:var(--cyan)}
 .tab-btn:hover:not(.active){color:var(--text-hi)}
 
-/* SCROLL AREA */
 .tab-content{flex:1;overflow:hidden;position:relative}
 .tab-panel{position:absolute;inset:0;overflow-y:auto;padding:20px;display:none}
 .tab-panel.active{display:block}
 .tab-panel::-webkit-scrollbar{width:4px}
 .tab-panel::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:2px}
 
-/* PANELS */
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:2px;margin-bottom:16px}
 .panel-head{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .panel-title{font-family:var(--font-head);font-size:.85rem;font-weight:700;color:var(--cyan);letter-spacing:.08em;text-transform:uppercase}
 .panel-body{padding:16px}
 
-/* FORM */
 .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
 .field{margin-bottom:0}
 .field label{display:block;font-size:.72rem;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
@@ -61,14 +54,18 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--cyan);box-shadow:0 0 0 1px rgba(0,212,255,.15)}
 .field textarea{resize:vertical;min-height:72px}
 .field select option{background:var(--bg)}
+.field input[readonly]{color:var(--text-dim);cursor:default}
 
-/* EQ STATUS CARDS */
+.sub-section{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.sub-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.sub-label{font-size:.72rem;color:var(--text-dim);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.sub-label::before{content:'';display:inline-block;width:3px;height:12px;background:var(--cyan);border-radius:1px}
+
 .eq-cards{display:flex;gap:12px;flex-wrap:wrap}
 .eq-card{flex:1;min-width:100px;padding:12px 16px;border:1px solid var(--border);border-radius:2px;text-align:center;background:rgba(2,8,20,.5)}
 .eq-val{font-family:var(--font-head);font-size:1.8rem;font-weight:700;line-height:1}
 .eq-label{font-size:.72rem;color:var(--text-dim);letter-spacing:.08em;margin-top:4px}
 
-/* DYNAMIC LIST */
 .dyn-list{margin-top:10px}
 .dyn-item{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;animation:fadeIn .2s}
 @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
@@ -83,81 +80,93 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .add-btn{background:var(--cyan-dim);border:1px solid var(--cyan);color:var(--cyan);padding:8px 14px;cursor:pointer;font-family:var(--font-mono);font-size:.82rem;border-radius:2px;white-space:nowrap;transition:all .15s}
 .add-btn:hover{background:rgba(0,212,255,.18)}
 
-/* BUTTONS */
 .btn-primary{width:100%;padding:12px;background:rgba(0,212,255,.1);border:1px solid var(--cyan);color:var(--cyan);font-family:var(--font-head);font-weight:700;font-size:.92rem;letter-spacing:.1em;cursor:pointer;border-radius:2px;transition:all .2s;text-transform:uppercase;margin-top:4px}
 .btn-primary:hover{background:rgba(0,212,255,.2);box-shadow:var(--cyan-glow)}
 .btn-confirm{background:rgba(0,255,157,.08);border-color:var(--green);color:var(--green)}
 .btn-confirm:hover{background:rgba(0,255,157,.16);box-shadow:0 0 12px rgba(0,255,157,.35)}
 .btn-secondary{background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:9px 18px;cursor:pointer;font-family:var(--font-mono);font-size:.84rem;border-radius:2px;transition:all .2s}
 .btn-secondary:hover{border-color:var(--cyan);color:var(--cyan)}
+.btn-sm{padding:4px 12px;font-size:.78rem}
 .btn-row{display:flex;gap:10px;margin-top:12px}
 .btn-row .btn-primary{flex:1}
 
-/* FILTER BAR */
 .filter-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
 .filter-bar select,.filter-bar input[type=date]{padding:8px 12px;background:rgba(2,8,20,.85);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-family:var(--font-mono);font-size:.82rem;outline:none;transition:border .2s}
 .filter-bar select:focus,.filter-bar input[type=date]:focus{border-color:var(--cyan)}
 .filter-bar select option{background:var(--bg)}
 
-/* TABLE */
 .data-table{width:100%;border-collapse:collapse;font-size:.82rem}
 .data-table th{padding:9px 12px;text-align:left;font-family:var(--font-head);font-size:.72rem;font-weight:700;letter-spacing:.1em;color:var(--cyan);border-bottom:1px solid var(--border-hi);white-space:nowrap;background:rgba(0,212,255,.04)}
 .data-table td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
 .data-table tr:hover td{background:rgba(0,212,255,.03)}
+
 .badge{display:inline-block;padding:2px 8px;font-size:.72rem;font-family:var(--font-mono);border-radius:2px;letter-spacing:.06em;white-space:nowrap}
 .badge-draft{background:rgba(255,179,0,.1);color:var(--amber);border:1px solid rgba(255,179,0,.3)}
 .badge-confirmed{background:rgba(0,255,157,.08);color:var(--green);border:1px solid rgba(0,255,157,.25)}
+.badge-open{background:rgba(255,59,59,.1);color:var(--red);border:1px solid rgba(255,59,59,.3)}
+.badge-in_progress{background:rgba(255,179,0,.1);color:var(--amber);border:1px solid rgba(255,179,0,.3)}
+.badge-pending{background:rgba(26,127,255,.1);color:var(--blue);border:1px solid rgba(26,127,255,.3)}
+.badge-closed{background:rgba(0,255,157,.08);color:var(--green);border:1px solid rgba(0,255,157,.25)}
 
-/* MODAL */
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:none;align-items:center;justify-content:center;padding:16px}
+.case-stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.stat-chip{flex:1;min-width:100px;padding:10px 14px;border:1px solid var(--border);border-radius:2px;background:rgba(2,8,20,.5);text-align:center}
+.stat-chip-val{font-family:var(--font-head);font-size:1.5rem;font-weight:700;line-height:1}
+.stat-chip-label{font-size:.7rem;color:var(--text-dim);letter-spacing:.08em;margin-top:3px}
+
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;display:none;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
 .modal-bg.show{display:flex}
-.modal{background:var(--surface);border:1px solid var(--border-hi);border-radius:2px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;box-shadow:0 16px 64px rgba(0,0,0,.7)}
-.modal::-webkit-scrollbar{width:4px}
-.modal::-webkit-scrollbar-thumb{background:var(--border-hi)}
+.modal{background:var(--surface);border:1px solid var(--border-hi);border-radius:2px;width:100%;max-width:720px;box-shadow:0 16px 64px rgba(0,0,0,.7);margin:auto}
+.modal-wide{max-width:900px}
 .modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1}
 .modal-title{font-family:var(--font-head);font-size:1rem;font-weight:700;color:var(--cyan);letter-spacing:.08em}
 .modal-close{background:transparent;border:1px solid var(--border);color:var(--text-dim);width:30px;height:30px;cursor:pointer;border-radius:2px;font-size:1rem;transition:all .15s}
 .modal-close:hover{border-color:var(--red);color:var(--red)}
 .modal-body{padding:20px}
+.modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
+
 .detail-row{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)}
 .detail-row:last-child{border-bottom:none}
 .detail-label{width:90px;flex-shrink:0;font-size:.72rem;color:var(--text-dim);letter-spacing:.06em;padding-top:2px}
 .detail-value{flex:1;color:var(--text-hi);font-size:.85rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
-.detail-section{margin-top:16px;padding:12px;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:2px}
+.detail-section{margin-top:14px;padding:12px;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:2px}
 .detail-section-title{font-family:var(--font-head);font-size:.78rem;font-weight:700;color:var(--cyan);letter-spacing:.08em;margin-bottom:8px;text-transform:uppercase}
 .detail-item{padding:6px 10px;border-left:3px solid var(--border-hi);margin-bottom:4px;font-size:.84rem;color:var(--text-hi);background:rgba(0,212,255,.02)}
 .detail-item.issue{border-left-color:var(--red)}
 .detail-item.pending{border-left-color:var(--amber)}
-.detail-empty{color:var(--text-dim);font-size:.82rem;font-family:var(--font-mono)}
+.detail-empty{color:var(--text-dim);font-size:.82rem}
 
-/* SHIFT BADGE */
+.log-timeline{padding:4px 0}
+.log-entry{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.log-entry:last-child{border-bottom:none}
+.log-time{width:90px;flex-shrink:0;font-size:.7rem;color:var(--text-dim);font-family:var(--font-mono);line-height:1.4}
+.log-content{flex:1}
+.log-action{font-size:.76rem;color:var(--cyan);font-weight:700}
+.log-text{font-size:.82rem;color:var(--text-hi);margin-top:2px}
+.log-by{font-size:.7rem;color:var(--text-dim);margin-top:2px}
+
+.attach-item{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)}
+.attach-item:last-child{border-bottom:none}
+.attach-name{flex:1;font-size:.8rem;color:var(--text-hi);word-break:break-all}
+.attach-meta{font-size:.7rem;color:var(--text-dim);white-space:nowrap}
+.attach-actions{display:flex;gap:6px}
+.attach-actions a{font-size:.76rem;color:var(--cyan);text-decoration:none;padding:2px 6px;border:1px solid var(--border);border-radius:2px;transition:all .15s}
+.attach-actions a:hover{border-color:var(--cyan)}
+
 .shift-morning{color:var(--amber)}
 .shift-afternoon{color:var(--cyan)}
 .shift-night{color:var(--blue)}
 
-/* TOAST */
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(0,212,255,.15);border:1px solid var(--cyan);color:var(--cyan);padding:10px 24px;border-radius:2px;font-family:var(--font-mono);font-size:.84rem;pointer-events:none;opacity:0;transition:opacity .3s;z-index:200;white-space:nowrap}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(0,212,255,.15);border:1px solid var(--cyan);color:var(--cyan);padding:10px 24px;border-radius:2px;font-family:var(--font-mono);font-size:.84rem;pointer-events:none;opacity:0;transition:opacity .3s;z-index:300;white-space:nowrap}
 .toast.show{opacity:1}
 .toast.err{background:rgba(255,59,59,.15);border-color:var(--red);color:var(--red)}
 
-/* STATUS INDICATOR */
-.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.overdue-row td{background:rgba(255,59,59,.04)!important}
 
-/* PRINT */
-@media print{
-  .topbar,.tab-bar,.filter-bar,.btn-row,.btn-primary,.btn-secondary,.dyn-del,.add-row{display:none!important}
-  .tab-panel{display:block!important;position:static!important;overflow:visible!important;padding:0!important}
-  body{background:white;color:black}
-  .panel{border:1px solid #ccc;page-break-inside:avoid}
-  .panel-title,.modal-title{color:#333}
-  .detail-label{color:#666}
-  .detail-value{color:#000}
-}
-
-@media(max-width:600px){
+@media(max-width:640px){
   .form-grid{grid-template-columns:1fr}
   .topbar-org{display:none}
   .topbar-right a{display:none}
+  .case-stats{gap:6px}
 }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -165,7 +174,6 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 </head>
 <body>
 
-<!-- TOPBAR -->
 <div class="topbar">
   <div class="topbar-left">
     <span class="topbar-org"><span data-sysname="org">臺北農產運銷股份有限公司</span> <span data-sysname="site">第一果菜市場</span></span>
@@ -177,26 +185,25 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     <a href="admin.html">⬡ 後台</a>
     <span class="nav-user" id="navUser">LOADING…</span>
     <span class="clock" id="topClock">--:--:--</span>
-    <a href="index.html" class="topbar-right" style="color:var(--text-dim);text-decoration:none;padding:3px 10px;border:1px solid var(--border);border-radius:2px;font-size:.72rem;transition:all .2s" onmouseover="this.style.color='var(--cyan)';this.style.borderColor='var(--cyan)'" onmouseout="this.style.color='var(--text-dim)';this.style.borderColor='var(--border)'">⏏ 首頁</a>
+    <a href="index.html">⏏ 首頁</a>
   </div>
 </div>
 
-<!-- TABS -->
 <div class="tab-bar">
   <button class="tab-btn active" onclick="switchTab('new')" id="tab-new">✏ 新增交接</button>
+  <button class="tab-btn" onclick="switchTab('cases')" id="tab-cases">◉ 案件管理</button>
   <button class="tab-btn" onclick="switchTab('history')" id="tab-history">📋 交接記錄</button>
 </div>
 
 <div class="tab-content">
 
-  <!-- ── TAB: NEW HANDOVER ── -->
+  <!-- ══ TAB: NEW HANDOVER ══ -->
   <div class="tab-panel active" id="panel-new">
 
-    <!-- 班別 / 日期 / 部門 -->
     <div class="panel">
       <div class="panel-head"><span class="panel-title">⊞ 基本資訊</span></div>
       <div class="panel-body">
-        <div class="form-grid">
+        <div class="form-grid" style="grid-template-columns:1fr 1fr">
           <div class="field">
             <label>班別</label>
             <select id="hShift" onchange="onShiftChange()">
@@ -209,71 +216,77 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
             <label>交接日期</label>
             <input type="date" id="hDate" onchange="onShiftChange()">
           </div>
-          <div class="field">
-            <label>第一層部門 <span style="color:var(--text-dim);font-size:.7rem">（組織架構）</span></label>
-            <select id="hDeptL1" onchange="onHDeptL1Change()">
-              <option value="">— 選擇第一層 —</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>第二層（課）</label>
-            <select id="hDeptL2" onchange="onHDeptChange()" disabled>
-              <option value="">— 無下級單位 —</option>
-            </select>
-          </div>
         </div>
       </div>
     </div>
 
-    <!-- 交接人 / 接班人 -->
     <div class="panel">
       <div class="panel-head"><span class="panel-title">◉ 值班人員</span></div>
       <div class="panel-body">
-        <div class="form-grid">
-          <div class="field">
-            <label>交接人（離班）</label>
-            <select id="hHandoverBy">
-              <option value="">— 請先選擇部門 —</option>
-            </select>
+        <div class="sub-section">
+          <div class="sub-label">交接人（離班）</div>
+          <div class="form-grid">
+            <div class="field">
+              <label>第一層部門</label>
+              <select id="hHandoverL1" onchange="onHandoverL1Change()">
+                <option value="">— 選擇第一層 —</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>第二層（課）</label>
+              <select id="hHandoverL2" onchange="onHandoverDeptChange()" disabled>
+                <option value="">— 無下級單位 —</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>交接人員</label>
+              <select id="hHandoverBy">
+                <option value="">— 選擇人員 —</option>
+              </select>
+            </div>
           </div>
-          <div class="field">
-            <label>接班人（到班）</label>
-            <select id="hTakeoverBy">
-              <option value="">— 請先選擇部門 —</option>
-            </select>
+        </div>
+        <div class="sub-section">
+          <div class="sub-label">接班人（到班）</div>
+          <div class="form-grid">
+            <div class="field">
+              <label>第一層部門</label>
+              <select id="hTakeoverL1" onchange="onTakeoverL1Change()">
+                <option value="">— 選擇第一層 —</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>第二層（課）</label>
+              <select id="hTakeoverL2" onchange="onTakeoverDeptChange()" disabled>
+                <option value="">— 無下級單位 —</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>接班人員</label>
+              <select id="hTakeoverBy">
+                <option value="">— 選擇人員 —</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 設備運轉概況（自動抓取） -->
     <div class="panel">
       <div class="panel-head">
         <span class="panel-title">◧ 設備運轉概況</span>
-        <button class="btn-secondary" style="padding:4px 12px;font-size:.75rem" onclick="fetchEqStatus()">↻ 重新抓取</button>
+        <button class="btn-secondary btn-sm" onclick="fetchEqStatus()">↻ 重新抓取</button>
       </div>
       <div class="panel-body">
         <div class="eq-cards">
-          <div class="eq-card">
-            <div class="eq-val" id="eqNormal" style="color:var(--green)">—</div>
-            <div class="eq-label">✓ 正常台數</div>
-          </div>
-          <div class="eq-card">
-            <div class="eq-val" id="eqAbnormal" style="color:var(--red)">—</div>
-            <div class="eq-label">✗ 異常台數</div>
-          </div>
-          <div class="eq-card">
-            <div class="eq-val" id="eqTotal" style="color:var(--text-dim)">—</div>
-            <div class="eq-label">◈ 巡檢總數</div>
-          </div>
+          <div class="eq-card"><div class="eq-val" id="eqNormal" style="color:var(--green)">—</div><div class="eq-label">✓ 正常台數</div></div>
+          <div class="eq-card"><div class="eq-val" id="eqAbnormal" style="color:var(--red)">—</div><div class="eq-label">✗ 異常台數</div></div>
+          <div class="eq-card"><div class="eq-val" id="eqTotal" style="color:var(--text-dim)">—</div><div class="eq-label">◈ 巡檢總數</div></div>
         </div>
-        <div id="eqNote" style="margin-top:10px;font-size:.78rem;color:var(--text-dim);font-family:var(--font-mono)">
-          — 選擇班別與日期後自動載入當班巡檢結果 —
-        </div>
+        <div id="eqNote" style="margin-top:10px;font-size:.78rem;color:var(--text-dim)">— 選擇班別與日期後自動載入當班巡檢結果 —</div>
       </div>
     </div>
 
-    <!-- 異常事項 -->
     <div class="panel">
       <div class="panel-head"><span class="panel-title" style="color:var(--red)">⚠ 異常事項</span></div>
       <div class="panel-body">
@@ -285,7 +298,6 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       </div>
     </div>
 
-    <!-- 待辦事項 -->
     <div class="panel">
       <div class="panel-head"><span class="panel-title" style="color:var(--amber)">◎ 待辦事項</span></div>
       <div class="panel-body">
@@ -297,30 +309,76 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       </div>
     </div>
 
-    <!-- 備註 -->
     <div class="panel">
       <div class="panel-head"><span class="panel-title">備註</span></div>
       <div class="panel-body">
-        <textarea id="hNotes" placeholder="其他需要說明的事項…" style="width:100%;min-height:80px;background:rgba(2,8,20,.8);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-family:var(--font-mono);font-size:.88rem;padding:10px;outline:none;resize:vertical;transition:border .2s" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+        <textarea id="hNotes" class="add-input" style="min-height:80px;resize:vertical" placeholder="其他需要說明的事項…"></textarea>
       </div>
     </div>
 
-    <!-- ACTIONS -->
     <div class="btn-row">
-      <button class="btn-primary" onclick="saveDraft()" style="flex:1">儲存草稿</button>
-      <button class="btn-primary btn-confirm" onclick="confirmHandover()" style="flex:1">✓ 確認交接完成</button>
+      <button class="btn-primary" onclick="saveDraft()">儲存草稿</button>
+      <button class="btn-primary btn-confirm" onclick="confirmHandover()">✓ 確認交接完成</button>
     </div>
     <div style="height:24px"></div>
+  </div>
 
-  </div><!-- /panel-new -->
+  <!-- ══ TAB: CASE MANAGEMENT ══ -->
+  <div class="tab-panel" id="panel-cases">
 
-  <!-- ── TAB: HISTORY ── -->
-  <div class="tab-panel" id="panel-history">
+    <div class="case-stats" id="caseStats">
+      <div class="stat-chip"><div class="stat-chip-val" id="statOpen" style="color:var(--red)">—</div><div class="stat-chip-label">待處理</div></div>
+      <div class="stat-chip"><div class="stat-chip-val" id="statInProgress" style="color:var(--amber)">—</div><div class="stat-chip-label">處理中</div></div>
+      <div class="stat-chip"><div class="stat-chip-val" id="statPending" style="color:var(--blue)">—</div><div class="stat-chip-label">待確認</div></div>
+      <div class="stat-chip"><div class="stat-chip-val" id="statOverdue" style="color:var(--red)">—</div><div class="stat-chip-label">⚠ 逾期</div></div>
+      <div class="stat-chip"><div class="stat-chip-val" id="statClosed" style="color:var(--green)">—</div><div class="stat-chip-label">已結案</div></div>
+    </div>
 
     <div class="filter-bar">
-      <select id="fDept" onchange="loadHistory()" style="min-width:140px">
-        <option value="">全部部門</option>
+      <select id="cfStatus" onchange="loadCases()">
+        <option value="">全部狀態</option>
+        <option value="open">待處理</option>
+        <option value="in_progress">處理中</option>
+        <option value="pending">待確認</option>
+        <option value="closed">已結案</option>
       </select>
+      <select id="cfCat" onchange="loadCases()">
+        <option value="">全部類別</option>
+        <option value="機電設備類">機電設備類</option>
+        <option value="工務事項類">工務事項類</option>
+        <option value="駐警隊類">駐警隊類</option>
+        <option value="市場營運類">市場營運類</option>
+        <option value="其他">其他</option>
+      </select>
+      <input type="date" id="cfDateFrom" onchange="loadCases()" title="起始日期">
+      <input type="date" id="cfDateTo" onchange="loadCases()" title="結束日期">
+      <button class="btn-secondary btn-sm" onclick="loadCases()">↻ 重整</button>
+      <button class="btn-primary" style="width:auto;padding:7px 18px;font-size:.84rem;margin-top:0" onclick="openCaseForm()">＋ 新增案件</button>
+    </div>
+
+    <div class="panel">
+      <div style="overflow-x:auto">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>案件編號</th><th>異常類別</th><th>案件標題</th>
+              <th>狀態</th><th>承辦人</th><th>到期日</th>
+              <th>建立時間</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="casesTbody">
+            <tr><td colspan="8" style="color:var(--text-dim);text-align:center;padding:24px">LOADING…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div style="height:24px"></div>
+  </div>
+
+  <!-- ══ TAB: HISTORY ══ -->
+  <div class="tab-panel" id="panel-history">
+    <div class="filter-bar">
+      <select id="fDept" onchange="loadHistory()" style="min-width:140px"><option value="">全部部門</option></select>
       <select id="fShift" onchange="loadHistory()">
         <option value="">全部班別</option>
         <option value="morning">早班</option>
@@ -334,9 +392,8 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       </select>
       <input type="date" id="fDateFrom" onchange="loadHistory()" title="起始日期">
       <input type="date" id="fDateTo" onchange="loadHistory()" title="結束日期">
-      <button class="btn-secondary" onclick="loadHistory()" style="padding:7px 14px;font-size:.78rem">↻ 重整</button>
+      <button class="btn-secondary btn-sm" onclick="loadHistory()">↻ 重整</button>
     </div>
-
     <div class="panel">
       <div style="overflow-x:auto">
         <table class="data-table">
@@ -349,24 +406,133 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
             </tr>
           </thead>
           <tbody id="historyTbody">
-            <tr><td colspan="10" style="color:var(--text-dim);font-family:var(--font-mono);padding:24px;text-align:center">LOADING…</td></tr>
+            <tr><td colspan="10" style="color:var(--text-dim);text-align:center;padding:24px">LOADING…</td></tr>
           </tbody>
         </table>
       </div>
     </div>
+  </div>
 
-  </div><!-- /panel-history -->
+</div>
 
-</div><!-- /tab-content -->
-
-<!-- DETAIL MODAL -->
+<!-- ══ HANDOVER DETAIL MODAL ══ -->
 <div class="modal-bg" id="detailModal">
   <div class="modal">
     <div class="modal-head">
       <span class="modal-title" id="modalTitle">交接記錄詳情</span>
-      <button class="modal-close" onclick="closeModal()">✕</button>
+      <button class="modal-close" onclick="closeHandoverModal()">✕</button>
     </div>
     <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- ══ CASE FORM MODAL ══ -->
+<div class="modal-bg" id="caseFormModal">
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <span class="modal-title">◉ 新增案件</span>
+      <button class="modal-close" onclick="closeCaseForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:12px">
+        <div class="field"><label>案件編號</label><input id="caseNo" type="text" readonly></div>
+        <div class="field"><label>班別</label>
+          <select id="caseShift">
+            <option value="morning">早班 06:00–14:00</option>
+            <option value="afternoon">中班 14:00–22:00</option>
+            <option value="night">夜班 22:00–06:00</option>
+          </select>
+        </div>
+        <div class="field"><label>建立日期</label><input id="caseCreatedAt" type="text" readonly></div>
+      </div>
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="field"><label>通報人 *</label><input id="caseReporter" type="text" placeholder="通報人姓名"></div>
+        <div class="field"><label>所屬單位</label><input id="caseReporterUnit" type="text" placeholder="所屬單位"></div>
+        <div class="field"><label>發生時間</label><input id="caseIncidentTime" type="datetime-local"></div>
+        <div class="field"><label>發生地點</label><input id="caseLocation" type="text" placeholder="發生地點"></div>
+      </div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="field"><label>異常大類 *</label>
+          <select id="caseCat" onchange="onCaseCatChange()">
+            <option value="">— 選擇大類 —</option>
+            <option value="機電設備類">機電設備類</option>
+            <option value="工務事項類">工務事項類</option>
+            <option value="駐警隊類">駐警隊類</option>
+            <option value="市場營運類">市場營運類</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div class="field"><label>異常小類</label>
+          <select id="caseSub" disabled>
+            <option value="">— 請先選擇大類 —</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" id="caseOtherDiv" style="display:none;margin-bottom:12px">
+        <label>其他說明</label><input id="caseOther" type="text" placeholder="請說明異常事項">
+      </div>
+      <div class="field" style="margin-bottom:12px">
+        <label>案件標題</label><input id="caseTitle" type="text" placeholder="簡短描述案件（留空則自動產生）">
+      </div>
+      <div class="field" style="margin-bottom:12px">
+        <label>異常事項詳述</label>
+        <textarea id="caseDesc" placeholder="詳細描述異常事項…" style="min-height:80px"></textarea>
+      </div>
+      <div class="field" style="margin-bottom:12px">
+        <label>處理情形</label>
+        <textarea id="caseAction" placeholder="已採取的處理措施…" style="min-height:64px"></textarea>
+      </div>
+      <div class="field" style="margin-bottom:12px">
+        <label>後續交接事項</label>
+        <textarea id="caseFollowup" placeholder="需交接給下一班的事項…" style="min-height:64px"></textarea>
+      </div>
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="field"><label>負責單位</label><input id="caseResponsibleUnit" type="text" placeholder="負責單位"></div>
+        <div class="field"><label>指派承辦人</label>
+          <select id="caseAssignedTo"><option value="">— 指派承辦人 —</option></select>
+        </div>
+        <div class="field"><label>案件狀態</label>
+          <select id="caseStatus">
+            <option value="open">待處理</option>
+            <option value="in_progress">處理中</option>
+            <option value="pending">待確認</option>
+          </select>
+        </div>
+        <div class="field"><label>到期日</label><input id="caseDueDate" type="date"></div>
+      </div>
+      <div class="field" style="margin-bottom:16px">
+        <label>備註</label>
+        <textarea id="caseNote" placeholder="其他備註…" style="min-height:56px"></textarea>
+      </div>
+
+      <!-- 附件 -->
+      <div style="border:1px solid var(--border);border-radius:2px;padding:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span style="font-size:.75rem;color:var(--cyan);font-family:var(--font-head);letter-spacing:.08em">附件（<span id="attachCount">0/20</span>）</span>
+          <div>
+            <input type="file" id="attachInput" accept=".jpg,.jpeg,.png,.pdf,.docx,.xlsx" multiple style="display:none" onchange="onAttachSelect()">
+            <button class="btn-secondary btn-sm" onclick="document.getElementById('attachInput').click()">＋ 選擇附件</button>
+          </div>
+        </div>
+        <div style="font-size:.72rem;color:var(--text-dim);margin-bottom:8px">支援格式：JPG / PNG / PDF / DOCX / XLSX　每案最多 20 個</div>
+        <div id="pendingAttachList"><span style="font-size:.78rem;color:var(--text-dim)">尚無附件</span></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeCaseForm()">取消</button>
+      <button class="btn-primary" style="width:auto;padding:9px 28px;margin-top:0" onclick="submitCase()">提交案件</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CASE DETAIL MODAL ══ -->
+<div class="modal-bg" id="caseDetailModal">
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <span class="modal-title" id="caseDetailTitle">案件詳情</span>
+      <button class="modal-close" onclick="closeCaseDetail()">✕</button>
+    </div>
+    <div class="modal-body" id="caseDetailBody"></div>
   </div>
 </div>
 
@@ -379,25 +545,47 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const SHIFT_LABEL = { morning:'早班', afternoon:'中班', night:'夜班' };
 const SHIFT_HOURS = { morning:[6,14], afternoon:[14,22], night:[22,30] };
+const SHIFT_CLASS = { morning:'shift-morning', afternoon:'shift-afternoon', night:'shift-night' };
+
+const CASE_STATUS = {
+  open:        { label:'待處理', cls:'badge-open' },
+  in_progress: { label:'處理中', cls:'badge-in_progress' },
+  pending:     { label:'待確認', cls:'badge-pending' },
+  closed:      { label:'已結案', cls:'badge-closed' }
+};
+
+const ACTION_LABEL = {
+  create:'建立案件', assign:'指派承辦', transfer:'轉派案件',
+  update:'進度更新', close:'結案',    reopen:'重新開啟'
+};
+
+const ANOMALY_SUBS = {
+  '機電設備類': ['高壓設備','變壓器','發電機','冰水主機','空調設備','電梯設備','給排水設備','消防設備','弱電設備'],
+  '工務事項類': ['設施損壞','工程施工','漏水事件','照明異常','環境設施異常'],
+  '駐警隊類':   ['門禁異常','車輛事故','人員糾紛','緊急事件'],
+  '市場營運類': ['拍賣設備異常','攤商陳情','環境清潔','廢棄物處理'],
+  '其他':       []
+};
 
 let currentUser = null;
-let allDepts = [];
-let allUsers = [];
-let issues = [];
-let pendings = [];
+let allDepts = [], allUsers = [];
+let issues = [], pendings = [];
 let editingId = null;
+let pendingAttachments = [];
+let currentCaseId = null;
 
-// ── CLOCK ────────────────────────────────────────────────────
+// ── CLOCK ──────────────────────────────────────────
 (function tick(){
   const n=new Date(),p=x=>String(x).padStart(2,'0');
   document.getElementById('topClock').textContent=`${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
   setTimeout(tick,1000);
 })();
 
-// ── INIT ─────────────────────────────────────────────────────
+// ── INIT ───────────────────────────────────────────
 (async () => {
   currentUser = { user_id: null, name: '交接人員' };
   document.getElementById('navUser').textContent = '電子交接簿';
+
   db.from('system_settings').select('key,value').then(({ data }) => {
     if (!data) return;
     const s = Object.fromEntries(data.map(r => [r.key, r.value]));
@@ -414,23 +602,21 @@ let editingId = null;
 
   buildDeptSelects();
 
-  // Default date + auto shift
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('hDate').value = today;
   const h = new Date().getHours();
-  document.getElementById('hShift').value = h >= 6 && h < 14 ? 'morning' : h >= 14 && h < 22 ? 'afternoon' : 'night';
+  document.getElementById('hShift').value = h>=6&&h<14 ? 'morning' : h>=14&&h<22 ? 'afternoon' : 'night';
 
   await fetchEqStatus();
   await loadHistory();
 })();
 
-// ── DEPT DROPDOWNS ───────────────────────────────────────────
+// ── DEPT DROPDOWNS ─────────────────────────────────
 function buildDeptSelects() {
   const l1Depts = allDepts.filter(d => !d.parent_id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
-  // 新增表單：第一層選單
-  document.getElementById('hDeptL1').innerHTML = '<option value="">— 選擇第一層 —</option>' +
-    l1Depts.map(d => `<option value="${d.dept_id}">${d.name}</option>`).join('');
-  // 歷史篩選：平面階層選單
+  const l1Opts = '<option value="">— 選擇第一層 —</option>' + l1Depts.map(d => `<option value="${d.dept_id}">${d.name}</option>`).join('');
+  document.getElementById('hHandoverL1').innerHTML = l1Opts;
+  document.getElementById('hTakeoverL1').innerHTML = l1Opts;
   document.getElementById('fDept').innerHTML = '<option value="">全部部門</option>' + buildFlatDeptOpts();
 }
 
@@ -446,11 +632,10 @@ function buildFlatDeptOpts() {
   return html;
 }
 
-function onHDeptL1Change() {
-  const l1Id = document.getElementById('hDeptL1').value;
-  const l2Sel = document.getElementById('hDeptL2');
+function fillL2(l1Id, l2SelId) {
+  const l2Sel = document.getElementById(l2SelId);
   const children = allDepts.filter(d => d.parent_id === l1Id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
-  if (!l1Id || children.length === 0) {
+  if (!l1Id || !children.length) {
     l2Sel.innerHTML = '<option value="">— 無下級單位 —</option>';
     l2Sel.disabled = true;
   } else {
@@ -458,23 +643,36 @@ function onHDeptL1Change() {
       children.map(c => `<option value="${c.dept_id}">${c.name}</option>`).join('');
     l2Sel.disabled = false;
   }
-  onHDeptChange();
 }
 
-// ── DEPT → USERS ─────────────────────────────────────────────
-function onHDeptChange() {
-  const deptId = document.getElementById('hDeptL2').value || document.getElementById('hDeptL1').value;
+function fillPersonSelect(selId, deptId) {
   const filtered = deptId ? allUsers.filter(u => u.dept_id === deptId) : allUsers;
-  const opts = '<option value="">— 選擇 —</option>' +
+  document.getElementById(selId).innerHTML = '<option value="">— 選擇人員 —</option>' +
     filtered.map(u => `<option value="${u.user_id}">${u.name}</option>`).join('');
-  document.getElementById('hHandoverBy').innerHTML = opts;
-  document.getElementById('hTakeoverBy').innerHTML = opts;
 }
 
-// ── SHIFT CHANGE ─────────────────────────────────────────────
+function onHandoverL1Change() {
+  const l1 = document.getElementById('hHandoverL1').value;
+  fillL2(l1, 'hHandoverL2');
+  onHandoverDeptChange();
+}
+function onHandoverDeptChange() {
+  const deptId = document.getElementById('hHandoverL2').value || document.getElementById('hHandoverL1').value;
+  fillPersonSelect('hHandoverBy', deptId);
+}
+function onTakeoverL1Change() {
+  const l1 = document.getElementById('hTakeoverL1').value;
+  fillL2(l1, 'hTakeoverL2');
+  onTakeoverDeptChange();
+}
+function onTakeoverDeptChange() {
+  const deptId = document.getElementById('hTakeoverL2').value || document.getElementById('hTakeoverL1').value;
+  fillPersonSelect('hTakeoverBy', deptId);
+}
+
+// ── SHIFT CHANGE ───────────────────────────────────
 function onShiftChange() { fetchEqStatus(); }
 
-// ── SHIFT TIME RANGE ─────────────────────────────────────────
 function shiftRange(dateStr, type) {
   const [h1, h2] = SHIFT_HOURS[type];
   const base = new Date(dateStr + 'T00:00:00');
@@ -484,108 +682,85 @@ function shiftRange(dateStr, type) {
   };
 }
 
-// ── FETCH EQ STATUS ──────────────────────────────────────────
+// ── FETCH EQ STATUS ────────────────────────────────
 async function fetchEqStatus() {
   const date = document.getElementById('hDate').value;
   const shift = document.getElementById('hShift').value;
   if (!date || !shift) return;
-
   const { from, to } = shiftRange(date, shift);
   const { data } = await db.from('inspection_records')
-    .select('run_status,abnormal_note,equipment(name)')
-    .gte('inspect_time', from)
-    .lte('inspect_time', to);
-
+    .select('run_status,abnormal_note,equipment(name)').gte('inspect_time',from).lte('inspect_time',to);
   const recs = data || [];
-  const normal   = recs.filter(r => r.run_status === 'normal').length;
-  const abnRecs  = recs.filter(r => r.run_status === 'abnormal');
-  const total    = recs.length;
-
+  const normal = recs.filter(r => r.run_status === 'normal').length;
+  const abnRecs = recs.filter(r => r.run_status === 'abnormal');
   document.getElementById('eqNormal').textContent   = normal;
   document.getElementById('eqAbnormal').textContent  = abnRecs.length;
-  document.getElementById('eqTotal').textContent     = total;
+  document.getElementById('eqTotal').textContent     = recs.length;
   document.getElementById('eqAbnormal').style.color  = abnRecs.length ? 'var(--red)' : 'var(--green)';
-  document.getElementById('eqNote').textContent =
-    total ? `已取得 ${date} ${SHIFT_LABEL[shift]}（${['morning','afternoon','night'].indexOf(shift)===0?'06:00-14:00':shift==='afternoon'?'14:00-22:00':'22:00-06:00'}）共 ${total} 筆巡檢紀錄` :
+  document.getElementById('eqNote').textContent = recs.length ?
+    `已取得 ${date} ${SHIFT_LABEL[shift]} 共 ${recs.length} 筆巡檢紀錄` :
     `${date} ${SHIFT_LABEL[shift]} 尚無巡檢紀錄`;
-
-  // Pre-fill issues from abnormal records (only if list is empty)
   if (abnRecs.length > 0 && issues.length === 0) {
-    issues = abnRecs.map(r => `【${r.equipment?.name || '設備'}】${r.abnormal_note || '異常'}`);
+    issues = abnRecs.map(r => `【${r.equipment?.name||'設備'}】${r.abnormal_note||'異常'}`);
     renderIssues();
   }
 }
 
-// ── DYNAMIC LISTS ─────────────────────────────────────────────
+// ── DYNAMIC LISTS ──────────────────────────────────
 function renderIssues() {
-  document.getElementById('issueList').innerHTML = issues.map((txt, i) => `
+  document.getElementById('issueList').innerHTML = issues.map((txt,i) => `
     <div class="dyn-item">
       <div class="dyn-item-text issue">⚠ ${escHtml(txt)}</div>
-      <button class="dyn-del" onclick="removeIssue(${i})" title="刪除">✕</button>
+      <button class="dyn-del" onclick="removeIssue(${i})">✕</button>
     </div>`).join('');
 }
 function renderPendings() {
-  document.getElementById('pendingList').innerHTML = pendings.map((txt, i) => `
+  document.getElementById('pendingList').innerHTML = pendings.map((txt,i) => `
     <div class="dyn-item">
       <div class="dyn-item-text pending">◎ ${escHtml(txt)}</div>
-      <button class="dyn-del" onclick="removePending(${i})" title="刪除">✕</button>
+      <button class="dyn-del" onclick="removePending(${i})">✕</button>
     </div>`).join('');
 }
 function addIssue() {
   const v = document.getElementById('issueInput').value.trim();
   if (!v) return;
-  issues.push(v);
-  document.getElementById('issueInput').value = '';
-  renderIssues();
+  issues.push(v); document.getElementById('issueInput').value = ''; renderIssues();
 }
-function removeIssue(i) { issues.splice(i, 1); renderIssues(); }
+function removeIssue(i) { issues.splice(i,1); renderIssues(); }
 function addPending() {
   const v = document.getElementById('pendingInput').value.trim();
   if (!v) return;
-  pendings.push(v);
-  document.getElementById('pendingInput').value = '';
-  renderPendings();
+  pendings.push(v); document.getElementById('pendingInput').value = ''; renderPendings();
 }
-function removePending(i) { pendings.splice(i, 1); renderPendings(); }
+function removePending(i) { pendings.splice(i,1); renderPendings(); }
 
-// ── SAVE / CONFIRM ────────────────────────────────────────────
+// ── SAVE HANDOVER ──────────────────────────────────
 async function saveDraft() { await doSave('draft'); }
 async function confirmHandover() {
-  const taker = document.getElementById('hTakeoverBy').value;
-  if (!taker) { showToast('請選擇接班人再確認交接', true); return; }
+  if (!document.getElementById('hTakeoverBy').value) { showToast('請選擇接班人再確認交接', true); return; }
   await doSave('confirmed');
 }
 
 async function doSave(status) {
   const shift     = document.getElementById('hShift').value;
   const date      = document.getElementById('hDate').value;
-  const deptId    = document.getElementById('hDeptL2').value || document.getElementById('hDeptL1').value || null;
+  const deptId    = document.getElementById('hHandoverL2').value || document.getElementById('hHandoverL1').value || null;
   const handoverBy = document.getElementById('hHandoverBy').value || null;
   const takeoverBy = document.getElementById('hTakeoverBy').value || null;
   const notes     = document.getElementById('hNotes').value.trim();
   const eqNormal  = parseInt(document.getElementById('eqNormal').textContent) || 0;
   const eqAbnormal= parseInt(document.getElementById('eqAbnormal').textContent) || 0;
-
   if (!date) { showToast('請選擇交接日期', true); return; }
   if (!handoverBy && !takeoverBy) { showToast('請至少填寫交接人或接班人', true); return; }
-
   const record = {
-    shift_date:   date,
-    shift_type:   shift,
-    dept_id:      deptId,
-    handover_by:  handoverBy,
-    takeover_by:  takeoverBy,
-    eq_normal:    eqNormal,
-    eq_abnormal:  eqAbnormal,
-    issues:       issues.join('\n'),
-    pending:      pendings.join('\n'),
-    notes,
-    status,
-    created_by:   currentUser.user_id,
-    confirmed_at: status === 'confirmed' ? new Date().toISOString() : null,
-    confirmed_by: status === 'confirmed' ? currentUser.user_id : null,
+    shift_date: date, shift_type: shift, dept_id: deptId,
+    handover_by: handoverBy, takeover_by: takeoverBy,
+    eq_normal: eqNormal, eq_abnormal: eqAbnormal,
+    issues: issues.join('\n'), pending: pendings.join('\n'),
+    notes, status, created_by: currentUser.user_id,
+    confirmed_at: status==='confirmed' ? new Date().toISOString() : null,
+    confirmed_by: status==='confirmed' ? currentUser.user_id : null,
   };
-
   let err;
   if (editingId) {
     ({ error: err } = await db.from('handover_records').update(record).eq('record_id', editingId));
@@ -593,17 +768,15 @@ async function doSave(status) {
     ({ error: err } = await db.from('handover_records').insert(record));
   }
   if (err) { showToast('儲存失敗：' + translateError(err.message || err.code), true); return; }
-
-  showToast(status === 'confirmed' ? '✓ 交接已確認完成' : '草稿已儲存');
-  resetForm();
+  showToast(status==='confirmed' ? '✓ 交接已確認完成' : '草稿已儲存');
+  resetHandoverForm();
   editingId = null;
   await loadHistory();
   switchTab('history');
 }
 
-function resetForm() {
-  issues = []; pendings = [];
-  renderIssues(); renderPendings();
+function resetHandoverForm() {
+  issues = []; pendings = []; renderIssues(); renderPendings();
   document.getElementById('hNotes').value = '';
   document.getElementById('hHandoverBy').value = '';
   document.getElementById('hTakeoverBy').value = '';
@@ -612,31 +785,24 @@ function resetForm() {
   document.getElementById('eqTotal').textContent = '—';
 }
 
-// ── HISTORY ──────────────────────────────────────────────────
+// ── HISTORY ────────────────────────────────────────
 async function loadHistory() {
   const deptFilter   = document.getElementById('fDept').value;
   const shiftFilter  = document.getElementById('fShift').value;
   const statusFilter = document.getElementById('fStatus').value;
   const dateFrom     = document.getElementById('fDateFrom').value;
   const dateTo       = document.getElementById('fDateTo').value;
-
   let q = db.from('handover_records')
     .select('*,departments(name),handover_user:users!handover_by(name),takeover_user:users!takeover_by(name)')
-    .order('shift_date', { ascending: false })
-    .order('shift_type')
-    .limit(200);
-
+    .order('shift_date',{ascending:false}).order('shift_type').limit(200);
   if (deptFilter)   q = q.eq('dept_id', deptFilter);
   if (shiftFilter)  q = q.eq('shift_type', shiftFilter);
   if (statusFilter) q = q.eq('status', statusFilter);
   if (dateFrom)     q = q.gte('shift_date', dateFrom);
   if (dateTo)       q = q.lte('shift_date', dateTo);
-
   const { data, error } = await q;
   if (error) { showToast('載入失敗', true); return; }
   const rows = data || [];
-
-  const SHIFT_CLASS = { morning:'shift-morning', afternoon:'shift-afternoon', night:'shift-night' };
   document.getElementById('historyTbody').innerHTML = rows.length ? rows.map(r => {
     const issueLines = r.issues ? r.issues.split('\n').filter(Boolean) : [];
     const pendLines  = r.pending ? r.pending.split('\n').filter(Boolean) : [];
@@ -644,101 +810,493 @@ async function loadHistory() {
     return `<tr>
       <td style="font-family:var(--font-mono);font-size:.78rem">${r.shift_date}</td>
       <td><span class="${SHIFT_CLASS[r.shift_type]}">${SHIFT_LABEL[r.shift_type]}</span></td>
-      <td style="font-size:.82rem">${r.departments?.name || '—'}</td>
-      <td style="font-size:.82rem">${r.handover_user?.name || '—'}</td>
-      <td style="font-size:.82rem">${r.takeover_user?.name || '—'}</td>
-      <td style="text-align:right;font-family:var(--font-mono);color:var(--green)">${r.eq_normal || '—'}</td>
-      <td style="text-align:right;font-family:var(--font-mono);color:${r.eq_abnormal ? 'var(--red)' : 'var(--text-dim)'}">${r.eq_abnormal || '—'}</td>
-      <td style="font-size:.8rem;color:${r.issues ? 'var(--red)' : 'var(--text-dim)'}">${escHtml(summary)}</td>
-      <td><span class="badge badge-${r.status}">${r.status === 'confirmed' ? '已確認' : '草稿'}</span></td>
+      <td style="font-size:.82rem">${r.departments?.name||'—'}</td>
+      <td style="font-size:.82rem">${r.handover_user?.name||'—'}</td>
+      <td style="font-size:.82rem">${r.takeover_user?.name||'—'}</td>
+      <td style="text-align:right;font-family:var(--font-mono);color:var(--green)">${r.eq_normal||'—'}</td>
+      <td style="text-align:right;font-family:var(--font-mono);color:${r.eq_abnormal?'var(--red)':'var(--text-dim)'}">${r.eq_abnormal||'—'}</td>
+      <td style="font-size:.8rem;color:${r.issues?'var(--red)':'var(--text-dim)'}">${escHtml(summary)}</td>
+      <td><span class="badge badge-${r.status}">${r.status==='confirmed'?'已確認':'草稿'}</span></td>
       <td>
-        <button class="btn-secondary" style="padding:3px 10px;font-size:.74rem" onclick="openDetail('${r.record_id}')">查看</button>
-        ${r.status === 'draft' ? `<button class="btn-secondary" style="padding:3px 10px;font-size:.74rem;margin-left:4px;color:var(--green);border-color:var(--green)" onclick="quickConfirm('${r.record_id}')">確認</button>` : ''}
+        <button class="btn-secondary btn-sm" onclick="openHandoverDetail('${r.record_id}')">查看</button>
+        ${r.status==='draft'?`<button class="btn-secondary btn-sm" style="margin-left:4px;color:var(--green);border-color:var(--green)" onclick="quickConfirm('${r.record_id}')">確認</button>`:''}
       </td>
     </tr>`;
-  }).join('') : '<tr><td colspan="10" style="color:var(--text-dim);font-family:var(--font-mono);text-align:center;padding:24px">NO RECORDS</td></tr>';
+  }).join('') : '<tr><td colspan="10" style="color:var(--text-dim);text-align:center;padding:24px">NO RECORDS</td></tr>';
 }
 
-// ── DETAIL MODAL ──────────────────────────────────────────────
-async function openDetail(id) {
+async function openHandoverDetail(id) {
   const { data: r } = await db.from('handover_records')
-    .select('*,departments(name,parent_id),handover_user:users!handover_by(name),takeover_user:users!takeover_by(name),confirmed_user:users!confirmed_by(name)')
+    .select('*,departments(name),handover_user:users!handover_by(name),takeover_user:users!takeover_by(name),confirmed_user:users!confirmed_by(name)')
     .eq('record_id', id).single();
   if (!r) { showToast('載入失敗', true); return; }
-
   const issueLines   = r.issues  ? r.issues.split('\n').filter(Boolean)  : [];
   const pendingLines = r.pending ? r.pending.split('\n').filter(Boolean) : [];
-
-  const deptName = r.departments?.name || '—';
-  const SHIFT_CLASS = { morning:'shift-morning', afternoon:'shift-afternoon', night:'shift-night' };
-
-  document.getElementById('modalTitle').textContent =
-    `${r.shift_date} ${SHIFT_LABEL[r.shift_type]} 交接記錄`;
-
+  document.getElementById('modalTitle').textContent = `${r.shift_date} ${SHIFT_LABEL[r.shift_type]} 交接記錄`;
   document.getElementById('modalBody').innerHTML = `
     <div class="detail-row"><span class="detail-label">日期</span><span class="detail-value">${r.shift_date}</span></div>
     <div class="detail-row"><span class="detail-label">班別</span><span class="detail-value"><span class="${SHIFT_CLASS[r.shift_type]}">${SHIFT_LABEL[r.shift_type]}</span></span></div>
-    <div class="detail-row"><span class="detail-label">部門</span><span class="detail-value">${deptName}</span></div>
-    <div class="detail-row"><span class="detail-label">交接人</span><span class="detail-value">${r.handover_user?.name || '—'}</span></div>
-    <div class="detail-row"><span class="detail-label">接班人</span><span class="detail-value">${r.takeover_user?.name || '—'}</span></div>
-    <div class="detail-row">
-      <span class="detail-label">設備狀況</span>
-      <span class="detail-value">
-        <span style="color:var(--green)">✓ 正常 ${r.eq_normal} 台</span>
-        <span style="color:${r.eq_abnormal ? 'var(--red)' : 'var(--text-dim)'}">✗ 異常 ${r.eq_abnormal} 台</span>
-      </span>
-    </div>
-    <div class="detail-row"><span class="detail-label">狀態</span><span class="detail-value"><span class="badge badge-${r.status}">${r.status === 'confirmed' ? '已確認' : '草稿'}</span>${r.confirmed_at ? `<span style="font-size:.75rem;color:var(--text-dim);margin-left:8px">確認時間：${new Date(r.confirmed_at).toLocaleString('zh-TW')}　by ${r.confirmed_user?.name||'—'}</span>` : ''}</span></div>
-    <div class="detail-row"><span class="detail-label">建立時間</span><span class="detail-value" style="font-family:var(--font-mono);font-size:.78rem">${new Date(r.created_at).toLocaleString('zh-TW')}</span></div>
-
+    <div class="detail-row"><span class="detail-label">部門</span><span class="detail-value">${r.departments?.name||'—'}</span></div>
+    <div class="detail-row"><span class="detail-label">交接人</span><span class="detail-value">${r.handover_user?.name||'—'}</span></div>
+    <div class="detail-row"><span class="detail-label">接班人</span><span class="detail-value">${r.takeover_user?.name||'—'}</span></div>
+    <div class="detail-row"><span class="detail-label">設備狀況</span><span class="detail-value"><span style="color:var(--green)">✓ 正常 ${r.eq_normal} 台</span>&nbsp;&nbsp;<span style="color:${r.eq_abnormal?'var(--red)':'var(--text-dim)'}">✗ 異常 ${r.eq_abnormal} 台</span></span></div>
+    <div class="detail-row"><span class="detail-label">狀態</span><span class="detail-value"><span class="badge badge-${r.status}">${r.status==='confirmed'?'已確認':'草稿'}</span>${r.confirmed_at?`<span style="font-size:.72rem;color:var(--text-dim);margin-left:8px">${new Date(r.confirmed_at).toLocaleString('zh-TW')} by ${r.confirmed_user?.name||'—'}</span>`:''}</span></div>
     <div class="detail-section">
-      <div class="detail-section-title" style="color:var(--red)">⚠ 異常事項（${issueLines.length} 項）</div>
-      ${issueLines.length ? issueLines.map(l => `<div class="detail-item issue">${escHtml(l)}</div>`).join('') : '<span class="detail-empty">無異常事項</span>'}
+      <div class="detail-section-title" style="color:var(--red)">⚠ 異常事項（${issueLines.length}項）</div>
+      ${issueLines.length ? issueLines.map(l=>`<div class="detail-item issue">${escHtml(l)}</div>`).join('') : '<span class="detail-empty">無異常事項</span>'}
     </div>
-
     <div class="detail-section">
-      <div class="detail-section-title" style="color:var(--amber)">◎ 待辦事項（${pendingLines.length} 項）</div>
-      ${pendingLines.length ? pendingLines.map(l => `<div class="detail-item pending">${escHtml(l)}</div>`).join('') : '<span class="detail-empty">無待辦事項</span>'}
+      <div class="detail-section-title" style="color:var(--amber)">◎ 待辦事項（${pendingLines.length}項）</div>
+      ${pendingLines.length ? pendingLines.map(l=>`<div class="detail-item pending">${escHtml(l)}</div>`).join('') : '<span class="detail-empty">無待辦事項</span>'}
     </div>
-
-    ${r.notes ? `<div class="detail-section"><div class="detail-section-title">備註</div><div style="font-size:.85rem;color:var(--text-hi);white-space:pre-wrap">${escHtml(r.notes)}</div></div>` : ''}
-
+    ${r.notes?`<div class="detail-section"><div class="detail-section-title">備註</div><div style="font-size:.85rem;color:var(--text-hi);white-space:pre-wrap">${escHtml(r.notes)}</div></div>`:''}
     <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
-      ${r.status === 'draft' ? `<button class="btn-primary btn-confirm" style="flex:1;min-width:120px" onclick="quickConfirm('${r.record_id}',true)">✓ 確認交接</button>` : ''}
+      ${r.status==='draft'?`<button class="btn-primary btn-confirm" style="flex:1;min-width:120px" onclick="quickConfirm('${r.record_id}',true)">✓ 確認交接</button>`:''}
       <button class="btn-secondary" onclick="window.print()">🖨 列印</button>
-      <button class="btn-secondary" onclick="closeModal()" style="margin-left:auto">關閉</button>
+      <button class="btn-secondary" onclick="closeHandoverModal()" style="margin-left:auto">關閉</button>
     </div>
   `;
   document.getElementById('detailModal').classList.add('show');
 }
 
 async function quickConfirm(id, closeAfter) {
-  const updates = {
-    status: 'confirmed',
-    confirmed_at: new Date().toISOString(),
-    confirmed_by: currentUser.user_id
-  };
+  const updates = { status:'confirmed', confirmed_at:new Date().toISOString(), confirmed_by:currentUser.user_id };
   const { error } = await db.from('handover_records').update(updates).eq('record_id', id);
   if (error) { showToast('確認失敗', true); return; }
   showToast('✓ 交接已確認');
-  if (closeAfter) closeModal();
+  if (closeAfter) closeHandoverModal();
   await loadHistory();
 }
 
-function closeModal() { document.getElementById('detailModal').classList.remove('show'); }
+function closeHandoverModal() { document.getElementById('detailModal').classList.remove('show'); }
 
-// ── TAB SWITCH ────────────────────────────────────────────────
+// ══════════════════════════════════════════════════
+// ── CASE MANAGEMENT ────────────────────────────────
+// ══════════════════════════════════════════════════
+
+function genCaseNo() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  return `CASE-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${String(d.getTime()).slice(-5)}`;
+}
+
+function openCaseForm() {
+  const now = new Date();
+  document.getElementById('caseNo').value = genCaseNo();
+  document.getElementById('caseCreatedAt').value = now.toLocaleString('zh-TW');
+  const h = now.getHours();
+  document.getElementById('caseShift').value = h>=6&&h<14 ? 'morning' : h>=14&&h<22 ? 'afternoon' : 'night';
+  document.getElementById('caseCat').value = '';
+  document.getElementById('caseSub').innerHTML = '<option value="">— 請先選擇大類 —</option>';
+  document.getElementById('caseSub').disabled = true;
+  document.getElementById('caseOtherDiv').style.display = 'none';
+  document.getElementById('caseAssignedTo').innerHTML = '<option value="">— 指派承辦人 —</option>' +
+    allUsers.map(u => `<option value="${u.user_id}">${u.name}</option>`).join('');
+  ['caseTitle','caseReporter','caseReporterUnit','caseLocation','caseDesc','caseAction','caseFollowup','caseResponsibleUnit','caseDueDate','caseNote','caseOther'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('caseIncidentTime').value = '';
+  document.getElementById('caseStatus').value = 'open';
+  pendingAttachments = [];
+  renderPendingAttachments();
+  document.getElementById('caseFormModal').classList.add('show');
+}
+
+function closeCaseForm() { document.getElementById('caseFormModal').classList.remove('show'); }
+
+function onCaseCatChange() {
+  const cat = document.getElementById('caseCat').value;
+  const subSel = document.getElementById('caseSub');
+  const otherDiv = document.getElementById('caseOtherDiv');
+  const subs = ANOMALY_SUBS[cat] || [];
+  if (!cat) {
+    subSel.innerHTML = '<option value="">— 請先選擇大類 —</option>';
+    subSel.disabled = true;
+    otherDiv.style.display = 'none';
+    return;
+  }
+  if (cat === '其他') {
+    subSel.innerHTML = '<option value="">— 無小類 —</option>';
+    subSel.disabled = true;
+    otherDiv.style.display = '';
+  } else {
+    subSel.innerHTML = '<option value="">— 選擇小類 —</option>' + subs.map(s => `<option value="${s}">${s}</option>`).join('');
+    subSel.disabled = false;
+    otherDiv.style.display = 'none';
+  }
+}
+
+async function submitCase() {
+  const caseNo   = document.getElementById('caseNo').value;
+  const cat      = document.getElementById('caseCat').value;
+  const reporter = document.getElementById('caseReporter').value.trim();
+  if (!cat)      { showToast('請選擇異常大類', true); return; }
+  if (!reporter) { showToast('請填寫通報人', true); return; }
+
+  const sub      = document.getElementById('caseSub').value;
+  const other    = document.getElementById('caseOther').value.trim();
+  const title    = document.getElementById('caseTitle').value.trim() ||
+                   (cat + (sub ? ' – ' + sub : '') + (other ? ' – ' + other : ''));
+  const incTime  = document.getElementById('caseIncidentTime').value;
+
+  const newCase = {
+    case_no:          caseNo,
+    title,
+    shift_type:       document.getElementById('caseShift').value,
+    reporter,
+    reporter_unit:    document.getElementById('caseReporterUnit').value.trim() || null,
+    incident_time:    incTime ? new Date(incTime).toISOString() : null,
+    incident_location:document.getElementById('caseLocation').value.trim() || null,
+    anomaly_category: cat,
+    anomaly_sub:      sub || null,
+    anomaly_other:    other || null,
+    description:      document.getElementById('caseDesc').value.trim() || null,
+    action_taken:     document.getElementById('caseAction').value.trim() || null,
+    followup:         document.getElementById('caseFollowup').value.trim() || null,
+    responsible_unit: document.getElementById('caseResponsibleUnit').value.trim() || null,
+    assigned_to:      document.getElementById('caseAssignedTo').value || null,
+    status:           document.getElementById('caseStatus').value,
+    due_date:         document.getElementById('caseDueDate').value || null,
+    note:             document.getElementById('caseNote').value.trim() || null,
+    created_by:       currentUser.user_id,
+  };
+
+  const { data, error } = await db.from('handover_cases').insert(newCase).select().single();
+  if (error) { showToast('建立案件失敗：' + translateError(error.message), true); return; }
+
+  await db.from('handover_case_logs').insert({
+    case_id: data.case_id, action: 'create',
+    content: `案件建立：${title}`, new_data: newCase, created_by: currentUser.user_id
+  });
+
+  if (pendingAttachments.length > 0) await uploadAttachments(data.case_id);
+
+  showToast(`案件 ${caseNo} 已建立`);
+  closeCaseForm();
+  await loadCases();
+}
+
+// ── CASE LIST ──────────────────────────────────────
+async function loadCases() {
+  const statusFilter = document.getElementById('cfStatus').value;
+  const catFilter    = document.getElementById('cfCat').value;
+  const dateFrom     = document.getElementById('cfDateFrom').value;
+  const dateTo       = document.getElementById('cfDateTo').value;
+
+  let q = db.from('handover_cases')
+    .select('*,assigned_user:users!assigned_to(name)')
+    .order('created_at',{ascending:false}).limit(300);
+  if (statusFilter) q = q.eq('status', statusFilter);
+  if (catFilter)    q = q.eq('anomaly_category', catFilter);
+  if (dateFrom)     q = q.gte('created_at', dateFrom + 'T00:00:00');
+  if (dateTo)       q = q.lte('created_at', dateTo + 'T23:59:59');
+
+  const { data, error } = await q;
+  if (error) { showToast('載入失敗', true); return; }
+  const rows = data || [];
+  const today = new Date().toISOString().split('T')[0];
+
+  // Update stats
+  const allQ = await db.from('handover_cases').select('status,due_date');
+  const all = allQ.data || [];
+  document.getElementById('statOpen').textContent        = all.filter(c=>c.status==='open').length;
+  document.getElementById('statInProgress').textContent  = all.filter(c=>c.status==='in_progress').length;
+  document.getElementById('statPending').textContent     = all.filter(c=>c.status==='pending').length;
+  document.getElementById('statOverdue').textContent     = all.filter(c=>c.due_date&&c.due_date<today&&c.status!=='closed').length;
+  document.getElementById('statClosed').textContent      = all.filter(c=>c.status==='closed').length;
+
+  document.getElementById('casesTbody').innerHTML = rows.length ? rows.map(c => {
+    const s = CASE_STATUS[c.status] || { label:c.status, cls:'' };
+    const isOverdue = c.due_date && c.due_date < today && c.status !== 'closed';
+    return `<tr ${isOverdue?'class="overdue-row"':''}>
+      <td style="font-family:var(--font-mono);font-size:.76rem;white-space:nowrap">${c.case_no}</td>
+      <td style="font-size:.8rem">${escHtml(c.anomaly_category||'—')}${c.anomaly_sub?`<br><span style="font-size:.7rem;color:var(--text-dim)">└ ${escHtml(c.anomaly_sub)}</span>`:''}</td>
+      <td style="font-size:.8rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml((c.title||'—').substring(0,40))}</td>
+      <td><span class="badge ${s.cls}">${s.label}</span></td>
+      <td style="font-size:.8rem">${c.assigned_user?.name||'<span style="color:var(--text-dim)">未指派</span>'}</td>
+      <td style="font-size:.76rem;color:${isOverdue?'var(--red)':'var(--text-dim)'};white-space:nowrap">${c.due_date||'—'}${isOverdue?' ⚠':''}</td>
+      <td style="font-family:var(--font-mono);font-size:.74rem;white-space:nowrap">${new Date(c.created_at).toLocaleDateString('zh-TW')}</td>
+      <td><button class="btn-secondary btn-sm" onclick="openCaseDetail('${c.case_id}')">詳情</button></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="8" style="color:var(--text-dim);text-align:center;padding:24px;font-family:var(--font-mono)">NO CASES</td></tr>';
+}
+
+// ── CASE DETAIL ────────────────────────────────────
+async function openCaseDetail(caseId) {
+  currentCaseId = caseId;
+  const [{ data: c }, { data: logs }, { data: attachments }] = await Promise.all([
+    db.from('handover_cases').select('*,assigned_user:users!assigned_to(name),created_user:users!created_by(name),closed_user:users!closed_by(name)').eq('case_id', caseId).single(),
+    db.from('handover_case_logs').select('*,log_user:users!created_by(name)').eq('case_id', caseId).order('created_at'),
+    db.from('handover_case_attachments').select('*').eq('case_id', caseId).order('uploaded_at')
+  ]);
+  if (!c) { showToast('載入失敗', true); return; }
+
+  const s = CASE_STATUS[c.status] || { label:c.status, cls:'' };
+  const today = new Date().toISOString().split('T')[0];
+  const isOverdue = c.due_date && c.due_date < today && c.status !== 'closed';
+  const attachList = attachments || [];
+  const canAddAttach = attachList.length < 20;
+
+  document.getElementById('caseDetailTitle').textContent = `案件 ${c.case_no}`;
+  document.getElementById('caseDetailBody').innerHTML = `
+    <div class="detail-section">
+      <div class="detail-section-title">基本資訊</div>
+      <div class="detail-row"><span class="detail-label">案件編號</span><span class="detail-value" style="font-family:var(--font-mono)">${c.case_no}</span></div>
+      <div class="detail-row"><span class="detail-label">建立時間</span><span class="detail-value" style="font-family:var(--font-mono);font-size:.78rem">${new Date(c.created_at).toLocaleString('zh-TW')}</span></div>
+      <div class="detail-row"><span class="detail-label">班別</span><span class="detail-value">${SHIFT_LABEL[c.shift_type]||c.shift_type||'—'}</span></div>
+      <div class="detail-row"><span class="detail-label">通報人</span><span class="detail-value">${escHtml(c.reporter||'—')}</span></div>
+      <div class="detail-row"><span class="detail-label">所屬單位</span><span class="detail-value">${escHtml(c.reporter_unit||'—')}</span></div>
+      <div class="detail-row"><span class="detail-label">發生時間</span><span class="detail-value">${c.incident_time?new Date(c.incident_time).toLocaleString('zh-TW'):'—'}</span></div>
+      <div class="detail-row"><span class="detail-label">發生地點</span><span class="detail-value">${escHtml(c.incident_location||'—')}</span></div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title" style="color:var(--red)">⚠ 異常事項</div>
+      <div class="detail-row"><span class="detail-label">大類</span><span class="detail-value">${escHtml(c.anomaly_category||'—')}</span></div>
+      <div class="detail-row"><span class="detail-label">小類</span><span class="detail-value">${escHtml(c.anomaly_sub||'—')}</span></div>
+      ${c.anomaly_other?`<div class="detail-row"><span class="detail-label">其他說明</span><span class="detail-value">${escHtml(c.anomaly_other)}</span></div>`:''}
+      <div class="detail-row"><span class="detail-label">事項說明</span><span class="detail-value">${escHtml(c.description||'—')}</span></div>
+      <div class="detail-row"><span class="detail-label">處理情形</span><span class="detail-value">${escHtml(c.action_taken||'—')}</span></div>
+      <div class="detail-row"><span class="detail-label">後續交接</span><span class="detail-value">${escHtml(c.followup||'—')}</span></div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">案件狀態</div>
+      <div class="detail-row"><span class="detail-label">狀態</span><span class="detail-value"><span class="badge ${s.cls}">${s.label}</span>${isOverdue?' <span style="color:var(--red);font-size:.76rem">⚠ 逾期</span>':''}</span></div>
+      <div class="detail-row"><span class="detail-label">承辦人</span><span class="detail-value">${c.assigned_user?.name||'<span style="color:var(--text-dim)">未指派</span>'}</span></div>
+      <div class="detail-row"><span class="detail-label">負責單位</span><span class="detail-value">${escHtml(c.responsible_unit||'—')}</span></div>
+      <div class="detail-row"><span class="detail-label">到期日</span><span class="detail-value" style="color:${isOverdue?'var(--red)':'inherit'}">${c.due_date||'—'}</span></div>
+      ${c.closed_at?`<div class="detail-row"><span class="detail-label">結案時間</span><span class="detail-value" style="font-family:var(--font-mono);font-size:.76rem">${new Date(c.closed_at).toLocaleString('zh-TW')} by ${c.closed_user?.name||'—'}</span></div>`:''}
+      ${c.note?`<div class="detail-row"><span class="detail-label">備註</span><span class="detail-value">${escHtml(c.note)}</span></div>`:''}
+    </div>
+
+    <!-- 操作區 -->
+    ${c.status !== 'closed' ? `
+    <div class="detail-section">
+      <div class="detail-section-title">操作</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+        <select id="actionAssignTo" style="background:rgba(2,8,20,.85);border:1px solid var(--border);color:var(--text-hi);padding:7px 10px;font-family:var(--font-mono);font-size:.82rem;border-radius:2px;outline:none">
+          <option value="">— 指派承辦人 —</option>
+          ${allUsers.map(u=>`<option value="${u.user_id}" ${u.user_id===c.assigned_to?'selected':''}>${u.name}</option>`).join('')}
+        </select>
+        <button class="btn-secondary btn-sm" onclick="assignCase('${caseId}')">指派／轉派</button>
+        <select id="actionStatus" style="background:rgba(2,8,20,.85);border:1px solid var(--border);color:var(--text-hi);padding:7px 10px;font-family:var(--font-mono);font-size:.82rem;border-radius:2px;outline:none">
+          <option value="open" ${c.status==='open'?'selected':''}>待處理</option>
+          <option value="in_progress" ${c.status==='in_progress'?'selected':''}>處理中</option>
+          <option value="pending" ${c.status==='pending'?'selected':''}>待確認</option>
+          <option value="closed">已結案</option>
+        </select>
+        <button class="btn-secondary btn-sm" onclick="updateCaseStatus('${caseId}','${c.status}')">更新狀態</button>
+      </div>
+      <div style="display:flex;gap:8px">
+        <input id="progressNote" type="text" placeholder="輸入進度說明…" style="flex:1;background:rgba(2,8,20,.85);border:1px solid var(--border);color:var(--text-hi);padding:7px 10px;font-family:var(--font-mono);font-size:.82rem;border-radius:2px;outline:none;transition:border .2s" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--border)'">
+        <button class="btn-secondary btn-sm" onclick="addProgressNote('${caseId}')">新增進度</button>
+      </div>
+    </div>` : `
+    <div class="detail-section" style="border-color:rgba(0,255,157,.2)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="color:var(--green)">✓ 已結案</span>
+        <button class="btn-secondary btn-sm" onclick="reopenCase('${caseId}')">重新開啟</button>
+      </div>
+    </div>`}
+
+    <!-- 附件 -->
+    <div class="detail-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="detail-section-title" style="margin-bottom:0">附件（${attachList.length}/20）</div>
+        ${canAddAttach?`<div><input type="file" id="addAttachInput" accept=".jpg,.jpeg,.png,.pdf,.docx,.xlsx" multiple style="display:none" onchange="addAttachmentToCase('${caseId}')"><button class="btn-secondary btn-sm" onclick="document.getElementById('addAttachInput').click()">＋ 新增附件</button></div>`:''}
+      </div>
+      ${buildAttachmentList(attachList)}
+    </div>
+
+    <!-- 歷程 -->
+    <div class="detail-section">
+      <div class="detail-section-title">案件歷程（${logs?.length||0} 筆，永久保留）</div>
+      <div class="log-timeline">${buildCaseLogTimeline(logs||[])}</div>
+    </div>
+  `;
+  document.getElementById('caseDetailModal').classList.add('show');
+}
+
+function buildAttachmentList(list) {
+  if (!list.length) return '<span class="detail-empty">尚無附件</span>';
+  return list.map(a => {
+    const isImage = /\.(jpg|jpeg|png)$/i.test(a.file_name);
+    let publicUrl = '#';
+    try {
+      publicUrl = db.storage.from('handover-attachments').getPublicUrl(a.storage_path).data.publicUrl;
+    } catch(e) {}
+    return `<div class="attach-item">
+      <span class="attach-name">${escHtml(a.file_name)}</span>
+      <span class="attach-meta">${a.file_size ? Math.round(a.file_size/1024) + 'KB' : ''}</span>
+      <div class="attach-actions">
+        ${isImage ? `<a href="${publicUrl}" target="_blank">預覽</a>` : ''}
+        <a href="${publicUrl}" target="_blank">下載</a>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function buildCaseLogTimeline(logs) {
+  if (!logs.length) return '<span class="detail-empty">尚無歷程紀錄</span>';
+  return logs.map(l => {
+    const d = new Date(l.created_at);
+    const timeStr = `${d.getMonth()+1}/${d.getDate()}<br>${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    return `<div class="log-entry">
+      <div class="log-time">${timeStr}</div>
+      <div class="log-content">
+        <div class="log-action">${ACTION_LABEL[l.action]||l.action}</div>
+        ${l.content?`<div class="log-text">${escHtml(l.content)}</div>`:''}
+        ${l.log_user?`<div class="log-by">by ${l.log_user.name}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function closeCaseDetail() {
+  document.getElementById('caseDetailModal').classList.remove('show');
+  currentCaseId = null;
+}
+
+// ── CASE ACTIONS ───────────────────────────────────
+async function assignCase(caseId) {
+  const assignedTo = document.getElementById('actionAssignTo').value || null;
+  const { data: old } = await db.from('handover_cases').select('assigned_to').eq('case_id', caseId).single();
+  const { error } = await db.from('handover_cases').update({ assigned_to: assignedTo, updated_at: new Date().toISOString() }).eq('case_id', caseId);
+  if (error) { showToast('指派失敗：' + translateError(error.message), true); return; }
+  const name = allUsers.find(u => u.user_id === assignedTo)?.name || '—';
+  await db.from('handover_case_logs').insert({
+    case_id: caseId,
+    action: old?.assigned_to ? 'transfer' : 'assign',
+    content: `${old?.assigned_to ? '轉派' : '指派'}承辦人：${name}`,
+    old_data: { assigned_to: old?.assigned_to },
+    new_data: { assigned_to: assignedTo },
+    created_by: currentUser.user_id
+  });
+  showToast(`已${old?.assigned_to?'轉派':'指派'}：${name}`);
+  await openCaseDetail(caseId);
+  await loadCases();
+}
+
+async function updateCaseStatus(caseId, oldStatus) {
+  const newStatus = document.getElementById('actionStatus').value;
+  if (newStatus === oldStatus) { showToast('狀態未變更', true); return; }
+  const updates = { status: newStatus, updated_at: new Date().toISOString() };
+  if (newStatus === 'closed') { updates.closed_at = new Date().toISOString(); updates.closed_by = currentUser.user_id; }
+  const { error } = await db.from('handover_cases').update(updates).eq('case_id', caseId);
+  if (error) { showToast('更新失敗：' + translateError(error.message), true); return; }
+  const oldL = CASE_STATUS[oldStatus]?.label || oldStatus;
+  const newL = CASE_STATUS[newStatus]?.label || newStatus;
+  await db.from('handover_case_logs').insert({
+    case_id: caseId,
+    action: newStatus === 'closed' ? 'close' : 'update',
+    content: `狀態更新：${oldL} → ${newL}`,
+    old_data: { status: oldStatus }, new_data: { status: newStatus },
+    created_by: currentUser.user_id
+  });
+  showToast(`狀態已更新為：${newL}`);
+  await openCaseDetail(caseId);
+  await loadCases();
+}
+
+async function reopenCase(caseId) {
+  const { error } = await db.from('handover_cases').update({ status:'open', closed_at:null, closed_by:null, updated_at:new Date().toISOString() }).eq('case_id', caseId);
+  if (error) { showToast('操作失敗', true); return; }
+  await db.from('handover_case_logs').insert({ case_id:caseId, action:'reopen', content:'案件重新開啟', created_by:currentUser.user_id });
+  showToast('案件已重新開啟');
+  await openCaseDetail(caseId);
+  await loadCases();
+}
+
+async function addProgressNote(caseId) {
+  const note = document.getElementById('progressNote').value.trim();
+  if (!note) { showToast('請輸入進度說明', true); return; }
+  await db.from('handover_cases').update({ updated_at: new Date().toISOString() }).eq('case_id', caseId);
+  const { error } = await db.from('handover_case_logs').insert({ case_id:caseId, action:'update', content:note, created_by:currentUser.user_id });
+  if (error) { showToast('新增失敗：' + translateError(error.message), true); return; }
+  showToast('進度已更新');
+  await openCaseDetail(caseId);
+}
+
+// ── ATTACHMENTS ────────────────────────────────────
+function renderPendingAttachments() {
+  const container = document.getElementById('pendingAttachList');
+  document.getElementById('attachCount').textContent = pendingAttachments.length + '/20';
+  if (!pendingAttachments.length) {
+    container.innerHTML = '<span style="font-size:.78rem;color:var(--text-dim)">尚無附件</span>';
+    return;
+  }
+  container.innerHTML = pendingAttachments.map((f,i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:.8rem">
+      <span style="flex:1;color:var(--text-hi)">${escHtml(f.name)}</span>
+      <span style="color:var(--text-dim)">${(f.size/1024).toFixed(1)} KB</span>
+      <button onclick="removePendingAttach(${i})" style="background:transparent;border:none;color:var(--red);cursor:pointer;font-size:.9rem">✕</button>
+    </div>`).join('');
+}
+
+function onAttachSelect() {
+  const input = document.getElementById('attachInput');
+  const allowed = /\.(jpg|jpeg|png|pdf|docx|xlsx)$/i;
+  for (const f of Array.from(input.files)) {
+    if (!allowed.test(f.name)) { showToast(`不支援的格式：${f.name}`, true); continue; }
+    if (pendingAttachments.length >= 20) { showToast('每案最多 20 個附件', true); break; }
+    pendingAttachments.push(f);
+  }
+  input.value = '';
+  renderPendingAttachments();
+}
+
+function removePendingAttach(i) { pendingAttachments.splice(i,1); renderPendingAttachments(); }
+
+async function uploadAttachments(caseId) {
+  for (const file of pendingAttachments) {
+    const path = `${caseId}/${Date.now()}_${file.name}`;
+    const { error: upErr } = await db.storage.from('handover-attachments').upload(path, file);
+    if (upErr) { showToast(`附件上傳失敗：${file.name}`, true); continue; }
+    await db.from('handover_case_attachments').insert({
+      case_id: caseId, file_name: file.name, file_type: file.type,
+      file_size: file.size, storage_path: path, uploaded_by: currentUser.user_id
+    });
+  }
+  pendingAttachments = [];
+}
+
+async function addAttachmentToCase(caseId) {
+  const input = document.getElementById('addAttachInput');
+  const files = Array.from(input.files);
+  const { data: existing } = await db.from('handover_case_attachments').select('attachment_id').eq('case_id', caseId);
+  const cnt = existing?.length || 0;
+  if (cnt + files.length > 20) { showToast(`目前 ${cnt} 個附件，最多可新增 ${20-cnt} 個`, true); input.value=''; return; }
+  const allowed = /\.(jpg|jpeg|png|pdf|docx|xlsx)$/i;
+  for (const file of files) {
+    if (!allowed.test(file.name)) { showToast(`不支援格式：${file.name}`, true); continue; }
+    const path = `${caseId}/${Date.now()}_${file.name}`;
+    const { error: upErr } = await db.storage.from('handover-attachments').upload(path, file);
+    if (upErr) { showToast(`上傳失敗：${file.name}`, true); continue; }
+    await db.from('handover_case_attachments').insert({
+      case_id: caseId, file_name: file.name, file_type: file.type,
+      file_size: file.size, storage_path: path, uploaded_by: currentUser.user_id
+    });
+  }
+  showToast('附件已上傳');
+  input.value = '';
+  await openCaseDetail(caseId);
+}
+
+// ── TAB SWITCH ─────────────────────────────────────
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   document.getElementById('panel-' + name).classList.add('active');
   if (name === 'history') loadHistory();
+  if (name === 'cases')   loadCases();
 }
 
-// ── UTILS ─────────────────────────────────────────────────────
+// ── UTILS ──────────────────────────────────────────
 function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function translateError(msg) {
@@ -754,6 +1312,7 @@ function translateError(msg) {
   if (msg.includes('permission denied')) return '無操作權限';
   if (msg.includes('JWT expired')) return '登入已過期，請重新整理頁面';
   if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) return '網路連線失敗，請稍後再試';
+  if (msg.includes('relation') && msg.includes('does not exist')) return '資料表不存在，請先執行 handover_cases.sql';
   return msg;
 }
 
@@ -763,7 +1322,6 @@ function showToast(msg, isErr = false) {
   t.className = 'toast show' + (isErr ? ' err' : '');
   setTimeout(() => { t.className = 'toast'; }, 2800);
 }
-
 </script>
 </body>
 </html>
