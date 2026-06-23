@@ -1275,7 +1275,14 @@ async function createUser() {
   if (!/^[A-Za-z0-9_]+$/.test(username)) { showToast('帳號僅限英文、數字、底線', true); return; }
 
   const { data: authData, error: authErr } = await db.auth.signUp({ email, password: pass });
-  if (authErr) { showToast('建立帳號失敗：' + authErr.message, true); return; }
+  if (authErr) {
+    if (authErr.message === 'User already registered') {
+      showToast('此 Email 已被註冊，請換一個 Email 或確認帳號是否已存在', true);
+    } else {
+      showToast('建立帳號失敗：' + authErr.message, true);
+    }
+    return;
+  }
 
   const profile = { auth_id: authData.user.id, name, username, email, phone: phone || null, dept_id: deptId, role, status: 'active', created_by: currentUser.user_id };
   const { error: profErr } = await db.from('users').insert(profile);
