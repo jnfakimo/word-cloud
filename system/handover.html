@@ -312,7 +312,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     <div class="panel">
       <div class="panel-head"><span class="panel-title">備註</span></div>
       <div class="panel-body">
-        <textarea id="hNotes" class="add-input" style="min-height:80px;resize:vertical" placeholder="其他需要說明的事項…"></textarea>
+        <textarea id="hNotes" class="add-input" style="min-height:80px;resize:vertical;width:100%;box-sizing:border-box" placeholder="其他需要說明的事項…"></textarea>
       </div>
     </div>
 
@@ -670,7 +670,7 @@ const ANOMALY_SUBS = {
 let currentUser = null;
 let _handoverHasSession = false;
 let allDepts = [], allUsers = [];
-let issues = [], pendings = [];
+let issues = ['無異常事項。如果有需要再填列'], pendings = ['無代辦事項。如果有需要再填列'];
 let editingId = null;
 let pendingAttachments = [];
 let currentCaseId = null;
@@ -954,7 +954,7 @@ async function doSave(status) {
 }
 
 function resetHandoverForm() {
-  issues = []; pendings = []; renderIssues(); renderPendings();
+  issues = ['無異常事項。如果有需要再填列']; pendings = ['無代辦事項。如果有需要再填列']; renderIssues(); renderPendings();
   document.getElementById('hNotes').value = '';
   document.getElementById('hHandoverBy').value = '';
   document.getElementById('hTakeoverBy').value = '';
@@ -1061,7 +1061,7 @@ async function genCaseNo() {
     .select('*', { count: 'exact', head: true })
     .gte('created_at', startOfDay);
   const seq = String((count || 0) + 1).padStart(3, '0');
-  return `CASE-${dateStr}-${seq}`;
+  return `${dateStr}-${seq}`;
 }
 
 async function openCaseForm() {
