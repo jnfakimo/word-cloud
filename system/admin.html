@@ -665,6 +665,19 @@ body{
         </div>
         <div id="csvImportLog" style="margin-top:12px;font-family:var(--font-mono);font-size:.75rem;max-height:180px;overflow-y:auto;background:rgba(2,8,20,.8);border:1px solid var(--border);border-radius:2px;padding:10px;display:none;line-height:1.7"></div>
       </div>
+      <!-- 批次匯入 CSV -->
+      <div class="panel">
+        <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>批次匯入帳號（CSV）</span>
+          <button class="btn btn-sm" style="background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.2);color:var(--text-dim);font-size:.72rem" onclick="downloadImportTemplate()">↓ 下載範本</button>
+        </div>
+        <p style="font-size:.78rem;color:var(--text-dim);margin-bottom:12px">CSV 欄位順序：姓名, 帳號, Email, 密碼, 電話（選填）, 角色（inspector / maintenance / supervisor / admin）</p>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input type="file" id="csvImportFile" accept=".csv" style="flex:1;padding:8px;background:rgba(2,8,20,.8);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-size:.8rem;outline:none;min-width:200px">
+          <button class="btn btn-primary btn-sm" onclick="importUsersCsv()">↑ 開始匯入</button>
+        </div>
+        <div id="csvImportLog" style="margin-top:12px;font-family:var(--font-mono);font-size:.75rem;max-height:180px;overflow-y:auto;background:rgba(2,8,20,.8);border:1px solid var(--border);border-radius:2px;padding:10px;display:none;line-height:1.7"></div>
+      </div>
     </div>
 
     <!-- EQUIPMENT -->
@@ -1462,6 +1475,7 @@ function changePage(delta) {
   userPage += delta;
   filterUsers();
 }
+
 
 function clearUserFilters() {
   document.getElementById('filterL1').value = '';
