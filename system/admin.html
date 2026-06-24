@@ -667,20 +667,7 @@ body{
           <span>批次匯入帳號（CSV）</span>
           <button class="btn btn-sm" style="background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.2);color:var(--text-dim);font-size:.72rem" onclick="downloadImportTemplate()">↓ 下載範本</button>
         </div>
-        <p style="font-size:.78rem;color:var(--text-dim);margin-bottom:12px">CSV 欄位順序：姓名, 帳號, Email, 密碼, 電話（選填）, 角色（inspector / maintenance / supervisor / admin）</p>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <input type="file" id="csvImportFile" accept=".csv" style="flex:1;padding:8px;background:rgba(2,8,20,.8);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-size:.8rem;outline:none;min-width:200px">
-          <button class="btn btn-primary btn-sm" onclick="importUsersCsv()">↑ 開始匯入</button>
-        </div>
-        <div id="csvImportLog" style="margin-top:12px;font-family:var(--font-mono);font-size:.75rem;max-height:180px;overflow-y:auto;background:rgba(2,8,20,.8);border:1px solid var(--border);border-radius:2px;padding:10px;display:none;line-height:1.7"></div>
-      </div>
-      <!-- 批次匯入 CSV -->
-      <div class="panel">
-        <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center">
-          <span>批次匯入帳號（CSV）</span>
-          <button class="btn btn-sm" style="background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.2);color:var(--text-dim);font-size:.72rem" onclick="downloadImportTemplate()">↓ 下載範本</button>
-        </div>
-        <p style="font-size:.78rem;color:var(--text-dim);margin-bottom:12px">CSV 欄位順序：姓名, 帳號, Email, 密碼, 電話（選填）, 角色（inspector / maintenance / supervisor / admin）</p>
+        <p style="font-size:.78rem;color:var(--text-dim);margin-bottom:12px">支援匯出格式（12欄）或範本格式（姓名, 帳號, Email, 密碼, 電話, 角色）。帳號/Email已存在則自動跳過。</p>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <input type="file" id="csvImportFile" accept=".csv" style="flex:1;padding:8px;background:rgba(2,8,20,.8);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-size:.8rem;outline:none;min-width:200px">
           <button class="btn btn-primary btn-sm" onclick="importUsersCsv()">↑ 開始匯入</button>
@@ -1602,41 +1589,57 @@ function parseCSVLine(line) {
   return result;
 }
 
+function genTempPassword() {
+  return 'Tc' + Math.random().toString(36).slice(2,8).toUpperCase() + Math.floor(10 + Math.random() * 90);
+}
+
 async function importUsersCsv() {
   const file = document.getElementById('csvImportFile').files[0];
   if (!file) { showToast('請選擇 CSV 檔案', true); return; }
   const log = document.getElementById('csvImportLog');
   log.style.display = 'block'; log.innerHTML = '<div style="color:var(--cyan)">▶ 開始匯入…</div>';
   const text = await file.text();
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const lines = text.replace(/^﻿/, '').split('\n').map(l => l.trim()).filter(Boolean);
   if (lines.length < 2) { log.innerHTML += '<div style="color:var(--red)">CSV 格式錯誤：需至少一筆資料列</div>'; return; }
+  const header = parseCSVLine(lines[0]);
+  const isExportFmt = header.length >= 8;
   const dataLines = lines.slice(1);
-  let success = 0, failed = 0;
-  const validRoles = ['inspector','maintenance','supervisor','admin'];
+  let success = 0, failed = 0, skipped = 0;
+  const existingUsernames = new Set(allUsers.map(u => (u.username || '').toLowerCase()));
+  const existingEmails    = new Set(allUsers.map(u => (u.email    || '').toLowerCase()));
+  const roleMap = {'巡檢人員':'inspector','維修人員':'maintenance','主管':'supervisor','管理者':'admin','inspector':'inspector','maintenance':'maintenance','supervisor':'supervisor','admin':'admin'};
   for (let i = 0; i < dataLines.length; i++) {
     const cols = parseCSVLine(dataLines[i]);
-    const [name, username, email, password, phone, role] = cols;
-    if (!name || !username || !email || !password) {
-      log.innerHTML += `<div style="color:var(--amber)">第 ${i+2} 行：缺少必填欄位（姓名/帳號/Email/密碼），跳過</div>`; failed++; continue;
+    let name, username, email, password, phone, roleRaw;
+    if (isExportFmt) {
+      [name, username, email, password, phone] = cols;
+      roleRaw = cols[6];
+    } else {
+      [name, username, email, password, phone, roleRaw] = cols;
     }
-    if (!/^[一-龥]{2,10}$/.test(name)) {
-      log.innerHTML += `<div style="color:var(--amber)">第 ${i+2} 行「${name}」：姓名需為 2-10 個中文字，跳過</div>`; failed++; continue;
+    if (!name || !username || !email) {
+      log.innerHTML += `<div style="color:var(--amber)">第 ${i+2} 行：缺少必填欄位（姓名/帳號/Email），跳過</div>`; failed++; continue;
     }
-    const userRole = validRoles.includes(role) ? role : 'inspector';
-    const { data: authData, error: authErr } = await db.auth.signUp({ email, password });
+    if (existingUsernames.has((username||'').toLowerCase()) || existingEmails.has((email||'').toLowerCase())) {
+      log.innerHTML += `<div style="color:var(--text-dim)">第 ${i+2} 行「${name}」（${username}）：帳號或Email已存在，跳過</div>`; skipped++; continue;
+    }
+    const pwd = password || genTempPassword();
+    const userRole = roleMap[roleRaw] || 'inspector';
+    const { data: authData, error: authErr } = await db.auth.signUp({ email, password: pwd });
     if (authErr) {
       log.innerHTML += `<div style="color:var(--red)">第 ${i+2} 行「${name}」：${translateError(authErr.message)}</div>`; failed++; continue;
     }
-    const profile = { auth_id: authData.user.id, name, username, email, phone: phone || null, role: userRole, status: 'active', created_by: currentUser.user_id };
+    const profile = { auth_id: authData.user.id, name, username, email, phone: phone || null, role: userRole, status: 'active', created_by: currentUser?.user_id };
     const { error: profErr } = await db.from('users').insert(profile);
     if (profErr) {
       log.innerHTML += `<div style="color:var(--red)">第 ${i+2} 行「${name}」：${translateError(profErr.message)}</div>`; failed++; continue;
     }
-    log.innerHTML += `<div style="color:var(--green)">✓ 「${name}」（${username}）匯入成功</div>`;
+    const pwdNote = !password ? `<span style="color:var(--amber)">（臨時密碼：${pwd}）</span>` : '';
+    log.innerHTML += `<div style="color:var(--green)">✓ 「${name}」（${username}）匯入成功 ${pwdNote}</div>`;
     success++;
     log.scrollTop = log.scrollHeight;
   }
-  log.innerHTML += `<div style="color:var(--cyan);margin-top:8px;border-top:1px solid var(--border);padding-top:6px">完成：成功 ${success} 筆，失敗 ${failed} 筆</div>`;
+  log.innerHTML += `<div style="color:var(--cyan);margin-top:8px;border-top:1px solid var(--border);padding-top:6px">完成：新增 ${success} 筆，已存在跳過 ${skipped} 筆，失敗 ${failed} 筆</div>`;
   log.scrollTop = log.scrollHeight;
   if (success > 0) await loadUsers();
 }
