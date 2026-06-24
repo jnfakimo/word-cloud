@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type",
+  "Access-Control-Allow-Headers": "authorization, content-type, x-line-signature",
 };
 
 function json(body: unknown, status = 200) {
@@ -23,7 +23,26 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Load system_settings
+    const payload = await req.json();
+
+    // ── Incoming LINE Webhook (from LINE → capture groupId) ───────────────────
+    if (Array.isArray(payload.events)) {
+      for (const ev of payload.events) {
+        const src = ev.source;
+        if (src?.type === "group" && src.groupId) {
+          console.log("LINE groupId captured:", src.groupId);
+          // Auto-save groupId to system_settings
+          await db.from("system_settings").upsert(
+            [{ key: "line_group_id", value: src.groupId }],
+            { onConflict: "key" },
+          );
+          console.log("groupId saved to system_settings:", src.groupId);
+        }
+      }
+      return new Response("ok", { status: 200 });
+    }
+
+    // ── Load system_settings ─────────────────────────────────────────────────
     const { data: rows } = await db.from("system_settings").select("key,value");
     const s: Record<string, string> = {};
     (rows ?? []).forEach((r: { key: string; value: string }) => (s[r.key] = r.value));
@@ -35,15 +54,14 @@ Deno.serve(async (req) => {
       return json({ ok: false, msg: "LINE not configured" });
     }
 
-    const payload = await req.json();
     let text = "";
 
-    // ── Test message ───────────────────────────────────────────────────────────
+    // ── Test message ──────────────────────────────────────────────────────────
     if (payload.test === true) {
       text = "✅ 系統測試訊息\n臺北農產巡檢維修系統 LINE 推播連線正常。";
     }
 
-    // ── Inspection abnormal ────────────────────────────────────────────────────
+    // ── Inspection abnormal ───────────────────────────────────────────────────
     else if (
       payload.table === "inspection_records" &&
       payload.record?.run_status === "abnormal"
@@ -65,7 +83,7 @@ Deno.serve(async (req) => {
       text = `⚠️ 巡檢異常警報\n設備：${eqName}\n時間：${dtStr}\n說明：${rec.note ?? "（未填）"}`;
     }
 
-    // ── New repair request ─────────────────────────────────────────────────────
+    // ── New repair request ────────────────────────────────────────────────────
     else if (payload.table === "repair_requests") {
       if (s.line_notify_repair !== "true") return json({ ok: true, msg: "disabled" });
       const rec = payload.record;
@@ -81,7 +99,7 @@ Deno.serve(async (req) => {
       text = `🔧 新報修單\n設備：${eqName}\n報修人：${rec.reporter ?? "—"}\n說明：${rec.fault_desc ?? "—"}`;
     }
 
-    // ── New handover case ──────────────────────────────────────────────────────
+    // ── New handover case ─────────────────────────────────────────────────────
     else if (payload.table === "handover_cases") {
       if (s.line_notify_case !== "true") return json({ ok: true, msg: "disabled" });
       const rec = payload.record;
@@ -90,7 +108,7 @@ Deno.serve(async (req) => {
 
     if (!text) return json({ ok: true, msg: "skip" });
 
-    // ── Send LINE push ─────────────────────────────────────────────────────────
+    // ── Send LINE push ────────────────────────────────────────────────────────
     const lineRes = await fetch("https://api.line.me/v2/bot/message/push", {
       method: "POST",
       headers: {
