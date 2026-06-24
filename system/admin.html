@@ -621,6 +621,11 @@ body{
           <span>帳號清單</span>
           <button class="btn btn-primary btn-sm" onclick="exportUsersCsv()">↓ 匯出 CSV</button>
         </div>
+        <!-- 頁籤列 -->
+        <div style="display:flex;gap:0;margin-bottom:12px;border-bottom:1px solid var(--border)">
+          <button id="tabActive" onclick="setUserTab('active')" style="padding:8px 18px;background:rgba(0,212,255,.1);border:none;border-bottom:2px solid var(--cyan);color:var(--cyan);cursor:pointer;font-family:var(--font-head);font-size:.82rem;letter-spacing:.06em">啟用帳號</button>
+          <button id="tabInactive" onclick="setUserTab('inactive')" style="padding:8px 18px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-dim);cursor:pointer;font-family:var(--font-head);font-size:.82rem;letter-spacing:.06em">停用帳號</button>
+        </div>
         <!-- 篩選列 -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
           <select id="filterL1" onchange="onFilterL1Change()" style="padding:7px 10px;background:rgba(2,8,20,.85);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-family:var(--font-mono);font-size:.8rem;outline:none;min-width:120px">
@@ -645,6 +650,7 @@ body{
             <tbody id="usersTbody"><tr><td colspan="7" style="color:var(--text-dim);font-family:var(--font-mono)">LOADING…</td></tr></tbody>
           </table>
         </div>
+        <div id="userPagination"></div>
       </div>
       <!-- 批次匯入 CSV -->
       <div class="panel">
@@ -1088,9 +1094,9 @@ const DTP=(()=>{
   function _fmt(s){if(!s||!s.d)return null;return s.mode==='datetime'?`${s.y}/${_p(s.m)}/${_p(s.d)} ${_p(s.H||0)}:${_p(s.M||0)}`:`${s.y}/${_p(s.m)}/${_p(s.d)}`;}
   function getValue(id){const s=S[id];if(!s||!s.d)return null;const b=`${s.y}-${_p(s.m)}-${_p(s.d)}`;return s.mode==='datetime'?`${b}T${_p(s.H||0)}:${_p(s.M||0)}:00`:b;}
   function setValue(id,val){const s=S[id];if(!s)return;if(!val){s.y=s.m=s.d=null;s.H=0;s.M=0;}else{const dt=new Date(typeof val==='string'&&!val.includes('T')?val+'T00:00:00':val);s.y=dt.getFullYear();s.m=dt.getMonth()+1;s.d=dt.getDate();s.H=dt.getHours();s.M=dt.getMinutes();s.vy=s.y;s.vm=s.m;}_rD(id);}
-  function _rD(id){const s=S[id];const f=_fmt(s);const v=document.getElementById(id+'_v');const b=document.getElementById(id+'_b');const p=document.getElementById(id+'_p');if(v)v.textContent=f||'— 點選選擇 —';if(b)b.style.color=f?'var(--text-hi,#e0f0ff)':'var(--text-dim,#4a7a8a)';if(p)p.style.display=s._o?'block':'none';if(s._o)_rP(id);}
+  function _rD(id){const s=S[id];const f=_fmt(s);const v=document.getElementById(id+'_v');const b=document.getElementById(id+'_b');const p=document.getElementById(id+'_p');if(v)v.textContent=f||'— 點選選擇 —';if(b)b.style.color=f?'var(--text-hi,#e0f0ff)':'var(--text-dim,#4a7a8a)';if(p){if(s._o){const r=b.getBoundingClientRect();p.style.top=(r.bottom+3)+'px';p.style.left=r.left+'px';p.style.display='block';}else p.style.display='none';}if(s._o)_rP(id);}
   function _rP(id){const p=document.getElementById(id+'_p');if(!p)return;const s=S[id];const now=new Date();const vy=s.vy||s.y||now.getFullYear();const vm=s.vm||s.m||(now.getMonth()+1);const dim=_days(vy,vm);const fdow=new Date(vy,vm-1,1).getDay();let rows='<tr>';let col=0;for(let i=0;i<fdow;i++,col++)rows+='<td></td>';for(let d=1;d<=dim;d++,col++){if(col&&col%7===0)rows+='</tr><tr>';const sel=s.d===d&&s.m===vm&&s.y===vy;const tod=now.getDate()===d&&now.getMonth()+1===vm&&now.getFullYear()===vy;rows+=`<td onclick="DTP._pd('${id}',${vy},${vm},${d})" style="width:32px;height:26px;text-align:center;cursor:pointer;border-radius:2px;font-size:.76rem;${sel?'background:var(--cyan,#00d4ff);color:#000;font-weight:bold':tod?'color:var(--cyan,#00d4ff);outline:1px solid var(--cyan,#00d4ff)':''}">${d}</td>`;}rows+='</tr>';const th=['日','一','二','三','四','五','六'].map(d=>`<td style="color:var(--text-dim,#4a7a8a);font-size:.7rem;text-align:center;padding-bottom:3px">${d}</td>`).join('');const tH=s.mode==='datetime'?`<div style="display:flex;align-items:center;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border,#1a3a4a)"><span style="color:var(--text-dim,#4a7a8a);font-size:.78rem">時</span><select onchange="DTP._sh('${id}',this.value)" style="flex:1;padding:4px;background:rgba(2,8,20,.9);border:1px solid var(--border,#1a3a4a);color:var(--text-hi,#e0f0ff);font-size:.78rem">${Array.from({length:24},(_,i)=>`<option value="${i}"${(s.H||0)===i?' selected':''}>${_p(i)}</option>`).join('')}</select><span style="color:var(--text-dim,#4a7a8a);font-size:.78rem">分</span><select onchange="DTP._sm('${id}',this.value)" style="flex:1;padding:4px;background:rgba(2,8,20,.9);border:1px solid var(--border,#1a3a4a);color:var(--text-hi,#e0f0ff);font-size:.78rem">${Array.from({length:12},(_,i)=>`<option value="${i*5}"${(s.M||0)===i*5?' selected':''}>${_p(i*5)}</option>`).join('')}</select></div>`:'';p.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><button type="button" onclick="DTP._pm('${id}')" style="background:none;border:none;color:var(--cyan,#00d4ff);cursor:pointer;font-size:1rem;padding:2px 8px">◀</button><span style="font-size:.8rem;color:var(--text-hi,#e0f0ff);font-family:var(--font-head,monospace)">${vy} 年 ${vm} 月</span><button type="button" onclick="DTP._nm('${id}')" style="background:none;border:none;color:var(--cyan,#00d4ff);cursor:pointer;font-size:1rem;padding:2px 8px">▶</button></div><table style="width:100%;border-collapse:collapse"><tr>${th}</tr>${rows}</table>${tH}<div style="display:flex;gap:8px;margin-top:10px"><button type="button" onclick="DTP._cl('${id}')" style="flex:1;background:none;border:1px solid var(--border,#1a3a4a);color:var(--text-dim,#4a7a8a);padding:5px;cursor:pointer;font-size:.75rem;border-radius:2px">清除</button><button type="button" onclick="DTP._ok('${id}')" style="flex:1;background:var(--cyan,#00d4ff);border:none;color:#000;padding:5px;cursor:pointer;font-size:.75rem;font-weight:bold;border-radius:2px">確認</button></div>`;}
-  function init(id,mode,cb){S[id]={mode:mode||'date',y:null,m:null,d:null,H:0,M:0,vy:null,vm:null,_o:false,_cb:cb||null};const el=document.getElementById(id);if(!el)return;el.style.position='relative';el.innerHTML=`<button id="${id}_b" type="button" onclick="DTP._tog('${id}')" style="width:100%;text-align:left;padding:8px 10px;background:rgba(2,8,20,.8);border:1px solid var(--border,#1a3a4a);color:var(--text-dim,#4a7a8a);font-family:var(--font-mono,monospace);font-size:.82rem;cursor:pointer;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;border-radius:2px"><span id="${id}_v">— 點選選擇 —</span><span style="color:var(--cyan,#00d4ff);font-size:.65rem">▾</span></button><div id="${id}_p" style="display:none;position:absolute;z-index:9999;top:calc(100% + 3px);left:0;min-width:240px;background:var(--bg2,#071220);border:1px solid var(--border,#1a3a4a);padding:12px;box-shadow:0 6px 24px rgba(0,212,255,.18);box-sizing:border-box"></div>`;if(!DTP._gl){document.addEventListener('click',e=>{const path=e.composedPath?e.composedPath():[];Object.keys(S).forEach(pid=>{if(!S[pid]._o)return;const el=document.getElementById(pid);if(el&&!path.includes(el)){S[pid]._o=false;_rD(pid);}});});DTP._gl=true;}}
+  function init(id,mode,cb){S[id]={mode:mode||'date',y:null,m:null,d:null,H:0,M:0,vy:null,vm:null,_o:false,_cb:cb||null};const el=document.getElementById(id);if(!el)return;el.style.position='relative';el.innerHTML=`<button id="${id}_b" type="button" onclick="DTP._tog('${id}')" style="width:100%;text-align:left;padding:8px 10px;background:rgba(2,8,20,.8);border:1px solid var(--border,#1a3a4a);color:var(--text-dim,#4a7a8a);font-family:var(--font-mono,monospace);font-size:.82rem;cursor:pointer;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;border-radius:2px"><span id="${id}_v">— 點選選擇 —</span><span style="color:var(--cyan,#00d4ff);font-size:.65rem">▾</span></button><div id="${id}_p" style="display:none;position:fixed;z-index:9999;min-width:240px;background:var(--bg2,#071220);border:1px solid var(--border,#1a3a4a);padding:12px;box-shadow:0 6px 24px rgba(0,212,255,.18);box-sizing:border-box"></div>`;if(!DTP._gl){document.addEventListener('click',e=>{const path=e.composedPath?e.composedPath():[];Object.keys(S).forEach(pid=>{if(!S[pid]._o)return;const el=document.getElementById(pid);if(el&&!path.includes(el)){S[pid]._o=false;_rD(pid);}});});DTP._gl=true;}}
   function _tog(id){Object.keys(S).forEach(pid=>{if(pid!==id&&S[pid]._o){S[pid]._o=false;_rD(pid);}});S[id]._o=!S[id]._o;_rD(id);}
   function _pm(id){const s=S[id];const now=new Date();let y=s.vy||s.y||now.getFullYear();let m=s.vm||s.m||(now.getMonth()+1);if(--m<1){m=12;y--;}s.vy=y;s.vm=m;_rP(id);}
   function _nm(id){const s=S[id];const now=new Date();let y=s.vy||s.y||now.getFullYear();let m=s.vm||s.m||(now.getMonth()+1);if(++m>12){m=1;y++;}s.vy=y;s.vm=m;_rP(id);}
@@ -1108,6 +1114,9 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
 let allUsers = [], allEquipment = [], allDepts = [], userMap = {}, eqMap = {}, deptMap = {};
+let userTab = 'active';
+let userPage = 1;
+const USER_PAGE_SIZE = 15;
 const ROLE_LABEL = { admin:'管理者', inspector:'巡檢人員', maintenance:'維修人員', supervisor:'主管' };
 const STATUS_LABEL = { pending:'待處理', transferred:'已轉維修', closed:'已結案' };
 const ORDER_STATUS_LABEL = { pending:'待處理', in_progress:'處理中', pending_review:'待驗收', completed:'已完成', closed:'結案' };
@@ -1426,13 +1435,42 @@ function onFilterL1Change() {
   filterUsers();
 }
 
+function setUserTab(tab) {
+  userTab = tab;
+  userPage = 1;
+  document.getElementById('tabActive').style.cssText = tab === 'active'
+    ? 'padding:8px 18px;background:rgba(0,212,255,.1);border:none;border-bottom:2px solid var(--cyan);color:var(--cyan);cursor:pointer;font-family:var(--font-head);font-size:.82rem;letter-spacing:.06em'
+    : 'padding:8px 18px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-dim);cursor:pointer;font-family:var(--font-head);font-size:.82rem;letter-spacing:.06em';
+  document.getElementById('tabInactive').style.cssText = tab === 'inactive'
+    ? 'padding:8px 18px;background:rgba(0,212,255,.1);border:none;border-bottom:2px solid var(--cyan);color:var(--cyan);cursor:pointer;font-family:var(--font-head);font-size:.82rem;letter-spacing:.06em'
+    : 'padding:8px 18px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-dim);cursor:pointer;font-family:var(--font-head);font-size:.82rem;letter-spacing:.06em';
+  filterUsers();
+}
+
+function renderPagination(total) {
+  const totalPages = Math.ceil(total / USER_PAGE_SIZE) || 1;
+  const el = document.getElementById('userPagination');
+  if (!el) return;
+  el.innerHTML = `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;color:var(--text-dim);font-family:var(--font-mono);font-size:.78rem">
+    <button onclick="changePage(-1)" ${userPage <= 1 ? 'disabled' : ''} style="padding:4px 12px;background:rgba(12,40,64,.5);border:1px solid var(--border);color:${userPage<=1?'var(--text-dim)':'var(--cyan)'};cursor:${userPage<=1?'default':'pointer'};border-radius:2px;font-family:var(--font-mono)">◀</button>
+    <span>第 ${userPage} / ${totalPages} 頁（共 ${total} 筆）</span>
+    <button onclick="changePage(1)" ${userPage >= totalPages ? 'disabled' : ''} style="padding:4px 12px;background:rgba(12,40,64,.5);border:1px solid var(--border);color:${userPage>=totalPages?'var(--text-dim)':'var(--cyan)'};cursor:${userPage>=totalPages?'default':'pointer'};border-radius:2px;font-family:var(--font-mono)">▶</button>
+  </div>`;
+}
+
+function changePage(delta) {
+  userPage += delta;
+  filterUsers();
+}
+
 function clearUserFilters() {
   document.getElementById('filterL1').value = '';
   document.getElementById('filterL2').innerHTML = '<option value="">全部課別</option>';
   document.getElementById('filterL2').disabled = true;
   document.getElementById('filterRole').value = '';
   document.getElementById('userSearch').value = '';
-  renderUsers(allUsers);
+  userPage = 1;
+  filterUsers();
 }
 
 function filterUsers() {
@@ -1441,6 +1479,8 @@ function filterUsers() {
   const l2Id  = document.getElementById('filterL2')?.value || '';
   const role  = document.getElementById('filterRole')?.value || '';
   let filtered = allUsers;
+  // Filter by tab status first
+  filtered = filtered.filter(u => userTab === 'active' ? u.status === 'active' : u.status !== 'active');
   if (l2Id) {
     filtered = filtered.filter(u => u.dept_id === l2Id);
   } else if (l1Id) {
@@ -1453,15 +1493,18 @@ function filterUsers() {
     (u.username || '').toLowerCase().includes(q) ||
     getDeptPath(u.dept_id).toLowerCase().includes(q)
   );
-  renderUsers(filtered);
+  renderPagination(filtered.length);
+  const paginated = filtered.slice((userPage - 1) * USER_PAGE_SIZE, userPage * USER_PAGE_SIZE);
+  renderUsers(paginated);
 }
 
 function exportUsersCsv() {
-  const headers = ['姓名','帳號','Email','電話','部門','角色','狀態','巡檢系統','維修系統','電子交接簿','報修系統'];
+  const headers = ['姓名','帳號','Email','密碼','電話','部門','角色','狀態','巡檢系統','維修系統','電子交接簿','報修系統'];
   const rows = allUsers.map(u => {
     const p = u.permissions || {};
     return [
-      u.name, u.username || '', u.email || '', u.phone || '',
+      u.name, u.username || '', u.email || '', '', // 密碼欄留空（Supabase Auth 加密儲存）
+      u.phone || '',
       getDeptPath(u.dept_id), ROLE_LABEL[u.role] || u.role,
       u.status === 'active' ? '啟用' : '停用',
       p.inspector  !== false ? '是' : '否',
@@ -1707,14 +1750,22 @@ async function loadInspections() {
 
 async function loadRepairs() {
   const statusFilter = document.getElementById('repairStatusFilter').value;
-  let query = db.from('repair_requests').select('*,equipment(name),maintenance_orders(status),locations(floor,area,detail,markets(name))').order('created_at',{ascending:false}).limit(200);
+  let query = db.from('repair_requests').select('*,equipment(name),maintenance_orders(status),locations(floor,area,detail,markets(name))').order('created_at',{ascending:true});
   if (statusFilter) query = query.eq('status', statusFilter);
   const { data } = await query;
-  const rows = data || [];
+  let rows = data || [];
+  // assign sequential repair_no per day
+  const dayCounts = {};
+  rows = rows.map(r => {
+    const date = r.created_at.split('T')[0].replace(/-/g,'');
+    dayCounts[date] = (dayCounts[date] || 0) + 1;
+    return { ...r, _repairNo: `${date}-${String(dayCounts[date]).padStart(3,'0')}` };
+  });
+  rows.reverse(); // show newest first
   document.getElementById('repairsTbody').innerHTML = rows.length ? rows.map(r => {
     const ordStatus = r.maintenance_orders?.[0]?.status;
     return `<tr>
-      <td style="font-family:var(--font-mono);font-size:.72rem;color:var(--text-dim)">${r.request_id.substring(0,8)}…</td>
+      <td style="font-family:var(--font-mono);font-size:.75rem;color:var(--cyan)">${r._repairNo}</td>
       <td>${r.equipment?.name || '—'}</td>
       <td>${r.reporter || '—'}</td>
       <td>${(r.fault_desc || '').substring(0,40)}</td>
