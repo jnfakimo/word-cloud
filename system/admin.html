@@ -514,6 +514,24 @@ body{
   .stats-grid{grid-template-columns:1fr}
 }
 
+/* ===== SETTINGS HUB ===== */
+.settings-hub-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px;margin-bottom:8px}
+.scard{position:relative;background:rgba(4,17,31,.9);border:1px solid var(--border);border-radius:4px;padding:28px 22px 20px;cursor:pointer;transition:border .22s,background .22s,transform .22s,box-shadow .22s;overflow:hidden}
+.scard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--scard-c,var(--cyan)) 0%,transparent 80%);opacity:.7}
+.scard::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,212,255,.012) 3px,rgba(0,212,255,.012) 4px);pointer-events:none}
+.scard:hover{border-color:var(--scard-c,var(--cyan));background:rgba(0,212,255,.04);transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,.4),0 0 0 1px var(--scard-c,var(--cyan)) inset}
+.scard-icon{font-size:2rem;font-family:var(--font-mono);color:var(--scard-c,var(--cyan));margin-bottom:14px;line-height:1;text-shadow:0 0 12px var(--scard-c,var(--cyan))}
+.scard-title{font-family:var(--font-head);font-size:1.05rem;font-weight:700;color:var(--text-hi);letter-spacing:.1em;margin-bottom:6px}
+.scard-desc{font-size:.74rem;color:var(--text-dim);font-family:var(--font-mono);line-height:1.6;margin-bottom:18px;min-height:2.8em}
+.scard-enter{font-family:var(--font-mono);font-size:.7rem;color:var(--scard-c,var(--cyan));opacity:.6;display:flex;align-items:center;gap:5px;transition:opacity .2s}
+.scard:hover .scard-enter{opacity:1}
+.scard-badge{position:absolute;top:10px;right:12px;font-family:var(--font-mono);font-size:.62rem;color:var(--scard-c,var(--cyan));border:1px solid var(--scard-c,var(--cyan));padding:1px 6px;border-radius:2px;opacity:.6}
+.settings-back-btn{display:inline-flex;align-items:center;gap:8px;padding:7px 16px;background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.25);border-radius:2px;color:var(--text-dim);font-family:var(--font-mono);font-size:.78rem;cursor:pointer;margin-bottom:20px;transition:all .2s}
+.settings-back-btn:hover{color:var(--cyan);border-color:var(--cyan)}
+.settings-section-header{display:flex;align-items:center;gap:10px;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.settings-section-header .s-icon{font-size:1.4rem;color:var(--scard-c,var(--cyan));font-family:var(--font-mono)}
+.settings-section-header h3{font-family:var(--font-head);font-size:1rem;font-weight:700;color:var(--text-hi);letter-spacing:.1em}
+
 .line-toggle{position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0}
 .line-toggle input{opacity:0;width:0;height:0}
 .line-toggle-slider{position:absolute;cursor:pointer;inset:0;background:rgba(0,212,255,.08);border:1px solid var(--border);border-radius:26px;transition:.25s}
@@ -921,94 +939,156 @@ body{
 
     <!-- SETTINGS -->
     <div class="page-section" id="page-settings">
-      <div class="page-header"><h2>⚙ 系統設定</h2><p>SYSTEM NAME &amp; ORG STRUCTURE MANAGEMENT</p></div>
+      <div class="page-header"><h2>⚙ 系統設定</h2><p>SYSTEM CONFIGURATION MANAGEMENT</p></div>
 
-      <!-- 系統名稱 -->
-      <div class="panel">
-        <div class="panel-title">系統名稱</div>
-        <div class="form-grid" style="margin-bottom:16px">
-          <div class="field">
-            <label>機構名稱</label>
-            <input id="set-org-name" type="text" placeholder="臺北農產運銷股份有限公司">
+      <!-- ══ SETTINGS HUB (卡片總覽) ══ -->
+      <div id="settings-hub">
+        <div class="settings-hub-grid">
+
+          <!-- 卡片1：系統識別 -->
+          <div class="scard" style="--scard-c:#00d4ff" onclick="openSettingsSection('sec-sysname')">
+            <div class="scard-badge">SYS-01</div>
+            <div class="scard-icon">◈</div>
+            <div class="scard-title">系統識別</div>
+            <div class="scard-desc">機構名稱 / 場所名稱<br>系統顯示標題設定</div>
+            <div class="scard-enter">▶ 進入設定</div>
           </div>
-          <div class="field">
-            <label>場所名稱</label>
-            <input id="set-site-name" type="text" placeholder="第一果菜市場">
+
+          <!-- 卡片2：組織架構 -->
+          <div class="scard" style="--scard-c:#ffb300" onclick="openSettingsSection('sec-dept')">
+            <div class="scard-badge">SYS-02</div>
+            <div class="scard-icon">⊞</div>
+            <div class="scard-title">組織架構</div>
+            <div class="scard-desc">一/二級部門新增<br>部門樹狀結構管理</div>
+            <div class="scard-enter">▶ 進入設定</div>
           </div>
+
+          <!-- 卡片3：班別管理 -->
+          <div class="scard" style="--scard-c:#00ff9d" onclick="openSettingsSection('sec-shift')">
+            <div class="scard-badge">SYS-03</div>
+            <div class="scard-icon">⌖</div>
+            <div class="scard-title">班別管理</div>
+            <div class="scard-desc">早/中/夜班時段設定<br>交接簿班別自動套用</div>
+            <div class="scard-enter">▶ 進入設定</div>
+          </div>
+
+          <!-- 卡片4：推播通知 -->
+          <div class="scard" style="--scard-c:#b48aff" onclick="openSettingsSection('sec-line')">
+            <div class="scard-badge">SYS-04</div>
+            <div class="scard-icon">◎</div>
+            <div class="scard-title">LINE 推播</div>
+            <div class="scard-desc">Channel Token / 群組 ID<br>異常/報修/案件通知開關</div>
+            <div class="scard-enter">▶ 進入設定</div>
+          </div>
+
         </div>
-        <button class="btn btn-primary" onclick="saveSystemName()">儲存系統名稱</button>
-        <p style="margin-top:10px;font-size:.72rem;color:var(--text-dim);font-family:var(--font-mono)">修改後重新整理頁面即可看到更新</p>
       </div>
 
-      <!-- 部門架構 -->
-      <div class="panel">
-        <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center">
-          <span>部門架構管理</span>
-          <button class="btn btn-primary btn-sm" onclick="startAddDept(null)">+ 新增一級部門</button>
-        </div>
+      <!-- ══ SETTINGS DETAIL (點卡片後顯示) ══ -->
+      <div id="settings-detail" style="display:none">
+        <button class="settings-back-btn" onclick="backToSettingsHub()">◀ 返回設定總覽</button>
 
-        <!-- 新增 L1 inline form（預設隱藏） -->
-        <div id="add-l1-form" style="display:none;margin-bottom:12px">
-          <div class="dept-edit-row" style="border:1px dashed rgba(0,212,255,.35);border-radius:2px;background:rgba(0,212,255,.04)">
-            <input id="add-l1-name" type="text" placeholder="部門名稱（例：資訊部）">
-            <input id="add-l1-code" type="text" placeholder="代碼（例：IT）" style="max-width:120px">
-            <button class="dept-edit-save" onclick="confirmAddDept(null)">新增</button>
-            <button class="dept-edit-cancel" onclick="cancelDeptForm('add-l1-form')">取消</button>
+        <!-- 系統識別 -->
+        <div class="settings-section" id="sec-sysname" style="display:none">
+          <div class="settings-section-header" style="--scard-c:#00d4ff">
+            <span class="s-icon">◈</span>
+            <div><h3>系統識別設定</h3><div style="font-size:.72rem;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px">SYS-01 / SYSTEM IDENTITY</div></div>
+          </div>
+          <div class="panel">
+            <div class="form-grid" style="margin-bottom:16px">
+              <div class="field"><label>機構名稱</label><input id="set-org-name" type="text" placeholder="臺北農產運銷股份有限公司"></div>
+              <div class="field"><label>場所名稱</label><input id="set-site-name" type="text" placeholder="第一果菜市場"></div>
+            </div>
+            <button class="btn btn-primary" onclick="saveSystemName()">儲存系統名稱</button>
+            <p style="margin-top:10px;font-size:.72rem;color:var(--text-dim);font-family:var(--font-mono)">修改後重新整理頁面即可看到更新</p>
           </div>
         </div>
 
-        <div id="deptTree"></div>
-      </div>
+        <!-- 組織架構 -->
+        <div class="settings-section" id="sec-dept" style="display:none">
+          <div class="settings-section-header" style="--scard-c:#ffb300">
+            <span class="s-icon" style="color:#ffb300">⊞</span>
+            <div><h3>組織架構管理</h3><div style="font-size:.72rem;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px">SYS-02 / ORG STRUCTURE</div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center">
+              <span>部門架構</span>
+              <button class="btn btn-primary btn-sm" onclick="startAddDept(null)">+ 新增一級部門</button>
+            </div>
+            <div id="add-l1-form" style="display:none;margin-bottom:12px">
+              <div class="dept-edit-row" style="border:1px dashed rgba(255,179,0,.35);border-radius:2px;background:rgba(255,179,0,.04)">
+                <input id="add-l1-name" type="text" placeholder="部門名稱（例：資訊部）">
+                <input id="add-l1-code" type="text" placeholder="代碼（例：IT）" style="max-width:120px">
+                <button class="dept-edit-save" onclick="confirmAddDept(null)">新增</button>
+                <button class="dept-edit-cancel" onclick="cancelDeptForm('add-l1-form')">取消</button>
+              </div>
+            </div>
+            <div id="deptTree"></div>
+          </div>
+        </div>
 
-      <!-- 班別設定 -->
-      <div class="panel">
-        <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center">
-          <span>班別設定</span>
-          <button class="btn btn-primary btn-sm" onclick="addShiftRow()">+ 新增班別</button>
+        <!-- 班別管理 -->
+        <div class="settings-section" id="sec-shift" style="display:none">
+          <div class="settings-section-header" style="--scard-c:#00ff9d">
+            <span class="s-icon" style="color:#00ff9d">⌖</span>
+            <div><h3>班別管理設定</h3><div style="font-size:.72rem;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px">SYS-03 / SHIFT MANAGEMENT</div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center">
+              <span>班別列表</span>
+              <button class="btn btn-primary btn-sm" onclick="addShiftRow()">+ 新增班別</button>
+            </div>
+            <div id="shiftList"></div>
+            <div style="margin-top:12px">
+              <button class="btn btn-primary" onclick="saveShifts()">儲存班別設定</button>
+            </div>
+            <p style="margin-top:10px;font-size:.72rem;color:var(--text-dim);font-family:var(--font-mono)">設定各班別名稱與時段，電子交接簿等系統將自動套用。班別 ID 僅限小寫英文字母、數字、底線。</p>
+          </div>
         </div>
-        <div id="shiftList"></div>
-        <div style="margin-top:12px">
-          <button class="btn btn-primary" onclick="saveShifts()">儲存班別設定</button>
-        </div>
-        <p style="margin-top:10px;font-size:.72rem;color:var(--text-dim);font-family:var(--font-mono)">設定各班別名稱與時段，電子交接簿等系統將自動套用。班別 ID 僅限小寫英文字母、數字、底線。</p>
-      </div>
 
-      <!-- LINE 推播設定 -->
-      <div class="panel">
-        <div class="panel-title">LINE 推播通知設定</div>
-        <div class="form-grid" style="margin-bottom:16px">
-          <div class="field" style="grid-column:1/-1">
-            <label>Channel Access Token</label>
-            <input id="line-token" type="password" placeholder="貼上 LINE Messaging API Channel access token" style="font-family:var(--font-mono);font-size:.82rem">
+        <!-- LINE 推播 -->
+        <div class="settings-section" id="sec-line" style="display:none">
+          <div class="settings-section-header" style="--scard-c:#b48aff">
+            <span class="s-icon" style="color:#b48aff">◎</span>
+            <div><h3>LINE 推播通知設定</h3><div style="font-size:.72rem;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px">SYS-04 / LINE NOTIFICATION</div></div>
           </div>
-          <div class="field">
-            <label>LINE Group ID</label>
-            <input id="line-group-id" type="text" placeholder="C... 或 G...（群組 ID）" style="font-family:var(--font-mono)">
+          <div class="panel">
+            <div class="form-grid" style="margin-bottom:16px">
+              <div class="field" style="grid-column:1/-1">
+                <label>Channel Access Token</label>
+                <input id="line-token" type="password" placeholder="貼上 LINE Messaging API Channel access token" style="font-family:var(--font-mono);font-size:.82rem">
+              </div>
+              <div class="field">
+                <label>LINE Group ID</label>
+                <input id="line-group-id" type="text" placeholder="C... 或 G...（群組 ID）" style="font-family:var(--font-mono)">
+              </div>
+            </div>
+            <div style="margin-bottom:16px">
+              <div style="font-size:.78rem;color:var(--text-dim);margin-bottom:10px;font-family:var(--font-mono);letter-spacing:.05em">推播事件開關</div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <label style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border:1px solid rgba(180,138,255,.2);border-radius:4px;cursor:pointer;background:rgba(180,138,255,.04)">
+                  <span style="font-size:.85rem;color:var(--text-hi)">⚠️ &nbsp;巡檢異常通知</span>
+                  <label class="line-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="line-notify-inspect"><span class="line-toggle-slider"></span></label>
+                </label>
+                <label style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border:1px solid rgba(180,138,255,.2);border-radius:4px;cursor:pointer;background:rgba(180,138,255,.04)">
+                  <span style="font-size:.85rem;color:var(--text-hi)">🔧 &nbsp;報修單通知</span>
+                  <label class="line-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="line-notify-repair"><span class="line-toggle-slider"></span></label>
+                </label>
+                <label style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border:1px solid rgba(180,138,255,.2);border-radius:4px;cursor:pointer;background:rgba(180,138,255,.04)">
+                  <span style="font-size:.85rem;color:var(--text-hi)">📋 &nbsp;異常案件通知</span>
+                  <label class="line-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="line-notify-case"><span class="line-toggle-slider"></span></label>
+                </label>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="saveLineSettings()">儲存 LINE 設定</button>
+              <button class="btn" style="background:rgba(180,138,255,.08);border:1px solid rgba(180,138,255,.35);color:#b48aff" onclick="testLinePush()">傳送測試訊息</button>
+            </div>
+            <p style="margin-top:10px;font-size:.72rem;color:var(--text-dim);font-family:var(--font-mono)">Group ID 取得方式：將 Bot 加入群組後，群組傳訊會在 Edge Function 日誌顯示 groupId。</p>
           </div>
         </div>
-        <div style="margin-bottom:16px">
-          <div style="font-size:.78rem;color:var(--text-dim);margin-bottom:10px;font-family:var(--font-mono);letter-spacing:.05em">推播事件開關</div>
-          <div style="display:flex;flex-direction:column;gap:8px">
-            <label style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border:1px solid rgba(0,212,255,.15);border-radius:4px;cursor:pointer;background:rgba(0,212,255,.03)">
-              <span style="font-size:.85rem;color:var(--text-hi)">⚠️ &nbsp;巡檢異常通知</span>
-              <label class="line-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="line-notify-inspect"><span class="line-toggle-slider"></span></label>
-            </label>
-            <label style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border:1px solid rgba(0,212,255,.15);border-radius:4px;cursor:pointer;background:rgba(0,212,255,.03)">
-              <span style="font-size:.85rem;color:var(--text-hi)">🔧 &nbsp;報修單通知</span>
-              <label class="line-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="line-notify-repair"><span class="line-toggle-slider"></span></label>
-            </label>
-            <label style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border:1px solid rgba(0,212,255,.15);border-radius:4px;cursor:pointer;background:rgba(0,212,255,.03)">
-              <span style="font-size:.85rem;color:var(--text-hi)">📋 &nbsp;異常案件通知</span>
-              <label class="line-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="line-notify-case"><span class="line-toggle-slider"></span></label>
-            </label>
-          </div>
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="saveLineSettings()">儲存 LINE 設定</button>
-          <button class="btn" style="background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.3);color:var(--cyan)" onclick="testLinePush()">傳送測試訊息</button>
-        </div>
-        <p style="margin-top:10px;font-size:.72rem;color:var(--text-dim);font-family:var(--font-mono)">儲存後請在 Supabase Dashboard → Database → Webhooks 設定三個 Webhook，事件發生時才會自動推播至 LINE 群組。Group ID 取得方式：將 Bot 加入群組後，群組傳訊會在 Edge Function 日誌顯示 groupId。</p>
-      </div>
+
+      </div><!-- /settings-detail -->
     </div>
 
   </main>
@@ -1959,6 +2039,17 @@ async function createCycle() {
 }
 
 // ─── SETTINGS PAGE ────────────────────────────────────────────────────────────
+
+function openSettingsSection(id) {
+  document.getElementById('settings-hub').style.display = 'none';
+  document.getElementById('settings-detail').style.display = 'block';
+  document.querySelectorAll('.settings-section').forEach(s => s.style.display = 'none');
+  document.getElementById(id).style.display = 'block';
+}
+function backToSettingsHub() {
+  document.getElementById('settings-hub').style.display = 'block';
+  document.getElementById('settings-detail').style.display = 'none';
+}
 
 let sysSettings = {};
 let _shifts = [
