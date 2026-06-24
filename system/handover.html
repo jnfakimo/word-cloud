@@ -663,11 +663,28 @@ const ANOMALY_SUBS = {
 };
 
 let currentUser = null;
+let _handoverHasSession = false;
 let allDepts = [], allUsers = [];
 let issues = [], pendings = [];
 let editingId = null;
 let pendingAttachments = [];
 let currentCaseId = null;
+
+function applyPerms() {
+  const p = currentUser?.permissions;
+  if (_handoverHasSession && p?.handover === false) {
+    const dest = p.inspector !== false ? 'app.html'
+               : p.maintenance !== false ? 'maintenance.html'
+               : 'login.html';
+    window.location.replace(dest);
+    return;
+  }
+  if (!p) return;
+  if (p.inspector === false)
+    document.querySelectorAll('a[href="app.html"]').forEach(el => el.style.display = 'none');
+  if (p.maintenance === false)
+    document.querySelectorAll('a[href="maintenance.html"]').forEach(el => el.style.display = 'none');
+}
 
 // ── CLOCK ──────────────────────────────────────────
 (function tick(){
@@ -699,16 +716,19 @@ let currentCaseId = null;
   // 載入目前登入使用者
   try {
     const { data: { session } } = await db.auth.getSession();
+    _handoverHasSession = !!session;
     if (session?.user?.id) {
-      const { data: u } = await db.from('users').select('*').eq('user_id', session.user.id).single();
+      const { data: u } = await db.from('users').select('*').eq('auth_id', session.user.id).single();
       if (u) { currentUser = u; document.getElementById('navUser').textContent = u.name; }
-    } else if (allUsers.length) {
+    }
+    if (!currentUser?.user_id && allUsers.length) {
       currentUser = allUsers[0];
       document.getElementById('navUser').textContent = allUsers[0].name;
     }
   } catch(e) {
     if (allUsers.length) { currentUser = allUsers[0]; document.getElementById('navUser').textContent = allUsers[0].name; }
   }
+  applyPerms();
 
   buildDeptSelects();
   DTP.init('caseIncidentPicker', 'datetime');

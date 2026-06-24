@@ -522,6 +522,16 @@ const STATUS_LABEL = { pending:'待處理', in_progress:'處理中', pending_rev
 const STATUS_NEXT = { pending:'in_progress', in_progress:'pending_review', pending_review:'completed', completed:'closed' };
 const STATUS_NEXT_LABEL = { pending:'開始處理', in_progress:'送交驗收', pending_review:'驗收通過', completed:'結案' };
 
+function applyPerms(hasSession) {
+  const p = currentUser?.permissions;
+  if (hasSession && p?.maintenance === false) {
+    const dest = p.inspector !== false ? 'app.html'
+               : p.handover !== false ? 'handover.html'
+               : 'login.html';
+    window.location.replace(dest);
+  }
+}
+
 function fmtLoc(loc) {
   if (!loc) return '—';
   const parts = [loc.markets?.name, loc.floor, loc.area];
@@ -545,6 +555,7 @@ const COST_TYPE_LABEL = { purchase:'購置費', outsource:'委外維修', parts:
   }
   currentUser = profile || { user_id: null, name: '維修人員', role: 'maintenance' };
   document.getElementById('navUser').textContent = currentUser.name;
+  applyPerms(!!session);
   checkFirstLogin();
   db.from('system_settings').select('key,value').then(({ data }) => {
     if (!data) return;

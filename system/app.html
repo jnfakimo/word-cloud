@@ -806,6 +806,17 @@ function getRepairDeptName() {
   const l1Id = document.getElementById('repairDeptL1')?.value;
   return _appDepts.find(d => d.dept_id === l1Id)?.name || '';
 }
+// ── 權限隱藏 ─────────────────────────────────────────────────
+function applyPerms() {
+  const p = currentUser?.permissions;
+  if (!p) return;
+  if (p.handover === false)
+    document.querySelectorAll('a[href="handover.html"]').forEach(el => el.style.display = 'none');
+  if (p.repair === false) {
+    const t = document.querySelector('.tab[data-tab="repair"]');
+    if (t) t.style.display = 'none';
+  }
+}
 // ────────────────────────────────────────────────────────────
 
 (async () => {
@@ -834,6 +845,7 @@ function getRepairDeptName() {
     }
     currentUser = profile || { user_id: null, name: '巡檢人員', role: 'inspector' };
     document.getElementById('navUser').textContent = currentUser.name;
+    applyPerms();
     db.from('system_settings').select('key,value').then(({ data }) => {
       if (!data) return;
       const s = Object.fromEntries(data.map(r => [r.key, r.value]));

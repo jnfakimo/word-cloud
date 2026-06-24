@@ -1120,6 +1120,13 @@ function fmtLoc(loc) {
   return parts.filter(Boolean).join(' › ');
 }
 
+function applyPerms() {
+  const p = currentUser?.permissions;
+  if (!p) return;
+  if (p.handover === false)
+    document.querySelectorAll('a[href="handover.html"]').forEach(el => el.style.display = 'none');
+}
+
 (async () => {
   // 登入驗證已關閉：有 session 用 session 帳號，否則自動套用預設管理者帳號
   let profile = null;
@@ -1135,7 +1142,7 @@ function fmtLoc(loc) {
   }
   currentUser = profile || { user_id: null, name: '系統管理者', role: 'admin', status: 'active' };
   document.getElementById('sidebarUser').textContent = `${currentUser.name} [${ROLE_LABEL[currentUser.role] || 'ADMIN'}]`;
-
+  applyPerms();
   setupNav();
   checkFirstLogin();
   DTP.init('eq-date-dtp','date');

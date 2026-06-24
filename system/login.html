@@ -96,6 +96,24 @@ const ROLE_ROUTES = {
   maintenance: 'maintenance.html',
 };
 
+function getLoginRoute(profile) {
+  const p = profile.permissions || {};
+  if (profile.role === 'admin' || profile.role === 'supervisor') return 'admin.html';
+  if (profile.role === 'inspector') {
+    if (p.inspector !== false) return 'app.html';
+    if (p.handover !== false) return 'handover.html';
+    if (p.maintenance !== false) return 'maintenance.html';
+    return 'app.html';
+  }
+  if (profile.role === 'maintenance') {
+    if (p.maintenance !== false) return 'maintenance.html';
+    if (p.inspector !== false) return 'app.html';
+    if (p.handover !== false) return 'handover.html';
+    return 'maintenance.html';
+  }
+  return ROLE_ROUTES[profile.role] || 'app.html';
+}
+
 // ── Handle password-reset link (#type=recovery) ───────────────────────────────
 (async () => {
   const hash = window.location.hash;
@@ -108,8 +126,8 @@ const ROLE_ROUTES = {
   // Already logged in?
   const { data: { session } } = await db.auth.getSession();
   if (session) {
-    const { data: profile } = await db.from('users').select('role').eq('auth_id', session.user.id).single();
-    if (profile) { window.location.href = ROLE_ROUTES[profile.role] || 'app.html'; return; }
+    const { data: profile } = await db.from('users').select('role,permissions').eq('auth_id', session.user.id).single();
+    if (profile) { window.location.href = getLoginRoute(profile); return; }
   }
 })();
 
@@ -141,7 +159,7 @@ async function doLogin() {
     return;
   }
 
-  const { data: profile } = await db.from('users').select('role,name').eq('auth_id', data.user.id).single();
+  const { data: profile } = await db.from('users').select('role,name,permissions').eq('auth_id', data.user.id).single();
   if (!profile) {
     err.textContent = '找不到使用者資料，請聯絡管理員';
     btn.disabled = false; btn.textContent = '登入';
@@ -151,7 +169,7 @@ async function doLogin() {
 
   sessionStorage.setItem('user_role', profile.role);
   sessionStorage.setItem('user_name', profile.name);
-  window.location.href = ROLE_ROUTES[profile.role] || 'app.html';
+  window.location.href = getLoginRoute(profile);
 }
 
 // ── 忘記密碼 ──────────────────────────────────────────────────────────────────
