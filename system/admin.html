@@ -514,6 +514,12 @@ body{
   .stats-grid{grid-template-columns:1fr}
 }
 
+.line-toggle{position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0}
+.line-toggle input{opacity:0;width:0;height:0}
+.line-toggle-slider{position:absolute;cursor:pointer;inset:0;background:rgba(0,212,255,.08);border:1px solid var(--border);border-radius:26px;transition:.25s}
+.line-toggle input:checked+.line-toggle-slider{background:rgba(0,212,255,.25);border-color:var(--cyan)}
+.line-toggle-slider:before{content:'';position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:var(--text-dim);border-radius:50%;transition:.25s}
+.line-toggle input:checked+.line-toggle-slider:before{transform:translateX(20px);background:var(--cyan)}
 </style>
 </head>
 <body>
@@ -975,6 +981,43 @@ body{
           <button class="btn btn-primary" onclick="saveShifts()">儲存班別設定</button>
         </div>
         <p style="margin-top:10px;font-size:.72rem;color:var(--text-dim);font-family:var(--font-mono)">設定各班別名稱與時段，電子交接簿等系統將自動套用。班別 ID 僅限小寫英文字母、數字、底線。</p>
+      </div>
+
+      <!-- LINE 推播設定 -->
+      <div class="panel">
+        <div class="panel-title">LINE 推播通知設定</div>
+        <div class="form-grid" style="margin-bottom:16px">
+          <div class="field" style="grid-column:1/-1">
+            <label>Channel Access Token</label>
+            <input id="line-token" type="password" placeholder="貼上 LINE Messaging API Channel access token" style="font-family:var(--font-mono);font-size:.82rem">
+          </div>
+          <div class="field">
+            <label>LINE Group ID</label>
+            <input id="line-group-id" type="text" placeholder="C... 或 G...（群組 ID）" style="font-family:var(--font-mono)">
+          </div>
+        </div>
+        <div style="margin-bottom:16px">
+          <div style="font-size:.78rem;color:var(--text-dim);margin-bottom:10px;font-family:var(--font-mono);letter-spacing:.05em">推播事件開關</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border:1px solid rgba(0,212,255,.15);border-radius:4px;cursor:pointer;background:rgba(0,212,255,.03)">
+              <span style="font-size:.85rem;color:var(--text-hi)">⚠️ &nbsp;巡檢異常通知</span>
+              <label class="line-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="line-notify-inspect"><span class="line-toggle-slider"></span></label>
+            </label>
+            <label style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border:1px solid rgba(0,212,255,.15);border-radius:4px;cursor:pointer;background:rgba(0,212,255,.03)">
+              <span style="font-size:.85rem;color:var(--text-hi)">🔧 &nbsp;報修單通知</span>
+              <label class="line-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="line-notify-repair"><span class="line-toggle-slider"></span></label>
+            </label>
+            <label style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border:1px solid rgba(0,212,255,.15);border-radius:4px;cursor:pointer;background:rgba(0,212,255,.03)">
+              <span style="font-size:.85rem;color:var(--text-hi)">📋 &nbsp;異常案件通知</span>
+              <label class="line-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="line-notify-case"><span class="line-toggle-slider"></span></label>
+            </label>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="saveLineSettings()">儲存 LINE 設定</button>
+          <button class="btn" style="background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.3);color:var(--cyan)" onclick="testLinePush()">傳送測試訊息</button>
+        </div>
+        <p style="margin-top:10px;font-size:.72rem;color:var(--text-dim);font-family:var(--font-mono)">儲存後請在 Supabase Dashboard → Database → Webhooks 設定三個 Webhook，事件發生時才會自動推播至 LINE 群組。Group ID 取得方式：將 Bot 加入群組後，群組傳訊會在 Edge Function 日誌顯示 groupId。</p>
       </div>
     </div>
 
@@ -1927,6 +1970,11 @@ async function loadSettings() {
   try { const p = JSON.parse(sysSettings.shifts || ''); if (Array.isArray(p) && p.length) _shifts = p; } catch(e) {}
   renderShiftList();
   renderDeptTree();
+  document.getElementById('line-token').value           = sysSettings.line_channel_token  || '';
+  document.getElementById('line-group-id').value        = sysSettings.line_group_id        || '';
+  document.getElementById('line-notify-inspect').checked = sysSettings.line_notify_inspect === 'true';
+  document.getElementById('line-notify-repair').checked  = sysSettings.line_notify_repair  === 'true';
+  document.getElementById('line-notify-case').checked    = sysSettings.line_notify_case    === 'true';
 }
 
 function renderShiftList() {
@@ -1984,6 +2032,44 @@ async function saveSystemName() {
   sysSettings.org_name = orgName; sysSettings.site_name = siteName;
   showToast('系統名稱已儲存');
   applySystemName();
+}
+
+async function saveLineSettings() {
+  const token   = document.getElementById('line-token').value.trim();
+  const groupId = document.getElementById('line-group-id').value.trim();
+  if (!token || !groupId) { showToast('請填寫 Token 與 Group ID', true); return; }
+  const notifyInspect = document.getElementById('line-notify-inspect').checked;
+  const notifyRepair  = document.getElementById('line-notify-repair').checked;
+  const notifyCase    = document.getElementById('line-notify-case').checked;
+  const { error } = await db.from('system_settings').upsert([
+    { key: 'line_channel_token',  value: token },
+    { key: 'line_group_id',       value: groupId },
+    { key: 'line_notify_inspect', value: String(notifyInspect) },
+    { key: 'line_notify_repair',  value: String(notifyRepair) },
+    { key: 'line_notify_case',    value: String(notifyCase) },
+  ], { onConflict: 'key' });
+  if (error) { showToast('儲存失敗：' + translateError(error.message), true); return; }
+  Object.assign(sysSettings, {
+    line_channel_token:  token, line_group_id: groupId,
+    line_notify_inspect: String(notifyInspect),
+    line_notify_repair:  String(notifyRepair),
+    line_notify_case:    String(notifyCase),
+  });
+  showToast('LINE 設定已儲存');
+}
+
+async function testLinePush() {
+  showToast('傳送測試訊息中…');
+  try {
+    const res = await fetch(SUPABASE_URL + '/functions/v1/line-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+      body: JSON.stringify({ test: true }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (body.ok) showToast('測試訊息已送出，請查看 LINE 群組');
+    else showToast('推播失敗：' + (body.msg || '請確認 Token / Group ID 已儲存'), true);
+  } catch(e) { showToast('推播失敗：' + e.message, true); }
 }
 
 function applySystemName() {
