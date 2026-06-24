@@ -531,6 +531,9 @@ body{
     <span data-sysname="org">臺北農產運銷股份有限公司</span> ／ <span data-sysname="site">第一果菜市場</span>
   </div>
   <div class="topbar-right">
+    <a href="app.html" style="font-size:.7rem;color:var(--text-dim);text-decoration:none;padding:3px 8px;border:1px solid var(--border);border-radius:2px;transition:all .2s" onmouseover="this.style.color='var(--cyan)';this.style.borderColor='var(--cyan)'" onmouseout="this.style.color='var(--text-dim)';this.style.borderColor='var(--border)'">◉ 巡檢</a>
+    <a href="maintenance.html" style="font-size:.7rem;color:var(--text-dim);text-decoration:none;padding:3px 8px;border:1px solid var(--border);border-radius:2px;transition:all .2s" onmouseover="this.style.color='var(--cyan)';this.style.borderColor='var(--cyan)'" onmouseout="this.style.color='var(--text-dim)';this.style.borderColor='var(--border)'">◪ 維修</a>
+    <a href="handover.html" style="font-size:.7rem;color:var(--text-dim);text-decoration:none;padding:3px 8px;border:1px solid var(--border);border-radius:2px;transition:all .2s" onmouseover="this.style.color='var(--cyan)';this.style.borderColor='var(--cyan)'" onmouseout="this.style.color='var(--text-dim)';this.style.borderColor='var(--border)'">◈ 交接簿</a>
     <span><span class="online-dot"></span>系統連線中</span>
     <span class="topbar-clock" id="topClock"></span>
   </div>
@@ -1172,7 +1175,7 @@ let currentUser = null;
 let allUsers = [], allEquipment = [], allDepts = [], userMap = {}, eqMap = {}, deptMap = {};
 let userTab = 'active';
 let userPage = 1;
-const USER_PAGE_SIZE = 10;
+const USER_PAGE_SIZE = 15;
 const ROLE_LABEL = { admin:'管理者', inspector:'巡檢人員', maintenance:'維修人員', supervisor:'主管' };
 const STATUS_LABEL = { pending:'待處理', transferred:'已轉維修', closed:'已結案' };
 const ORDER_STATUS_LABEL = { pending:'待處理', in_progress:'處理中', pending_review:'待驗收', completed:'已完成', closed:'結案' };

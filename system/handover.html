@@ -378,7 +378,8 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
   <!-- ══ TAB: HISTORY ══ -->
   <div class="tab-panel" id="panel-history">
     <div class="filter-bar">
-      <select id="fDept" onchange="loadHistory()" style="min-width:140px"><option value="">全部部門</option></select>
+      <select id="fDeptL1" onchange="onFDeptL1Change()" style="min-width:120px"><option value="">全部部門</option></select>
+      <select id="fDeptL2" onchange="loadHistory()" style="min-width:120px" disabled><option value="">全部課別</option></select>
       <select id="fShift" onchange="loadHistory()">
         <option value="">全部班別</option>
         <option value="morning">早班</option>
@@ -764,7 +765,29 @@ function buildDeptSelects() {
   const l1Opts = '<option value="">— 選擇第一層 —</option>' + l1Depts.map(d => `<option value="${d.dept_id}">${d.name}</option>`).join('');
   document.getElementById('hHandoverL1').innerHTML = l1Opts;
   document.getElementById('hTakeoverL1').innerHTML = l1Opts;
-  document.getElementById('fDept').innerHTML = '<option value="">全部部門</option>' + buildFlatDeptOpts();
+  const fL1Opts = '<option value="">全部部門</option>' + l1Depts.map(d => `<option value="${d.dept_id}">${d.name}</option>`).join('');
+  document.getElementById('fDeptL1').innerHTML = fL1Opts;
+  document.getElementById('fDeptL2').innerHTML = '<option value="">全部課別</option>';
+  document.getElementById('fDeptL2').disabled = true;
+}
+
+function onFDeptL1Change() {
+  const l1 = document.getElementById('fDeptL1').value;
+  const l2Sel = document.getElementById('fDeptL2');
+  if (l1) {
+    const children = allDepts.filter(d => d.parent_id === l1).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+    if (children.length) {
+      l2Sel.innerHTML = '<option value="">全部課別</option>' + children.map(c => `<option value="${c.dept_id}">${c.name}</option>`).join('');
+      l2Sel.disabled = false;
+    } else {
+      l2Sel.innerHTML = '<option value="">— 無下級單位 —</option>';
+      l2Sel.disabled = true;
+    }
+  } else {
+    l2Sel.innerHTML = '<option value="">全部課別</option>';
+    l2Sel.disabled = true;
+  }
+  loadHistory();
 }
 
 function buildFlatDeptOpts() {
@@ -965,7 +988,8 @@ function resetHandoverForm() {
 
 // ── HISTORY ────────────────────────────────────────
 async function loadHistory() {
-  const deptFilter   = document.getElementById('fDept').value;
+  const l1Filter     = document.getElementById('fDeptL1').value;
+  const l2Filter     = document.getElementById('fDeptL2').value;
   const shiftFilter  = document.getElementById('fShift').value;
   const statusFilter = document.getElementById('fStatus').value;
   const dateFrom     = DTP.getValue('fDateFrom-dtp');
@@ -973,7 +997,12 @@ async function loadHistory() {
   let q = db.from('handover_records')
     .select('*,departments(name),handover_user:users!handover_by(name),takeover_user:users!takeover_by(name)')
     .order('shift_date',{ascending:false}).order('shift_type').limit(200);
-  if (deptFilter)   q = q.eq('dept_id', deptFilter);
+  if (l2Filter) {
+    q = q.eq('dept_id', l2Filter);
+  } else if (l1Filter) {
+    const childIds = allDepts.filter(d => d.parent_id === l1Filter).map(d => d.dept_id);
+    q = q.in('dept_id', [l1Filter, ...childIds]);
+  }
   if (shiftFilter)  q = q.eq('shift_type', shiftFilter);
   if (statusFilter) q = q.eq('status', statusFilter);
   if (dateFrom)     q = q.gte('shift_date', dateFrom);
