@@ -1874,8 +1874,10 @@ function cancelDeptForm(id) {
 
 // ─── FIRST LOGIN & PASSWORD CHANGE ───────────────────────────────────────────
 
-function checkFirstLogin() {
+async function checkFirstLogin() {
   if (!currentUser?.user_id) return;
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) return; // 無 Auth session（免登入模式）不顯示提醒
   if (!localStorage.getItem('pw_noted_' + currentUser.user_id)) {
     document.getElementById('firstLoginModal').classList.add('show');
   }
@@ -1898,6 +1900,8 @@ async function changePassword() {
   const pw2 = document.getElementById('new-pw2').value;
   if (pw.length < 8) { showToast('密碼至少需要 8 個字元', true); return; }
   if (pw !== pw2) { showToast('兩次密碼不一致', true); return; }
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) { showToast('請先透過登入頁面登入後再更改密碼', true); return; }
   const { error } = await db.auth.updateUser({ password: pw });
   if (error) { showToast('更改失敗：' + translateError(error.message), true); return; }
   if (currentUser?.user_id) localStorage.setItem('pw_noted_' + currentUser.user_id, '1');
