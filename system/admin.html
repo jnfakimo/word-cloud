@@ -605,19 +605,59 @@ body{
             </select>
           </div>
         </div>
+        <div class="field" style="grid-column:1/-1;margin-top:4px">
+          <label>可使用系統（功能選單）</label>
+          <div style="display:flex;gap:20px;flex-wrap:wrap;padding:8px 0">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.85rem;color:var(--text-hi)"><input type="checkbox" id="perm-c-inspector" checked style="accent-color:var(--cyan)"> 巡檢系統</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.85rem;color:var(--text-hi)"><input type="checkbox" id="perm-c-maintenance" checked style="accent-color:var(--cyan)"> 維修系統</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.85rem;color:var(--text-hi)"><input type="checkbox" id="perm-c-handover" checked style="accent-color:var(--cyan)"> 電子交接簿</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.85rem;color:var(--text-hi)"><input type="checkbox" id="perm-c-repair" checked style="accent-color:var(--cyan)"> 報修系統</label>
+          </div>
+        </div>
         <div style="margin-top:14px"><button class="btn btn-primary" onclick="createUser()">+ 建立帳號</button></div>
       </div>
       <div class="panel">
-        <div class="panel-title">帳號清單</div>
-        <div class="search-bar">
-          <input class="search-input" id="userSearch" placeholder="搜尋姓名或部門…" oninput="filterUsers()">
+        <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>帳號清單</span>
+          <button class="btn btn-primary btn-sm" onclick="exportUsersCsv()">↓ 匯出 CSV</button>
+        </div>
+        <!-- 篩選列 -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+          <select id="filterL1" onchange="onFilterL1Change()" style="padding:7px 10px;background:rgba(2,8,20,.85);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-family:var(--font-mono);font-size:.8rem;outline:none;min-width:120px">
+            <option value="">全部部門</option>
+          </select>
+          <select id="filterL2" disabled onchange="filterUsers()" style="padding:7px 10px;background:rgba(2,8,20,.85);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-family:var(--font-mono);font-size:.8rem;outline:none;min-width:120px">
+            <option value="">全部課別</option>
+          </select>
+          <select id="filterRole" onchange="filterUsers()" style="padding:7px 10px;background:rgba(2,8,20,.85);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-family:var(--font-mono);font-size:.8rem;outline:none;min-width:110px">
+            <option value="">全部角色</option>
+            <option value="inspector">巡檢人員</option>
+            <option value="maintenance">維修人員</option>
+            <option value="supervisor">主管／查詢</option>
+            <option value="admin">系統管理者</option>
+          </select>
+          <input class="search-input" id="userSearch" placeholder="搜尋姓名或帳號…" oninput="filterUsers()" style="flex:1;min-width:140px">
+          <button class="btn btn-sm" style="background:rgba(12,40,64,.5);border:1px solid var(--border);color:var(--text-dim);white-space:nowrap" onclick="clearUserFilters()">✕ 清除</button>
         </div>
         <div style="overflow-x:auto">
           <table class="data-table" id="usersTable">
-            <thead><tr><th>姓名</th><th>帳號</th><th>部門</th><th>角色</th><th>狀態</th><th>操作</th></tr></thead>
-            <tbody id="usersTbody"><tr><td colspan="6" style="color:var(--text-dim);font-family:var(--font-mono)">LOADING…</td></tr></tbody>
+            <thead><tr><th>姓名</th><th>帳號</th><th>部門</th><th>角色</th><th>可用系統</th><th>狀態</th><th>操作</th></tr></thead>
+            <tbody id="usersTbody"><tr><td colspan="7" style="color:var(--text-dim);font-family:var(--font-mono)">LOADING…</td></tr></tbody>
           </table>
         </div>
+      </div>
+      <!-- 批次匯入 CSV -->
+      <div class="panel">
+        <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>批次匯入帳號（CSV）</span>
+          <button class="btn btn-sm" style="background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.2);color:var(--text-dim);font-size:.72rem" onclick="downloadImportTemplate()">↓ 下載範本</button>
+        </div>
+        <p style="font-size:.78rem;color:var(--text-dim);margin-bottom:12px">CSV 欄位順序：姓名, 帳號, Email, 密碼, 電話（選填）, 角色（inspector / maintenance / supervisor / admin）</p>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input type="file" id="csvImportFile" accept=".csv" style="flex:1;padding:8px;background:rgba(2,8,20,.8);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-size:.8rem;outline:none;min-width:200px">
+          <button class="btn btn-primary btn-sm" onclick="importUsersCsv()">↑ 開始匯入</button>
+        </div>
+        <div id="csvImportLog" style="margin-top:12px;font-family:var(--font-mono);font-size:.75rem;max-height:180px;overflow-y:auto;background:rgba(2,8,20,.8);border:1px solid var(--border);border-radius:2px;padding:10px;display:none;line-height:1.7"></div>
       </div>
     </div>
 
@@ -948,6 +988,15 @@ body{
           <option value="admin">系統管理者</option>
         </select>
       </div>
+      <div class="field" style="grid-column:1/-1">
+        <label>可使用系統（功能選單）</label>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;padding:6px 0">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.85rem;color:var(--text-hi)"><input type="checkbox" id="perm-e-inspector" checked style="accent-color:var(--cyan)"> 巡檢系統</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.85rem;color:var(--text-hi)"><input type="checkbox" id="perm-e-maintenance" checked style="accent-color:var(--cyan)"> 維修系統</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.85rem;color:var(--text-hi)"><input type="checkbox" id="perm-e-handover" checked style="accent-color:var(--cyan)"> 電子交接簿</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.85rem;color:var(--text-hi)"><input type="checkbox" id="perm-e-repair" checked style="accent-color:var(--cyan)"> 報修系統</label>
+        </div>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-sm" style="background:rgba(12,40,64,0.6);color:var(--text-dim);border:1px solid var(--border)" onclick="closeModal('editUserModal')">取消</button>
@@ -1243,6 +1292,11 @@ function editUser(userId) {
   document.getElementById('edit-u-phone').value = u.phone || '';
   document.getElementById('edit-u-role').value = u.role || 'inspector';
   populateEditUserDeptSelects(u.dept_id || null);
+  const p = u.permissions || {};
+  document.getElementById('perm-e-inspector').checked   = p.inspector   !== false;
+  document.getElementById('perm-e-maintenance').checked = p.maintenance !== false;
+  document.getElementById('perm-e-handover').checked    = p.handover    !== false;
+  document.getElementById('perm-e-repair').checked      = p.repair      !== false;
   document.getElementById('editUserModal').classList.add('show');
 }
 
@@ -1254,11 +1308,17 @@ async function saveEditUser() {
   const deptId = document.getElementById('edit-u-dept-l2').value || document.getElementById('edit-u-dept-l1').value || null;
   if (!name) { showToast('請填寫姓名', true); return; }
   if (!/^[一-龥]{2,10}$/.test(name)) { showToast('姓名格式錯誤，請輸入 2~10 個中文字', true); return; }
+  const permissions = {
+    inspector:   document.getElementById('perm-e-inspector').checked,
+    maintenance: document.getElementById('perm-e-maintenance').checked,
+    handover:    document.getElementById('perm-e-handover').checked,
+    repair:      document.getElementById('perm-e-repair').checked,
+  };
   const before = userMap[userId];
-  const updates = { name, phone: phone || null, role, dept_id: deptId };
+  const updates = { name, phone: phone || null, role, dept_id: deptId, permissions };
   const { error } = await db.from('users').update(updates).eq('user_id', userId);
   if (error) { showToast('儲存失敗：' + translateError(error.message), true); return; }
-  await writeAudit('users', userId, 'update', { name: before?.name, phone: before?.phone, role: before?.role, dept_id: before?.dept_id }, updates);
+  await writeAudit('users', userId, 'update', { name: before?.name, phone: before?.phone, role: before?.role, dept_id: before?.dept_id, permissions: before?.permissions }, updates);
   showToast(`使用者「${name}」已更新`);
   closeModal('editUserModal');
   await loadUsers();
@@ -1305,7 +1365,17 @@ async function loadDashboard() {
 
 async function loadUsers() {
   await loadAll();
+  populateUserFilters();
   renderUsers(allUsers);
+}
+
+function formatPerms(p) {
+  if (!p) return '<span style="font-size:.7rem;color:var(--text-dim)">全部</span>';
+  const map = { inspector:'巡檢', maintenance:'維修', handover:'交接', repair:'報修' };
+  const enabled = Object.entries(map).filter(([k]) => p[k] !== false).map(([,v]) => v);
+  if (!enabled.length) return '<span style="font-size:.7rem;color:var(--red)">無</span>';
+  if (enabled.length === 4) return '<span style="font-size:.7rem;color:var(--text-dim)">全部</span>';
+  return enabled.map(v => `<span style="font-size:.68rem;padding:1px 5px;border:1px solid var(--border-hi);border-radius:2px;color:var(--cyan)">${v}</span>`).join(' ');
 }
 
 function renderUsers(users) {
@@ -1314,6 +1384,7 @@ function renderUsers(users) {
     <td style="font-family:var(--font-mono);font-size:.8rem">${u.username || '—'}</td>
     <td>${getDeptPath(u.dept_id)}</td>
     <td><span class="role-badge">${ROLE_LABEL[u.role] || u.role}</span></td>
+    <td>${formatPerms(u.permissions)}</td>
     <td><span class="badge ${u.status === 'active' ? 'badge-active' : 'badge-inactive'}">${u.status === 'active' ? 'ACTIVE' : 'INACTIVE'}</span></td>
     <td style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn btn-primary btn-sm" onclick="editUser('${u.user_id}')">編輯</button>
@@ -1323,13 +1394,141 @@ function renderUsers(users) {
   </tr>`).join('');
 }
 
+function populateUserFilters() {
+  const l1Sel = document.getElementById('filterL1');
+  if (!l1Sel) return;
+  const prevL1 = l1Sel.value;
+  const l1Depts = allDepts.filter(d => !d.parent_id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+  l1Sel.innerHTML = '<option value="">全部部門</option>' +
+    l1Depts.map(d => `<option value="${d.dept_id}">${d.name}</option>`).join('');
+  if (prevL1) l1Sel.value = prevL1;
+}
+
+function onFilterL1Change() {
+  const l1Id = document.getElementById('filterL1').value;
+  const l2Sel = document.getElementById('filterL2');
+  const children = allDepts.filter(d => d.parent_id === l1Id).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+  if (!l1Id || children.length === 0) {
+    l2Sel.innerHTML = '<option value="">全部課別</option>';
+    l2Sel.disabled = true;
+  } else {
+    l2Sel.innerHTML = '<option value="">全部課別</option>' +
+      children.map(c => `<option value="${c.dept_id}">${c.name}</option>`).join('');
+    l2Sel.disabled = false;
+  }
+  filterUsers();
+}
+
+function clearUserFilters() {
+  document.getElementById('filterL1').value = '';
+  document.getElementById('filterL2').innerHTML = '<option value="">全部課別</option>';
+  document.getElementById('filterL2').disabled = true;
+  document.getElementById('filterRole').value = '';
+  document.getElementById('userSearch').value = '';
+  renderUsers(allUsers);
+}
+
 function filterUsers() {
-  const q = document.getElementById('userSearch').value.toLowerCase();
-  renderUsers(allUsers.filter(u =>
+  const q     = (document.getElementById('userSearch')?.value || '').toLowerCase();
+  const l1Id  = document.getElementById('filterL1')?.value || '';
+  const l2Id  = document.getElementById('filterL2')?.value || '';
+  const role  = document.getElementById('filterRole')?.value || '';
+  let filtered = allUsers;
+  if (l2Id) {
+    filtered = filtered.filter(u => u.dept_id === l2Id);
+  } else if (l1Id) {
+    const childIds = allDepts.filter(d => d.parent_id === l1Id).map(d => d.dept_id);
+    filtered = filtered.filter(u => u.dept_id === l1Id || childIds.includes(u.dept_id));
+  }
+  if (role)  filtered = filtered.filter(u => u.role === role);
+  if (q)     filtered = filtered.filter(u =>
     u.name.toLowerCase().includes(q) ||
     (u.username || '').toLowerCase().includes(q) ||
     getDeptPath(u.dept_id).toLowerCase().includes(q)
-  ));
+  );
+  renderUsers(filtered);
+}
+
+function exportUsersCsv() {
+  const headers = ['姓名','帳號','Email','電話','部門','角色','狀態','巡檢系統','維修系統','電子交接簿','報修系統'];
+  const rows = allUsers.map(u => {
+    const p = u.permissions || {};
+    return [
+      u.name, u.username || '', u.email || '', u.phone || '',
+      getDeptPath(u.dept_id), ROLE_LABEL[u.role] || u.role,
+      u.status === 'active' ? '啟用' : '停用',
+      p.inspector  !== false ? '是' : '否',
+      p.maintenance !== false ? '是' : '否',
+      p.handover   !== false ? '是' : '否',
+      p.repair     !== false ? '是' : '否',
+    ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
+  });
+  const csv = '﻿' + [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `users_${new Date().toLocaleDateString('zh-TW').replace(/\//g,'-')}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+function downloadImportTemplate() {
+  const csv = '﻿姓名,帳號,Email,密碼,電話,角色\n王小明,tcfm_wang,wang@example.com,Password123,0912345678,inspector\n';
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'user_import_template.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+function parseCSVLine(line) {
+  const result = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+    else if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+    else cur += ch;
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+async function importUsersCsv() {
+  const file = document.getElementById('csvImportFile').files[0];
+  if (!file) { showToast('請選擇 CSV 檔案', true); return; }
+  const log = document.getElementById('csvImportLog');
+  log.style.display = 'block'; log.innerHTML = '<div style="color:var(--cyan)">▶ 開始匯入…</div>';
+  const text = await file.text();
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length < 2) { log.innerHTML += '<div style="color:var(--red)">CSV 格式錯誤：需至少一筆資料列</div>'; return; }
+  const dataLines = lines.slice(1);
+  let success = 0, failed = 0;
+  const validRoles = ['inspector','maintenance','supervisor','admin'];
+  for (let i = 0; i < dataLines.length; i++) {
+    const cols = parseCSVLine(dataLines[i]);
+    const [name, username, email, password, phone, role] = cols;
+    if (!name || !username || !email || !password) {
+      log.innerHTML += `<div style="color:var(--amber)">第 ${i+2} 行：缺少必填欄位（姓名/帳號/Email/密碼），跳過</div>`; failed++; continue;
+    }
+    if (!/^[一-龥]{2,10}$/.test(name)) {
+      log.innerHTML += `<div style="color:var(--amber)">第 ${i+2} 行「${name}」：姓名需為 2-10 個中文字，跳過</div>`; failed++; continue;
+    }
+    const userRole = validRoles.includes(role) ? role : 'inspector';
+    const { data: authData, error: authErr } = await db.auth.signUp({ email, password });
+    if (authErr) {
+      log.innerHTML += `<div style="color:var(--red)">第 ${i+2} 行「${name}」：${translateError(authErr.message)}</div>`; failed++; continue;
+    }
+    const profile = { auth_id: authData.user.id, name, username, email, phone: phone || null, role: userRole, status: 'active', created_by: currentUser.user_id };
+    const { error: profErr } = await db.from('users').insert(profile);
+    if (profErr) {
+      log.innerHTML += `<div style="color:var(--red)">第 ${i+2} 行「${name}」：${translateError(profErr.message)}</div>`; failed++; continue;
+    }
+    log.innerHTML += `<div style="color:var(--green)">✓ 「${name}」（${username}）匯入成功</div>`;
+    success++;
+    log.scrollTop = log.scrollHeight;
+  }
+  log.innerHTML += `<div style="color:var(--cyan);margin-top:8px;border-top:1px solid var(--border);padding-top:6px">完成：成功 ${success} 筆，失敗 ${failed} 筆</div>`;
+  log.scrollTop = log.scrollHeight;
+  if (success > 0) await loadUsers();
 }
 
 async function createUser() {
@@ -1355,7 +1554,13 @@ async function createUser() {
     return;
   }
 
-  const profile = { auth_id: authData.user.id, name, username, email, phone: phone || null, dept_id: deptId, role, status: 'active', created_by: currentUser.user_id };
+  const permissions = {
+    inspector:   document.getElementById('perm-c-inspector').checked,
+    maintenance: document.getElementById('perm-c-maintenance').checked,
+    handover:    document.getElementById('perm-c-handover').checked,
+    repair:      document.getElementById('perm-c-repair').checked,
+  };
+  const profile = { auth_id: authData.user.id, name, username, email, phone: phone || null, dept_id: deptId, role, permissions, status: 'active', created_by: currentUser.user_id };
   const { error: profErr } = await db.from('users').insert(profile);
   if (profErr) { showToast('建立使用者資料失敗：' + translateError(profErr.message), true); return; }
 

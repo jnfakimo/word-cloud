@@ -6,6 +6,7 @@
 <title>臺北農產運銷股份有限公司 第一果菜市場 巡檢系統</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -462,6 +463,31 @@ body{
     <span class="section-title">◈ 設備清單</span>
     <span class="badge-count" id="pendingCount">LOADING…</span>
   </div>
+  <!-- 今日巡檢概況 -->
+  <div style="margin-bottom:12px;background:var(--panel);border:1px solid var(--border);border-radius:2px;padding:10px 14px;position:relative">
+    <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,var(--green),transparent);opacity:.4"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <span style="font-family:var(--font-mono);font-size:.68rem;color:var(--text-dim);letter-spacing:.06em">今日巡檢概況</span>
+      <span style="font-family:var(--font-mono);font-size:.62rem;color:var(--text-dim)" id="chartDate">—</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <canvas id="statusChart" width="80" height="80" style="flex-shrink:0"></canvas>
+      <div style="flex:1;display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.72rem;color:var(--green);font-family:var(--font-mono)">✓ 正常</span>
+          <span style="font-size:.9rem;font-weight:700;color:var(--green);font-family:var(--font-mono)" id="countNormal">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.72rem;color:var(--red);font-family:var(--font-mono)">✗ 異常</span>
+          <span style="font-size:.9rem;font-weight:700;color:var(--red);font-family:var(--font-mono)" id="countAbnormal">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.72rem;color:var(--amber);font-family:var(--font-mono)">○ 未巡檢</span>
+          <span style="font-size:.9rem;font-weight:700;color:var(--amber);font-family:var(--font-mono)" id="countPending">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
   <!-- 進度條 -->
   <div style="margin-bottom:12px;background:var(--panel);border:1px solid var(--border);border-radius:2px;padding:10px 14px;position:relative">
     <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,var(--cyan),transparent);opacity:.4"></div>
@@ -901,9 +927,52 @@ async function loadEquipment() {
   document.getElementById('progressText').textContent = `${done.length} / ${eqs.length}`;
 
   renderEqList(eqs);
+  updateStatusChart();
 
   const sel = document.getElementById('repairEqId');
   sel.innerHTML = eqs.map(e => `<option value="${e.equipment_id}">${e.name}</option>`).join('');
+}
+
+let _statusChart = null;
+function updateStatusChart() {
+  const normal   = Object.values(_inspectedMap).filter(r => r.run_status === 'normal').length;
+  const abnormal = Object.values(_inspectedMap).filter(r => r.run_status === 'abnormal').length;
+  const pending  = _allEqs.length - Object.keys(_inspectedMap).length;
+
+  document.getElementById('countNormal').textContent   = normal;
+  document.getElementById('countAbnormal').textContent = abnormal;
+  document.getElementById('countPending').textContent  = pending;
+
+  const now = new Date();
+  document.getElementById('chartDate').textContent =
+    `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
+
+  const canvas = document.getElementById('statusChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (_statusChart) { _statusChart.destroy(); _statusChart = null; }
+
+  const hasData = normal + abnormal + pending > 0;
+  _statusChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      datasets: [{
+        data: hasData ? [normal, abnormal, pending] : [1],
+        backgroundColor: hasData
+          ? ['rgba(0,255,157,0.75)','rgba(255,59,59,0.75)','rgba(255,179,0,0.3)']
+          : ['rgba(58,106,138,0.2)'],
+        borderColor: hasData
+          ? ['#00ff9d','#ff3b3b','rgba(255,179,0,0.6)']
+          : ['#1a4a70'],
+        borderWidth: 1,
+      }],
+    },
+    options: {
+      cutout: '65%',
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      animation: { duration: 400 },
+    },
+  });
 }
 
 function renderEqList(eqs) {
