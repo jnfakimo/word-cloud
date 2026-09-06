@@ -114,6 +114,7 @@ export function MarkerBoardModule({ profile }: Props) {
   const [detail, setDetail] = useState<{ marker: Marker; left: number; top: number } | null>(null);
 
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const navigatorHostRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<any>(null);
   const overlaysRef = useRef<Map<string, HTMLElement>>(new Map());
   const placeModeRef = useRef(placeMode);
@@ -218,15 +219,20 @@ export function MarkerBoardModule({ profile }: Props) {
       // 3D建模系統輸出的 PNG 將青色線條烘在檔案內。整合標記系統必須與平面模型圖、
       // 3D模型圖共用同一份預處理：一般版重畫為黑線，科技版保留青色但濾掉光暈。
       const OpenSeadragon = (await import('openseadragon')).default;
-      if (disposed || !hostRef.current) return;
+      if (disposed || !hostRef.current || !navigatorHostRef.current) return;
       // OpenSeadragon.destroy() 在圖像仍於背景解碼時可能留下舊 canvas；主題快速切換後，
       // 殘留的透明畫布會蓋住新 viewer。重建前統一清空 host，確保永遠只有一套畫布。
       hostRef.current.replaceChildren();
+      // OSD.destroy() 會移除 navigator element；不可把 React 擁有的容器交給它。
+      // 每次重建只交出可拋棄的子元素，切換主題後外層 ref 仍然有效。
+      const navigatorElement = document.createElement('div');
+      navigatorElement.className = 'mb-nav-content';
+      navigatorHostRef.current.replaceChildren(navigatorElement);
       const token = (name: string, fallback: string) =>
         getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
       viewer = OpenSeadragon({
         element: hostRef.current, prefixUrl: '',
-        showNavigationControl: false, showNavigator: true, navigatorId: 'markerboard-nav',
+        showNavigationControl: false, showNavigator: true, navigatorElement,
         navigatorAutoFade: false,
         navigatorBackground: token('--bg', '#020b18'),
         navigatorBorderColor: token('--line', '#173952'),
@@ -323,7 +329,11 @@ export function MarkerBoardModule({ profile }: Props) {
       for (let index = 0; index < orderedFloors.length; index += 1) {
         await addPreparedFloor(orderedFloors[index], index === 0);
       }
-    })();
+    })().catch(error => {
+      if (disposed) return;
+      console.error('markerboard viewer initialization failed', error);
+      setProgress({ pct: 100, msg: `圖臺載入失敗：${errorMessage(error, '請重新整理頁面後再試')}` });
+    });
     return () => {
       disposed = true;
       if (viewerRef.current === viewer) viewerRef.current = null;
@@ -692,7 +702,7 @@ export function MarkerBoardModule({ profile }: Props) {
     </aside>
 
     <div className="mb-osd" ref={hostRef} />
-    <div className="mb-nav" id="markerboard-nav" />
+    <div className="mb-nav" ref={navigatorHostRef} />
 
     {placeMode && <div className="mb-placehint">
       {pendingLinkRef.current ? '點選平面圖放置此項目' : '點選平面圖任一位置放置標記　·　再按一次退出放置模式'}
