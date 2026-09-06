@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$SourceRoot = (Split-Path $PSScriptRoot -Parent),
     [string]$FunctionsRoot = 'C:\supabase-0705\functions',
     [string]$Container = 'supabase_edge_runtime_0705',
