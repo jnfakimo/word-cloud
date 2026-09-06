@@ -20,7 +20,9 @@ def digest(value):
 
 def run_case(name, apply, mode='', corrupt=False, drift=False, dependency_lf=False, dependency_drift=False):
     with tempfile.TemporaryDirectory(prefix='inspection-repair-test-') as temp:
-        fixture = Path(temp)
+        # Windows hosted runners may provide RUNNER~1 in TEMP; resolve the fixture
+        # before crossing into Git Bash so realpath checks see the same path.
+        fixture = Path(temp).resolve()
         root, source, backup, diagnostics = [fixture/p for p in ('target', 'source', 'backup', 'diagnostics')]
         root.mkdir(); source.mkdir(); backup.mkdir(); diagnostics.mkdir()
         script = SCRIPT
