@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { canonicalFloor } from '@/lib/floor';
 import { preparePlanCanvas } from '@/lib/floorplan-render';
+import { perspectiveFitDistance } from '@/lib/perspective-fit';
 
 // 樓層排序沿用全站唯一的 web/lib/floor.ts；此處再匯出，既有匯入端不必改寫。
 export { floorOrder } from '@/lib/floor';
@@ -106,7 +107,6 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       // 與 .f3-stage 的 var(--bg) 對齊：兩者一旦有色差，畫布邊緣就會露出一條異色線。
       scene.background = new THREE.Color(isLight ? 0xf4f6fa : 0x020b18);
       const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2000);
-      camera.position.set(9, 9, 12);
       const renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.setSize(width, height);
@@ -114,7 +114,6 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
 
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
-      controls.target.set(xPan, normalizedModels.length * gap / 2 + yPan, 0);
 
       scene.add(new THREE.AmbientLight(0xffffff, 1.1));
       const dir = new THREE.DirectionalLight(0xffffff, 0.7);
@@ -127,10 +126,34 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       const loader = new THREE.TextureLoader();
       loader.setCrossOrigin('anonymous');
       // level 目前資料皆為 0，故以清單順序乘間距堆疊；日後 level 有值則優先採用。
-      const useLevel = normalizedModels.some(m => Number(m.level) !== 0);
+      const explicitLevels = normalizedModels.map(row => Number.isFinite(Number(row.level)) ? Number(row.level) : 0);
+      const useLevel = explicitLevels.some(level => level !== 0);
+      const levels = explicitLevels.map((level, index) => useLevel ? level : index * gap);
+      const visibleLevels = levels.filter((_, index) => visibleFloors?.[normalizedModels[index].floor_id] !== false);
+      const framedLevels = visibleLevels.length ? visibleLevels : levels;
+      const minY = Math.min(...framedLevels), maxY = Math.max(...framedLevels);
+      let autoFit = true;
+      const fitView = (direction: import('three').Vector3) => {
+        controls.target.set(xPan, (minY + maxY) / 2 + yPan, 0);
+        direction.normalize();
+        const distance = perspectiveFitDistance({
+          min: [-PLANE_W / 2, minY - 0.05, -PLANE_H / 2],
+          max: [PLANE_W / 2, maxY + 0.3, PLANE_H / 2],
+          target: [controls.target.x, controls.target.y, controls.target.z],
+          direction: [direction.x, direction.y, direction.z], fov: camera.fov, aspect: camera.aspect,
+        });
+        camera.position.copy(controls.target).addScaledVector(direction, distance);
+        camera.far = Math.max(2000, distance * 4);
+        camera.updateProjectionMatrix();
+        controls.update();
+      };
+      // Fit both horizontal and vertical fields of view; portrait screens are narrower.
+      fitView(new THREE.Vector3(9, 9, 12));
+      const stopAutoFit = () => { autoFit = false; };
+      controls.addEventListener('start', stopAutoFit);
 
       normalizedModels.forEach((row, index) => {
-        const y = useLevel ? Number(row.level) || 0 : index * gap;
+        const y = levels[index];
         
         const isVisible = visibleFloors ? visibleFloors[String(row.floor_id)] !== false : true;
         if (!isVisible) return;
@@ -286,25 +309,23 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       // V1 的 resetView／topView 是直接設定自製球座標的 theta／phi／r；這裡場景尺度不同
       // （V1 以公尺計、本元件的平面固定為 10×7 單位），因此改以等效視角表達：
       // 重置＝預設的四分之三視角，俯視＝正上方。
-      const stackTop = normalizedModels.length * gap;
       if (apiRef) {
         apiRef.current = {
           resetView: () => {
-            controls.target.set(xPan, stackTop / 2 + yPan, 0);
-            camera.position.set(9, 9, 12);
-            controls.update();
+            autoFit = true;
+            fitView(new THREE.Vector3(9, 9, 12));
           },
           topView: () => {
-            controls.target.set(xPan, stackTop / 2 + yPan, 0);
-            camera.position.set(xPan + 0.001, stackTop / 2 + yPan + 18, 0);
-            controls.update();
+            autoFit = true;
+            fitView(new THREE.Vector3(0.001, 1, 0));
           },
           focusMarker: markerId => {
             const marker = normalizedMarkers.find(item => item.id === markerId);
             if (!marker) return false;
             const index = normalizedModels.findIndex(row => String(row.floor_id) === marker.floor_id);
             if (index < 0) return false;
-            const y = (useLevel ? Number(normalizedModels[index].level) || 0 : index * gap) + 0.12;
+            autoFit = false;
+            const y = levels[index] + 0.12;
             const px = marker.x * PLANE_W - PLANE_W / 2;
             const pz = marker.y * PLANE_H - PLANE_H / 2;
             controls.target.set(px, y, pz);
@@ -317,6 +338,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       const onResize = () => {
         const w = host.clientWidth || width, h = host.clientHeight || height;
         camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
+        if (autoFit) fitView(camera.position.clone().sub(controls.target));
       };
       window.addEventListener('resize', onResize);
 
@@ -324,6 +346,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
         if (apiRef) apiRef.current = null;
         cancelAnimationFrame(raf);
         window.removeEventListener('resize', onResize);
+        controls.removeEventListener('start', stopAutoFit);
         controls.dispose();
         scene.traverse(obj => {
           const mesh = obj as unknown as { geometry?: { dispose?: () => void }; material?: unknown };
