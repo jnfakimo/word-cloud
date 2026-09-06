@@ -86,25 +86,50 @@ async function listTables() {
  * Requests use separate read snapshots: this is still an off-peak logical export,
  * not a transaction-consistent PostgreSQL snapshot under concurrent updates.
  */
-async function dumpTable(table, primaryColumns, tablesDir) {
+export function buildTablePageQuery(table, primaryColumns, pageSize, offset, cursor) {
+  if (!Number.isInteger(pageSize) || pageSize < 1 || !Number.isInteger(offset) || offset < 0) throw new Error('備份分頁參數不正確');
   const ident = quoteIdent(table);
   const order = primaryColumns.length ? primaryColumns.map(quoteIdent).join(', ') : 'ctid';
+  let where = '';
+  if (cursor !== null) {
+    if (!primaryColumns.length || !Array.isArray(cursor) || cursor.length !== primaryColumns.length || cursor.some(value => typeof value !== 'string')) {
+      throw new Error('備份主鍵游標格式不正確');
+    }
+    const literals = cursor.map(value => "E'" + value.replaceAll('\\', '\\\\').replaceAll("'", "''") + "'");
+    where = `where (${order}) > (${literals.join(', ')}) `;
+  }
+  const projection = primaryColumns.length
+    ? ', json_build_array(' + primaryColumns.map(column => `t.${quoteIdent(column)}::text`).join(', ') + ')::text as backup_cursor'
+    : '';
+  return `select row_to_json(t)::text as r${projection} from (select * from public.${ident} ` +
+    `${where}order by ${order} limit ${pageSize}${primaryColumns.length ? '' : ` offset ${offset}`}) t`;
+}
+
+async function dumpTable(table, primaryColumns, tablesDir) {
   const file = path.join(tablesDir, `${table}.ndjson`);
   const hash = createHash('sha256');
   let offset = 0;
   let rows = 0;
+  let cursor = null;
   await writeFile(file, '');
   for (;;) {
-    const batch = await query(
-      `select row_to_json(t)::text as r from (select * from public.${ident} ` +
-      `order by ${order} limit ${PAGE_SIZE} offset ${offset}) t`,
-    );
+    const pageStarted = Date.now();
+    const batch = await query(buildTablePageQuery(table, primaryColumns, PAGE_SIZE, offset, cursor));
     if (!batch.length) break;
     const chunk = batch.map(row => row.r).join('\n') + '\n';
     hash.update(chunk);
     await appendFile(file, chunk);
     rows += batch.length;
-    console.log(`資料表 ${table}：已匯出 ${rows} 列`);
+    console.log(`資料表 ${table}：已匯出 ${rows} 列（本頁 ${Date.now() - pageStarted} ms）`);
+    if (primaryColumns.length) {
+      const nextCursor = JSON.parse(batch.at(-1).backup_cursor);
+      // Validate before another request; a missing/repeated cursor must fail,
+      // never loop indefinitely or silently publish a truncated backup.
+      if (!Array.isArray(nextCursor)) throw new Error('備份主鍵游標格式不正確');
+      buildTablePageQuery(table, primaryColumns, PAGE_SIZE, 0, nextCursor);
+      if (JSON.stringify(nextCursor) === JSON.stringify(cursor)) throw new Error('備份主鍵游標未前進');
+      cursor = nextCursor;
+    }
     offset += batch.length;
     if (batch.length < PAGE_SIZE) break;
   }

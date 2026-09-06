@@ -44,13 +44,15 @@ globalThis.fetch = async (url, init) => {
       { table_name: 'over_page', column_name: 'ts' },
     ]);
   }
-  const match = body.query.match(/^select row_to_json\(t\)::text as r from \(select \* from public\."([a-z0-9_]+)" order by (.+) limit (\d+) offset (\d+)\) t$/);
+  const match = body.query.match(/from \(select \* from public\."([a-z0-9_]+)" (?:where (.+) )?order by (.+) limit (\d+)(?: offset (\d+))?\) t$/);
   if (!match) throw new Error(`未預期的查詢：${body.query.slice(0, 60)}`);
-  const [, table, order, limit, offset] = match;
+  const [, table, where, order, limit, offset] = match;
   seenOrders.set(table, order);
+  const start = where ? Number(where.match(/> \(E'(\d+)'/)[1]) + 1 : Number(offset || 0);
   const rows = [];
-  for (let i = Number(offset); i < Math.min(TABLES[table], Number(offset) + Number(limit)); i++) {
-    rows.push({ r: JSON.stringify({ id: i, name: `第 ${i} 筆`, ts: '2026-08-25T12:00:00+08:00' }) });
+  for (let i = start; i < Math.min(TABLES[table], start + Number(limit)); i++) {
+    rows.push({ r: JSON.stringify({ id: i, name: `第 ${i} 筆`, ts: '2026-08-25T12:00:00+08:00' }),
+      backup_cursor: JSON.stringify(table === 'over_page' ? [String(i), '2026-08-25T12:00:00+08:00'] : [String(i)]) });
   }
   return reply(rows);
 };
@@ -61,7 +63,7 @@ process.env.BACKUP_PAGE_SIZE = '100';
 process.env.BACKUP_INCLUDE_STORAGE = 'false';
 
 console.log('備份：分頁與完整性');
-const { main, verifyBackup } = await import(backupModule);
+const { main, verifyBackup, buildTablePageQuery } = await import(backupModule);
 await main();
 globalThis.fetch = originalFetch;
 
@@ -70,6 +72,12 @@ check('備份查詢全部是唯讀', readOnlyViolations === 0, `${readOnlyViolat
 check('單欄主鍵使用索引排序', seenOrders.get('exact_200') === '"id"');
 check('複合主鍵保留欄位順序', seenOrders.get('over_page') === '"id", "ts"');
 check('無主鍵保留 ctid 分頁', seenOrders.get('empty_table') === 'ctid');
+const cursorQuery = buildTablePageQuery('test', ['id', 'name'], 100, 2000, ['9007199254740993', "O'Brien\\x"]);
+check('主鍵以游標接續、不使用 OFFSET', !/\boffset\b/i.test(cursorQuery) && cursorQuery.includes('where ("id", "name") >'));
+check('游標保留大整數與正確跳脫字元', cursorQuery.includes("E'9007199254740993'") && cursorQuery.includes("E'O''Brien\\\\x'"));
+let invalidCursorRejected = false;
+try { buildTablePageQuery('test', ['id'], 100, 0, [null]); } catch { invalidCursorRejected = true; }
+check('無效游標會中止', invalidCursorRejected);
 for (const [name, expected] of Object.entries(TABLES)) {
   const entry = manifest.tables.find(t => t.name === name);
   check(`${name} 筆數 ${expected}`, entry?.rows === expected, `實際 ${entry?.rows}`);
