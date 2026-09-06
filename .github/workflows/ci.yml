@@ -24,6 +24,8 @@ jobs:
           node-version: '24'
       - name: Verify IIS deployment under Windows PowerShell 5.1
         run: node tools/iis-sync-compatibility-check.mjs
+      - name: Verify scoped WSL repair backups and rollback
+        run: python tools/wsl-edge-repair-check.py
 
   build:
     runs-on: ubuntu-latest

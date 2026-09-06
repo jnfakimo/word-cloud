@@ -67,6 +67,8 @@ BEGIN READ ONLY;
 SET LOCAL statement_timeout = '30s';
 SELECT 'PUBLIC_TABLE|' || c.relname || '|rls=' || c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' ORDER BY c.relname;
 SELECT 'ROW_ESTIMATE|' || relname || '|' || n_live_tup FROM pg_stat_user_tables WHERE schemaname='public' ORDER BY relname;
+SELECT format('SELECT %L || count(*) FROM %I.%I;', 'EXACT_ROWS|' || tablename || '|', schemaname, tablename) FROM pg_tables WHERE schemaname='public' ORDER BY tablename
+\gexec
 SELECT 'AUTH_USERS|' || count(*) FROM auth.users;
 SELECT 'STORAGE_OBJECTS|' || count(*) FROM storage.objects;
 SELECT 'STORAGE_BUCKET|' || id || '|public=' || public FROM storage.buckets ORDER BY id;
