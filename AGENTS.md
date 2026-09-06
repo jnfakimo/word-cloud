@@ -85,6 +85,10 @@ DELETE/TRUNCATE — it does not protect against a bad UPDATE.
 `.github/workflows/database-backup.yml` dumps every `public` table plus Storage nightly
 and uploads it AES256-encrypted, because this repo is public and artifacts are world-
 readable. Restoring is manual, dry-run unless `--execute`, and never deletes rows.
+Manifest v2 checks each Storage object's SHA-256 and size; encryption is verified
+by decrypting and comparing the archive before upload. Restore requires an explicit
+target project, preserves raw JSON numbers, and rejects nonempty tables without a
+primary key before any writes. This is not a complete application restore drill.
 **Auth accounts are deliberately out of scope** — after a full restore nobody can log in
 until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md`.
 

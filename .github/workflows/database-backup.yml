@@ -80,6 +80,14 @@ jobs:
             --pinentry-mode loopback --passphrase-fd 0 \
             --symmetric --cipher-algo AES256 \
             --output "$archive.gpg" "$archive"
+          # Verify the saved passphrase really decrypts the archive before
+          # removing plaintext. No restored data or passphrase is logged.
+          printf '%s' "$BACKUP_PASSPHRASE" | gpg --batch --yes --quiet \
+            --pinentry-mode loopback --passphrase-fd 0 \
+            --output "$archive.roundtrip" --decrypt "$archive.gpg"
+          cmp --silent "$archive" "$archive.roundtrip"
+          rm -f "$archive.roundtrip"
+          echo "加密解密往返驗證通過。"
           rm -f "$archive"
           rm -rf "$BACKUP_OUT_DIR"
           echo "ARCHIVE=$archive.gpg" >> "$GITHUB_ENV"

@@ -23,7 +23,7 @@ import path from 'node:path';
 import { verifyBackup } from './database-backup.mjs';
 
 const MANAGEMENT_TOKEN = process.env.SUPABASE_ACCESS_TOKEN || '';
-const PROJECT_REF = process.env.SUPABASE_PROJECT_REF || 'qztffronusdhgxhjjubt';
+const PROJECT_REF = process.env.SUPABASE_PROJECT_REF || '';
 const QUERY_URL = `https://api.supabase.com/v1/projects/${encodeURIComponent(PROJECT_REF)}/database/query`;
 const BATCH = 200;
 
@@ -48,7 +48,7 @@ function quoteIdent(name) {
 }
 
 function sqlLiteral(text) {
-  return `'${String(text).replace(/'/g, "''")}'`;
+  return `E'${String(text).replace(/\\/g, '\\\\').replace(/'/g, "''")}'`;
 }
 
 async function query(sql, readOnly) {
@@ -56,12 +56,13 @@ async function query(sql, readOnly) {
     method: 'POST',
     headers: { Authorization: `Bearer ${MANAGEMENT_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ query: sql, read_only: readOnly }),
+    signal: AbortSignal.timeout(60000),
   });
   if (!response.ok) throw new Error(`Management API 回應 HTTP ${response.status}`);
   return response.json();
 }
 
-/** upsert 需要主鍵；查不到主鍵的表只能用 insert-missing，否則會重複塞。 */
+/** A primary key is required: ON CONFLICT does not deduplicate a table without constraints. */
 async function primaryKey(table) {
   const rows = await query(
     'select a.attname as col from pg_index i ' +
@@ -83,10 +84,22 @@ async function columns(table) {
 }
 
 export function buildStatement(table, rows, pk, cols, mode) {
+  return buildStatementFromLines(table, rows.map(row => JSON.stringify(row)), pk, cols, mode);
+}
+
+/** Keep PostgreSQL's original JSON numbers: parsing and serializing loses bigint/numeric precision. */
+export function buildStatementFromLines(table, lines, pk, cols, mode) {
   const ident = `public.${quoteIdent(table)}`;
-  const payload = sqlLiteral(JSON.stringify(rows));
+  if (!pk.length) throw new Error(`資料表 ${table} 沒有主鍵，無法保證重複還原安全，請另訂隔離還原程序。`);
+  if (!['upsert', 'insert-missing'].includes(mode)) throw new Error('未知還原模式。');
+  for (const line of lines) {
+    let row;
+    try { row = JSON.parse(line); } catch { throw new Error('備份列不是有效 JSON。'); }
+    if (!row || Array.isArray(row) || typeof row !== 'object') throw new Error('備份列必須是 JSON 物件。');
+  }
+  const payload = sqlLiteral(`[${lines.join(',')}]`);
   const base = `insert into ${ident} select * from jsonb_populate_recordset(null::${ident}, ${payload}::jsonb)`;
-  if (mode === 'insert-missing' || pk.length === 0) return `${base} on conflict do nothing`;
+  if (mode === 'insert-missing') return `${base} on conflict do nothing`;
   const updatable = cols.filter(c => !pk.includes(c));
   if (!updatable.length) return `${base} on conflict do nothing`;
   const setClause = updatable.map(c => `${quoteIdent(c)} = excluded.${quoteIdent(c)}`).join(', ');
@@ -95,6 +108,7 @@ export function buildStatement(table, rows, pk, cols, mode) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  if (!PROJECT_REF) throw new Error('請明確設定 SUPABASE_PROJECT_REF；還原不預設指向正式專案。');
   if (!MANAGEMENT_TOKEN) throw new Error('缺少 SUPABASE_ACCESS_TOKEN。');
   if (!args.dir) throw new Error('請以 --dir=<解開後的備份目錄> 指定來源。');
   if (!['upsert', 'insert-missing'].includes(args.mode)) throw new Error(`--mode 只能是 upsert 或 insert-missing。`);
@@ -104,7 +118,8 @@ async function main() {
   }
 
   if (!args.skipVerify) {
-    const { problems } = await verifyBackup(args.dir);
+    const { problems, warnings } = await verifyBackup(args.dir);
+    for (const warning of warnings) console.warn(warning);
     if (problems.length) {
       throw new Error(`備份完整性檢查未通過，拒絕還原：\n  ${problems.join('\n  ')}`);
     }
@@ -126,20 +141,28 @@ async function main() {
 
   let totalRows = 0;
   let totalBatches = 0;
+  // Preflight every selected table before the first write, so an unsupported
+  // no-primary-key table cannot leave an otherwise avoidable partial restore.
+  const plans = [];
   for (const table of targets) {
+    quoteIdent(table);
     const content = await readFile(path.join(args.dir, 'tables', `${table}.ndjson`), 'utf8');
-    const rows = content ? content.trimEnd().split('\n').map(line => JSON.parse(line)) : [];
+    const rows = content ? content.trimEnd().split('\n') : [];
     if (!rows.length) { console.log(`  ${table.padEnd(32)} 備份中為空，略過`); continue; }
     const pk = await primaryKey(table);
     const cols = await columns(table);
-    const effectiveMode = pk.length ? args.mode : 'insert-missing';
+    if (!pk.length) throw new Error(`資料表 ${table} 沒有主鍵，已在寫入前中止。`);
+    for (let i = 0; i < rows.length; i += BATCH) buildStatementFromLines(table, rows.slice(i, i + BATCH), pk, cols, args.mode);
+    plans.push({ table, rows, pk, cols });
+  }
+  for (const { table, rows, pk, cols } of plans) {
     let batches = 0;
     for (let i = 0; i < rows.length; i += BATCH) {
-      const statement = buildStatement(table, rows.slice(i, i + BATCH), pk, cols, effectiveMode);
+      const statement = buildStatementFromLines(table, rows.slice(i, i + BATCH), pk, cols, args.mode);
       if (args.execute) await query(statement, false);
       batches += 1;
     }
-    const note = pk.length ? `主鍵 ${pk.join('+')}` : '無主鍵，改用 insert-missing';
+    const note = `主鍵 ${pk.join('+')}`;
     console.log(`  ${table.padEnd(32)} ${String(rows.length).padStart(6)} 筆／${batches} 批（${note}）`);
     totalRows += rows.length;
     totalBatches += batches;

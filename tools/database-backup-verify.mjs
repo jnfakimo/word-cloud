@@ -16,7 +16,8 @@ if (!dir) {
   process.exit(1);
 }
 
-const { manifest, problems } = await verifyBackup(dir);
+const { manifest, problems, warnings } = await verifyBackup(dir);
+for (const warning of warnings) console.warn(`::warning::${warning}`);
 
 if (problems.length) {
   console.error('::error::備份完整性檢查未通過：');

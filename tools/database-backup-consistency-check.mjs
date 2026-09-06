@@ -108,16 +108,17 @@ const { buildStatement, parseArgs } = await import(restoreModule);
 const rows = [{ id: 1, name: 'a' }, { id: 2, name: 'b' }];
 const upsert = buildStatement('locations', rows, ['id'], ['id', 'name'], 'upsert');
 const missing = buildStatement('locations', rows, ['id'], ['id', 'name'], 'insert-missing');
-const noPk = buildStatement('locations', rows, [], ['id', 'name'], 'upsert');
 
-for (const [label, sql] of [['upsert', upsert], ['insert-missing', missing], ['無主鍵', noPk]]) {
+for (const [label, sql] of [['upsert', upsert], ['insert-missing', missing]]) {
   check(`${label} 不含 delete/truncate/drop`, !/\b(delete|truncate|drop)\b/i.test(sql));
   check(`${label} 使用 jsonb_populate_recordset`, sql.includes('jsonb_populate_recordset'));
 }
 check('upsert 會更新非主鍵欄位', upsert.includes('do update set "name" = excluded."name"'));
 check('upsert 不更新主鍵本身', !upsert.includes('do update set "id"'));
 check('insert-missing 不覆蓋既有資料', missing.includes('on conflict do nothing'));
-check('無主鍵時退回 insert-missing', noPk.includes('on conflict do nothing'));
+let noPkRejected = false;
+try { buildStatement('locations', rows, [], ['id', 'name'], 'upsert'); } catch { noPkRejected = true; }
+check('無主鍵時拒絕不安全的重複還原', noPkRejected);
 
 let rejected = false;
 try { buildStatement('locations; drop table users', rows, ['id'], ['id'], 'upsert'); } catch { rejected = true; }

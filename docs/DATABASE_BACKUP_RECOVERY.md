@@ -38,8 +38,8 @@ idempotent 的，可依流程重建。資料與附件仍需持續備份並實際
 觸發（Actions → Database backup → Run workflow）。
 
 1. `tools/database-backup.mjs` 透過 Management API **唯讀**查詢，逐表分頁匯出
-2. `tools/database-backup-verify.mjs` 比對 sha256 與行數，對不上就讓流程失敗
-3. 打包後以 **AES256 對稱加密**，明文檔在 runner 上就刪掉
+2. `tools/database-backup-verify.mjs` 比對資料表 SHA-256 與行數，以及 Storage 逐檔 SHA-256、大小、數量與清單，對不上就讓流程失敗。新版 manifest 為 v2；v1 附件沒有逐檔雜湊，只能核對數量／總大小並明確警告
+3. 打包後以 **AES256 對稱加密**，在 runner 解密並逐位元組比對原封裝，通過後刪除兩份明文
 4. 確認產物確實是密文（解不開成 tar）才上傳
 5. 上傳成 artifact，保留 **90 天**
 
@@ -101,18 +101,22 @@ backup/
 還原一律採 upsert 或 insert-missing，**永遠不刪除**：它補回缺的、蓋回被改壞的，
 但不會清掉備份之後才新增的資料。
 
+執行前必須明確設定 `SUPABASE_PROJECT_REF`，工具不再預設正式專案。還原直接保留 NDJSON 的原始數字，避免 bigint／numeric 被 JavaScript 四捨五入。所有選定非空資料表會先檢查主鍵與 JSON；無主鍵表會在任何寫入前中止，不能把 `ON CONFLICT DO NOTHING` 當作無主鍵資料的去重機制。無主鍵表須另訂隔離環境的一次性載入程序。
+
+單次 Management API 請求限 60 秒；寫入不自動重試。若連線中斷或逾時，必須先核對目標資料，再決定是否續跑，不能假設該批完全未寫入。
+
 ### 情境 A：某張表被寫壞（最常見）
 
 先演練，確認影響範圍：
 
 ```bash
-SUPABASE_ACCESS_TOKEN=<token> node tools/database-restore.mjs --dir=backup --tables=locations
+SUPABASE_PROJECT_REF=<target-ref> SUPABASE_ACCESS_TOKEN=<token> node tools/database-restore.mjs --dir=backup --tables=locations
 ```
 
 輸出會列出筆數、批次與主鍵。確認無誤後才實際寫入：
 
 ```bash
-SUPABASE_ACCESS_TOKEN=<token> node tools/database-restore.mjs --dir=backup --tables=locations --execute --confirm=qztffronusdhgxhjjubt
+SUPABASE_PROJECT_REF=<target-ref> SUPABASE_ACCESS_TOKEN=<token> node tools/database-restore.mjs --dir=backup --tables=locations --execute --confirm=<target-ref>
 ```
 
 `--confirm` 必須與目標專案 ref 一致，否則拒絕執行——這是避免把備份倒進錯的專案。
@@ -136,7 +140,7 @@ SUPABASE_ACCESS_TOKEN=<token> node tools/database-restore.mjs --dir=backup --tab
    node tools/database-restore.mjs --dir=backup --all --execute --confirm=<ref>
    ```
 
-   第二道會把已還原的表再跑一次，upsert 是幂等的，重複執行不會產生問題。
+   第二道會把已還原的表再跑一次；有主鍵的資料列會依主鍵更新。觸發器或外部通知不一定冪等，須先完成隔離與副作用檢查。無主鍵非空表會在前置檢查中止，須另行處理。
 5. 上傳 `backup/storage/` 底下的附件到對應 bucket，並確認 bucket 的公開／私有設定
    與 migrations 一致（`floorplans` 必須是私有）
 6. **重建 Auth 帳號**並重新綁定 `public.users.auth_id`（見上方警告）

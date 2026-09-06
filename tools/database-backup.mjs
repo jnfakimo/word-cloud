@@ -19,6 +19,7 @@ import { mkdir, writeFile, appendFile, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { backupRequest } from './backup-request.mjs';
+import { backupObjectPath, verifyStorage } from './backup-storage-integrity.mjs';
 
 const PROJECT_REF = process.env.SUPABASE_PROJECT_REF || 'qztffronusdhgxhjjubt';
 const MANAGEMENT_TOKEN = process.env.SUPABASE_ACCESS_TOKEN || '';
@@ -158,19 +159,21 @@ async function dumpStorage(storageDir) {
     );
     let bytes = 0;
     let saved = 0;
+    const files = [];
     for (const object of objects) {
+      const target = backupObjectPath(storageDir, bucket.name, object.name);
       const url = `https://${PROJECT_REF}.supabase.co/storage/v1/object/` +
         `${encodeURIComponent(bucket.name)}/${object.name.split('/').map(encodeURIComponent).join('/')}`;
       const body = await backupRequest(url, {
         headers: { Authorization: `Bearer ${key}`, apikey: key },
       }, async response => Buffer.from(await response.arrayBuffer()), 'Storage 物件下載');
-      const target = path.join(storageDir, bucket.name, object.name);
       await mkdir(path.dirname(target), { recursive: true });
       await writeFile(target, body);
+      files.push({ name: object.name, bytes: body.byteLength, sha256: createHash('sha256').update(body).digest('hex') });
       bytes += body.byteLength;
       saved += 1;
     }
-    summary.push({ bucket: bucket.name, public: bucket.public === true, objects: saved, bytes });
+    summary.push({ bucket: bucket.name, public: bucket.public === true, objects: saved, bytes, files });
   }
   return summary;
 }
@@ -198,7 +201,7 @@ export async function main() {
   const storage = INCLUDE_STORAGE ? await dumpStorage(storageDir) : [];
 
   const manifest = {
-    version: 1,
+    version: 2,
     created_at: startedAt.toISOString(),
     finished_at: new Date().toISOString(),
     project_ref: PROJECT_REF,
@@ -249,7 +252,9 @@ export async function verifyBackup(dir) {
       problems.push(`${table.name}：行數 ${content === '' ? 0 : lines} 與 manifest 的 ${table.rows} 不符`);
     }
   }
-  return { manifest, problems };
+  const storage = await verifyStorage(dir, manifest);
+  problems.push(...storage.problems);
+  return { manifest, problems, warnings: storage.warnings };
 }
 
 // 只有直接執行才跑；被 import 時（還原腳本、測試）不動作。
