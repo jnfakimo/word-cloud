@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/lib/config';
+import { PUBLIC_WEATHER_SERVICE, SUPABASE_ANON_KEY, SUPABASE_URL } from '@/lib/config';
+import { createWeatherReader } from '@/lib/weather-api';
 // 版面微調集中在 web/lib/weather-map-tuning.ts，那支檔案不含邏輯，可直接改數字。
 import { COAST_MARGIN, MARKER_MIN_GAP, COUNTY_MARGIN_OFFSET, COUNTY_MARKER_POSITIONS } from '@/lib/weather-map-tuning';
 
@@ -117,7 +118,7 @@ function layoutMarkers(points: Array<{ name: string; x: number; y: number; manua
 
 const LEFT_TEMP_COUNTIES = new Set(['苗栗縣', '臺中市', '彰化縣', '雲林縣', '嘉義市', '嘉義縣', '臺南市', '高雄市', '屏東縣']);
 
-const ENDPOINT = `${SUPABASE_URL}/functions/v1/cwa-weather`;
+const readWeather = createWeatherReader({ url: `${SUPABASE_URL}/functions/v1/cwa-weather`, anonKey: SUPABASE_ANON_KEY }, PUBLIC_WEATHER_SERVICE);
 
 // Helpers
 const localTime = (value: unknown) => {
@@ -146,6 +147,8 @@ export function WeatherWidget() {
   const [county, setCounty] = useState('臺北市');
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
+  const [townError, setTownError] = useState('');
+  const [townBusy, setTownBusy] = useState(false);
   // SVG is parsed into a narrow, typed set of React attributes. Keeping raw
   // markup out of state avoids an injection sink if the asset is replaced.
   const [mapShapes, setMapShapes] = useState<MapCountyShape[]>([]);
@@ -209,11 +212,7 @@ export function WeatherWidget() {
   const load = useCallback(async () => {
     setBusy(true); setError('');
     try {
-      const url = new URL(ENDPOINT);
-      url.searchParams.set('view', 'summary');
-      const res = await fetch(url, { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
-      const payload = await res.json();
-      if (!res.ok || !payload.ok) throw new Error(payload.message || `API Error ${res.status}`);
+      const payload = await readWeather<Row>('summary');
       setSummary(payload);
     } catch (e: any) {
       setError(e.message || '天氣資料載入失敗');
@@ -221,26 +220,28 @@ export function WeatherWidget() {
     setBusy(false);
   }, []);
 
-  useEffect(() => { void loadMap(); void load(); }, [loadMap, load]);
+  useEffect(() => {
+    void loadMap(); void load();
+    const timer = window.setInterval(() => { if (!document.hidden) void load(); }, 600_000);
+    return () => window.clearInterval(timer);
+  }, [loadMap, load]);
   
   useEffect(() => {
+    let active = true;
+    setTowns([]); setTownError(''); setTownBusy(false);
     if (townsOpen && county) {
+      setTownBusy(true);
       const loadTowns = async () => {
         try {
-          const url = new URL(ENDPOINT);
-          url.searchParams.set('view', 'town');
-          url.searchParams.set('county', county);
-          const res = await fetch(url, { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
-          const payload = await res.json();
-          if (res.ok && payload.ok) setTowns(payload.towns || []);
+          const payload = await readWeather<Row>('town', county);
+          if (active) setTowns(payload.towns || []);
         } catch (e) {
-          console.error(e);
-        }
+          if (active) setTownError(e instanceof Error ? e.message : '鄉鎮預報載入失敗');
+        } finally { if (active) setTownBusy(false); }
       };
-      loadTowns();
-    } else {
-      setTowns([]);
+      void loadTowns();
     }
+    return () => { active = false; };
   }, [county, townsOpen]);
 
   useEffect(() => {
@@ -266,7 +267,7 @@ export function WeatherWidget() {
   }, [mapShapes, countyCenters]);
 
   if (busy && !summary) return <p className="empty">正在取得中央氣象署資料…</p>;
-  if (error && !summary) return <p className="empty">氣象服務暫時無法使用：{error}</p>;
+  if (error && !summary) return <div role="status"><p className="empty">{error}</p><button className="secondary-btn" onClick={() => void load()} disabled={busy}>重新取得氣象</button></div>;
 
   const current: Row = (summary?.counties || []).find((row: Row) => row.county.replace('台', '臺') === county) || {};
   const stem = county.replace(/[市縣]$/, '');
@@ -406,6 +407,8 @@ export function WeatherWidget() {
 
       {/* 資訊區域 */}
       <div className="weather-info-container" style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {error && <p className="inline-message" role="status">更新失敗，目前保留上次資料：{error}</p>}
+        {summary?.sourceWarnings?.length > 0 && <p className="inline-message" role="status">部分氣象資料暫缺，請以中央氣象署最新公告為準。</p>}
         
         {/* 全區警報 */}
         <div className="weather-bulletins">
@@ -431,6 +434,7 @@ export function WeatherWidget() {
         
         <div style={{ fontSize: '13px', color: 'var(--dim)' }}>
           {summary?.updatedAt ? `更新時間：${localTime(summary.updatedAt)}` : ''} {summary?.stale ? '【快取資料】' : ''}
+          {summary?.usingFallback && <span> · 使用備援氣象服務</span>}
         </div>
 
         {/* 主要天氣卡片 */}
@@ -483,6 +487,9 @@ export function WeatherWidget() {
         {/* 鄉鎮市區列表 */}
         {townsOpen && (
           <div className="responsive-table" style={{ maxHeight: '500px', overflowY: 'auto', background: 'var(--panel2)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+            {townBusy && <p role="status">正在取得鄉鎮預報…</p>}
+            {townError && <p role="status">{townError}</p>}
+            {!townBusy && !townError && !towns.length && <p>目前無鄉鎮預報資料。</p>}
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '15px' }}>
               <thead style={{ position: 'sticky', top: 0, background: 'var(--panel)', zIndex: 10 }}>
                 <tr>

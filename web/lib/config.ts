@@ -1,5 +1,9 @@
 const CLOUD_SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
 const CLOUD_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
+// Existing public weather service; never use an authenticated session for fallback.
+export const PUBLIC_WEATHER_SERVICE = {
+  url: `${CLOUD_SUPABASE_URL}/functions/v1/cwa-weather`, anonKey: CLOUD_SUPABASE_ANON_KEY,
+};
 // The self-hosted stack signs requests with the anon key from its local .env.
 // It is intentionally public in a browser build, but must match the local JWT
 // issuer; the cloud anon key is not accepted by the local Auth gateway.
