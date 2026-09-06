@@ -27,6 +27,7 @@ const restoreModule = new URL('./database-restore.mjs', import.meta.url).href;
 const TABLES = { exact_200: 200, over_page: 201, empty_table: 0 };
 const OUT = await mkdtemp(path.join(tmpdir(), 'backup-check-'));
 let readOnlyViolations = 0;
+const seenOrders = new Map();
 
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async (url, init) => {
@@ -36,9 +37,17 @@ globalThis.fetch = async (url, init) => {
   if (body.query.includes('information_schema.tables')) {
     return reply(Object.keys(TABLES).map(table_name => ({ table_name })));
   }
-  const match = body.query.match(/public\."([a-z0-9_]+)" t order by t\.ctid limit (\d+) offset (\d+)/);
+  if (body.query.includes('information_schema.table_constraints')) {
+    return reply([
+      { table_name: 'exact_200', column_name: 'id' },
+      { table_name: 'over_page', column_name: 'id' },
+      { table_name: 'over_page', column_name: 'ts' },
+    ]);
+  }
+  const match = body.query.match(/^select row_to_json\(t\)::text as r from \(select \* from public\."([a-z0-9_]+)" order by (.+) limit (\d+) offset (\d+)\) t$/);
   if (!match) throw new Error(`未預期的查詢：${body.query.slice(0, 60)}`);
-  const [, table, limit, offset] = match;
+  const [, table, order, limit, offset] = match;
+  seenOrders.set(table, order);
   const rows = [];
   for (let i = Number(offset); i < Math.min(TABLES[table], Number(offset) + Number(limit)); i++) {
     rows.push({ r: JSON.stringify({ id: i, name: `第 ${i} 筆`, ts: '2026-08-25T12:00:00+08:00' }) });
@@ -58,12 +67,17 @@ globalThis.fetch = originalFetch;
 
 const manifest = JSON.parse(await readFile(path.join(OUT, 'manifest.json'), 'utf8'));
 check('備份查詢全部是唯讀', readOnlyViolations === 0, `${readOnlyViolations} 次非唯讀`);
+check('單欄主鍵使用索引排序', seenOrders.get('exact_200') === '"id"');
+check('複合主鍵保留欄位順序', seenOrders.get('over_page') === '"id", "ts"');
+check('無主鍵保留 ctid 分頁', seenOrders.get('empty_table') === 'ctid');
 for (const [name, expected] of Object.entries(TABLES)) {
   const entry = manifest.tables.find(t => t.name === name);
   check(`${name} 筆數 ${expected}`, entry?.rows === expected, `實際 ${entry?.rows}`);
   const content = await readFile(path.join(OUT, 'tables', `${name}.ndjson`), 'utf8');
   const lines = content ? content.trimEnd().split('\n').length : 0;
   check(`${name} 實際行數 ${expected}`, lines === expected, `實際 ${lines}`);
+  const ids = content.trim() ? content.trimEnd().split('\n').map(line => JSON.parse(line).id) : [];
+  check(`${name} 分頁無遺漏或重複`, ids.length === expected && ids.every((id, index) => id === index));
 }
 check('manifest 總筆數正確', manifest.totals.rows === 401, `實際 ${manifest.totals.rows}`);
 check('manifest 標明未含 auth 帳號', manifest.scope.auth_users === false);

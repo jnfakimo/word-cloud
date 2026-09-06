@@ -62,15 +62,30 @@ async function listTables() {
     "select table_name from information_schema.tables " +
     "where table_schema = 'public' and table_type = 'BASE TABLE' order by table_name",
   );
-  return rows.map(r => r.table_name);
+  const keys = await query(
+    'select k.table_name, k.column_name from information_schema.table_constraints c ' +
+    'join information_schema.key_column_usage k on k.constraint_catalog = c.constraint_catalog ' +
+    'and k.constraint_schema = c.constraint_schema and k.constraint_name = c.constraint_name ' +
+    'and k.table_name = c.table_name ' +
+    "where c.table_schema = 'public' and c.constraint_type = 'PRIMARY KEY' " +
+    'order by k.table_name, k.ordinal_position',
+  );
+  return rows.map(r => ({
+    name: r.table_name,
+    primaryColumns: keys.filter(k => k.table_name === r.table_name).map(k => k.column_name),
+  }));
 }
 
 /**
- * 逐表分頁匯出。排序用 ctid：單次備份期間物理順序穩定，也不必假設每張表都有
- * 一致的主鍵欄位名稱。
+ * Prefer the primary-key index instead of sorting every table by physical ctid.
+ * Bound the source rows before JSON conversion; otherwise wide JSON columns can
+ * make sorting needlessly expensive. Tables without a PK retain the ctid fallback.
+ * Requests use separate read snapshots: this is still an off-peak logical export,
+ * not a transaction-consistent PostgreSQL snapshot under concurrent updates.
  */
-async function dumpTable(table, tablesDir) {
+async function dumpTable(table, primaryColumns, tablesDir) {
   const ident = quoteIdent(table);
+  const order = primaryColumns.length ? primaryColumns.map(quoteIdent).join(', ') : 'ctid';
   const file = path.join(tablesDir, `${table}.ndjson`);
   const hash = createHash('sha256');
   let offset = 0;
@@ -78,15 +93,15 @@ async function dumpTable(table, tablesDir) {
   await writeFile(file, '');
   for (;;) {
     const batch = await query(
-      `select row_to_json(t)::text as r from public.${ident} t ` +
-      `order by t.ctid limit ${PAGE_SIZE} offset ${offset}`,
+      `select row_to_json(t)::text as r from (select * from public.${ident} ` +
+      `order by ${order} limit ${PAGE_SIZE} offset ${offset}) t`,
     );
     if (!batch.length) break;
     const chunk = batch.map(row => row.r).join('\n') + '\n';
     hash.update(chunk);
     await appendFile(file, chunk);
     rows += batch.length;
-    if (rows % (PAGE_SIZE * 10) === 0) console.log(`資料表 ${table}：已匯出 ${rows} 列`);
+    console.log(`資料表 ${table}：已匯出 ${rows} 列`);
     offset += batch.length;
     if (batch.length < PAGE_SIZE) break;
   }
@@ -147,9 +162,9 @@ export async function main() {
 
   const dumped = [];
   for (const table of tables) {
-    console.log(`開始匯出資料表 ${table}`);
-    dumped.push(await dumpTable(table, tablesDir));
-    console.log(`完成資料表 ${table}：${dumped.at(-1).rows} 列`);
+    console.log(`開始匯出資料表 ${table.name}（${table.primaryColumns.length ? '主鍵排序' : '無主鍵，實體位置排序'}）`);
+    dumped.push(await dumpTable(table.name, table.primaryColumns, tablesDir));
+    console.log(`完成資料表 ${table.name}：${dumped.at(-1).rows} 列`);
   }
 
   const storage = INCLUDE_STORAGE ? await dumpStorage(storageDir) : [];
