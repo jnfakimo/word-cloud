@@ -8,18 +8,19 @@
 
 ## 為什麼需要這個
 
-Supabase **Free 方案沒有自動備份，也沒有 PITR**（Point-in-Time Recovery）。專案的
-41 張表雖然有 `trg_prevent_removal` 擋下 `DELETE` 與 `TRUNCATE`，但它**擋不住
-`UPDATE`**——一次寫錯條件的更新就能把資料改壞，而且沒有任何時間點可以回溯。
+本流程建立於 2026-08-25 當時的 Free 環境。2026-09-06 已查核雲端組織顯示
+**Pro**，Dashboard 有七份每日 physical backup；**PITR 尚未啟用**。平台備份
+不含 Storage 附件，因此仍需本流程的獨立加密匯出。`trg_prevent_removal` 能擋下
+`DELETE` 與 `TRUNCATE`，但擋不住錯誤的 `UPDATE`。
 
 Schema 本身是安全的：`system/sql/` 與 `supabase/migrations/` 都在版控裡，而且是
-idempotent 的，隨時能重建。真正沒有第二份的是**資料**。
+idempotent 的，可依流程重建。資料與附件仍需持續備份並實際驗證復原。
 
 ## 備份包含什麼
 
 | 項目 | 是否備份 | 說明 |
 | --- | --- | --- |
-| `public` schema 全部資料表 | ✅ | 約 67 張表。以 `row_to_json` 匯出成 NDJSON |
+| `public` schema 全部資料表 | ✅ | 依執行時目錄取得；2026-09-06 為 76 表／479,056 列。以 `row_to_json` 匯出 NDJSON，主鍵游標分頁 |
 | Storage 附件 | ✅ | `floorplans`、`repair-files`、`handover-attachments`、`vehicle-dispatch-files`、`inspection-photos` |
 | Schema／RLS 政策 | ➖ | 不在備份裡，因為已經在版控中（見 `AGENTS.md` 的套用順序） |
 | **`auth.users` 帳號** | ❌ | **見下方警告** |

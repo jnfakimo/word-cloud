@@ -78,8 +78,10 @@ rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
 `vehicle-dispatch-files` (all private), plus `inspection-photos`, which is **public**
 and currently empty — anything uploaded there is anonymously readable.
 
-**Backups** (2026-08-25): the Free tier has no automatic backups and no PITR, and
-`trg_prevent_removal` only stops DELETE/TRUNCATE — a bad UPDATE is unrecoverable.
+**Backups** (verified 2026-09-06): the cloud organization now shows Pro and the
+Dashboard lists seven daily physical backups; PITR is not enabled. Platform
+backups do not include Storage objects. `trg_prevent_removal` only stops
+DELETE/TRUNCATE — it does not protect against a bad UPDATE.
 `.github/workflows/database-backup.yml` dumps every `public` table plus Storage nightly
 and uploads it AES256-encrypted, because this repo is public and artifacts are world-
 readable. Restoring is manual, dry-run unless `--execute`, and never deletes rows.

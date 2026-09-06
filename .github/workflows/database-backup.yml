@@ -27,7 +27,9 @@ concurrency:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The market table alone now contains about 450k rows. Leave room for
+    # growth and Storage downloads; individual requests remain bounded.
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v7
