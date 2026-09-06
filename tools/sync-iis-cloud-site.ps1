@@ -1,3 +1,4 @@
+﻿# UTF-8 BOM is required: this script is also run by Windows PowerShell 5.1.
 param(
     [string]$SiteRoot = 'C:\InspectionRuntime\site\Inspection',
     [string]$StateRoot = 'C:\InspectionRuntime\site-sync',
@@ -26,7 +27,7 @@ try {
     $run = $runs[0]
     $stateFile = Join-Path $statePath 'last-success.json'
     if (Test-Path -LiteralPath $stateFile) {
-        $previous = Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json
+        $previous = Get-Content -LiteralPath $stateFile -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($previous.commit -eq $run.headSha) { Write-Output '內網已是最新成功部署版本。'; exit 0 }
     }
     # A fresh directory keeps an interrupted prior download from being reused.
@@ -46,7 +47,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw '網站封裝解壓失敗。' }
     & node (Join-Path $projectRoot 'tools\verify-provenance.mjs') (Join-Path $release 'provenance.json') (Join-Path $release 'provenance.sig') (Join-Path $projectRoot 'security\provenance-public-key.pem')
     if ($LASTEXITCODE -ne 0) { throw '正式網站來源簽章驗證失敗。' }
-    $manifest = Get-Content -LiteralPath (Join-Path $release 'provenance.json') -Raw | ConvertFrom-Json
+    $manifest = Get-Content -LiteralPath (Join-Path $release 'provenance.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($manifest.commit -ne $run.headSha -or $manifest.repository -ne $repo) { throw '網站產物與成功部署版本不符。' }
     $paths = @()
     foreach ($file in $manifest.files) {
