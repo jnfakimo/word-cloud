@@ -3,6 +3,7 @@ import { enforceDurableRateLimit, recordRateLimitDenial } from '../_shared/secur
 import { passwordPolicyMessage } from '../_shared/password-policy.ts';
 import { canonicalFloor } from '../_shared/floor.ts';
 import { clientIpFromRequest } from '../_shared/client-ip.ts';
+import { readMarketBoardNotices } from './market-board-notices.ts';
 
 type PortableRuntime = {
   env?: { get: (name: string) => string | undefined };
@@ -679,9 +680,7 @@ async function buildMarketBoardPayload(
 
   // 登入版跑馬燈沿用通知中心的最新內容（給現場人員看）。免登入公開版只顯示
   // 明確標記給看板的訊息（event='board_notice'），不把內部派工／公文通知投到大螢幕。
-  const noticeBase = admin.from('notifications').select('title,body,created_at');
-  const noticeResult = await (options.publicView ? noticeBase.eq('event', 'board_notice') : noticeBase)
-    .order('created_at', { ascending: false }).limit(60);
+  const noticeResult = await readMarketBoardNotices(admin, Boolean(options.publicView));
   if (noticeResult.error) console.warn('market board notices lookup failed:', noticeResult.error.message);
   const seenNotice = new Set<string>();
   const notices = ((noticeResult.data || []) as Array<Record<string, unknown>>)

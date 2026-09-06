@@ -1,5 +1,17 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+
+function checkRoutes(dir) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (['.next', 'out', 'node_modules'].includes(entry.name)) continue;
+    const file = path.join(dir, entry.name);
+    if (entry.isDirectory()) checkRoutes(file);
+    else if (/\.(tsx?|jsx?)$/.test(entry.name)) assert.doesNotMatch(readFileSync(file, 'utf8'), /["'`]\/api\/local\//, `不可再呼叫已移除的 cookie API：${file}`);
+  }
+}
+checkRoutes('web');
 
 // Bundle the actual adapter, substituting only its session client and audit sink.
 const output = await build({

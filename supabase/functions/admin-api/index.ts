@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.2';
 import { enforceDurableRateLimit, recordRateLimitDenial, securityRequestId } from '../_shared/security-monitor.ts';
 import { passwordPolicyMessage } from '../_shared/password-policy.ts';
 import { canonicalFloor } from '../_shared/floor.ts';
+import { BOARD_NOTICE_ACTIONS, handleBoardNotices } from './board-notices.ts';
 
 type PortableRuntime = {
   env?: { get: (name: string) => string | undefined };
@@ -144,7 +145,7 @@ export async function handleAdminApiRequest(req: Request) {
     const roleId = profile.rbac_role || (profile.role === 'admin' ? 'sysadmin' : profile.role);
     const body = await req.json().catch(() => ({} as Record<string, unknown>));
     const action = clean(body.action, 50);
-    if (!['admin_get_settings', 'admin_get_contract'].includes(action)) {
+    if (!['admin_get_settings', 'admin_get_contract', 'admin_list_board_notices'].includes(action)) {
       const writeRate = await enforceDurableRateLimit(admin, req, {
         subject: authData.user.id,
         scope: 'admin-api:write',
@@ -175,6 +176,10 @@ export async function handleAdminApiRequest(req: Request) {
       const { error } = await admin.from('audit_logs').insert({ table_name: tableName, record_id: clean(recordId, 200) || 'unknown', action: auditAction, changes: safeDetails(changes), operator_id: profile.user_id, source: 'v2-admin' });
       if (error) console.warn('admin audit skipped:', error.message);
     };
+    if (BOARD_NOTICE_ACTIONS.has(action)) {
+      const result = await handleBoardNotices(admin, action, body, audit);
+      return reply(req, result.body, result.status);
+    }
     const departmentName = async (deptId: string | null) => {
       if (!deptId) return null;
       const { data } = await admin.from('departments').select('name').eq('dept_id', deptId).maybeSingle();

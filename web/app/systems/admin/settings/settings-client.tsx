@@ -7,6 +7,7 @@ import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { TimeSelect } from '@/components/TimeSelect';
 import { invokeAdminApi } from '@/lib/admin-api';
+import { getSupabase } from '@/lib/supabase';
 import type { Profile } from '@/types/app';
 import styles from './settings.module.css';
 
@@ -331,12 +332,11 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
   }, []);
 
   const loadDepartments = useCallback(async () => {
-    const response = await fetch('/api/local/admin/departments', { credentials: 'include', cache: 'no-store' });
-    const result = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(result?.detail || '部門資料載入失敗');
-    const data = result?.data ?? [];
+    const { data, error } = await getSupabase().from('departments')
+      .select('dept_id,parent_id,name,code,level,sort_order,status').order('sort_order').order('name');
+    if (error) throw new Error('部門資料載入失敗，請重新整理或確認帳號權限');
     setDepartments(
-      data.map((row: Record<string, unknown>) => ({
+      (data || []).map((row: Record<string, unknown>) => ({
         dept_id: String(row.dept_id),
         parent_id: row.parent_id ? String(row.parent_id) : null,
         name: String(row.name ?? ''),

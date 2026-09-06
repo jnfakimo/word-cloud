@@ -6,6 +6,7 @@ import { emitSecurityDataRead } from './security-audit-sink';
 const READ_ACTION_LABELS: Record<string, string> = {
   admin_get_settings: '讀取系統設定',
   admin_list_account_applications: '讀取帳號申請清單',
+  admin_list_board_notices: '讀取公開看板公告',
 };
 
 export async function invokeAdminApi<T = Record<string, unknown>>(action: string, payload: Record<string, unknown> = {}) {

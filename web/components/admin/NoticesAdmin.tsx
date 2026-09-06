@@ -4,12 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase } from '@/lib/supabase';
 import { invokeAdminApi } from '@/lib/admin-api';
+import { BoardNoticesAdmin } from './BoardNoticesAdmin';
 import { AdminHeader, type AdminProps, errorMessage, fmtTime, PAGE_SIZE, Pager, type Row } from './shared';
 
 const NOTICE_EVENT_LABELS: Record<string, string> = {
   new_repair: '新報修', dispatch: '已派工', return: '退件', overdue: '逾期提醒',
   complete: '完工', close: '結案', sign: '簽核', assignment: '任務指派',
   reminder: '系統提醒', security_alert: '資安告警', vehicle_dispatch_followup: '派車回報提醒',
+  board_notice: '看板公告', board_notice_inactive: '已停用看板公告',
 };
 
 export function NoticesAdmin({ profile, module }: AdminProps) {
@@ -54,5 +56,6 @@ export function NoticesAdmin({ profile, module }: AdminProps) {
       <div className="admin-notice-list">{pageRows.map(row => <article className={row.is_read ? 'read' : 'unread'} key={row.notif_id}><div><span className="notice-event">{NOTICE_EVENT_LABELS[String(row.event || '')] || '系統通知'}</span><h3>{row.title || '系統通知'}</h3><p>{row.body || '—'}</p><time>{fmtTime(row.created_at)}</time></div>{!row.is_read && <button className="secondary-btn" disabled={busy} onClick={() => void mark(row.notif_id)}>標記已讀</button>}</article>)}{!busy && rows.length === 0 && <p className="empty">目前沒有符合條件的通知</p>}</div>
       {rows.length > 0 && <Pager page={page} total={rows.length} onPage={setPage} />}
     </section>
+    {(profile.role === 'admin' || profile.rbac_role === 'sysadmin') && <BoardNoticesAdmin />}
   </AppShell>;
 }

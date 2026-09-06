@@ -81,6 +81,14 @@
 /* Theme surfaces: preserve the light theme while keeping the tech theme readable. */
 .admin-toolbar input,.admin-toolbar select,.admin-form-grid input,.admin-form-grid select,.admin-tabs+input,.layout-summary select,.admin-layout-actions input,.layout-editor input,.permission-matrix select{background:var(--surface);color:var(--ink)}
 .admin-modal,.admin-alert,.admin-notice-list article{background:var(--surface);color:var(--ink)}
+.board-notice-form{display:grid;gap:14px;padding:20px}
+.board-notice-form label{display:grid;gap:6px;color:var(--text)}
+.board-notice-form input,.board-notice-form textarea{width:100%;min-width:0;box-sizing:border-box;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:10px}
+.board-notice-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end}
+.board-notices-panel .admin-toolbar{flex-wrap:wrap}
+.board-notices-panel .admin-toolbar h2{margin:0 auto 0 0}
+.board-notices-panel .admin-notice-list article>div:first-child{min-width:0;overflow-wrap:anywhere}
+.board-notices-panel .admin-notice-list p{white-space:pre-wrap}
 /* 主要操作按鈕由全站 button-standard.css 統一；此檔只保留後台版面配置。 */
 .admin-form-grid input[readonly]{background:var(--surface-muted)}
 .audit-details div,.detail-grid>div,.detail-timeline li{background:var(--surface-soft)}
