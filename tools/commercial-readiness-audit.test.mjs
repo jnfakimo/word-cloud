@@ -8,6 +8,10 @@ import { fileURLToPath } from 'node:url';
 
 const auditor = fileURLToPath(new URL('./commercial-readiness-audit.mjs', import.meta.url));
 const head = '<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width"><title>驗收</title><meta http-equiv="Content-Security-Policy" content="default-src &apos;self&apos;"></head>';
+test('路由目錄存在但缺少 index.html 仍阻擋發布', () => {
+  const result = audit('<a href="/Inspection/v2/empty/?next=home">入口</a>', {'_site/v2/empty/data.txt':'not a page'});
+  assert.equal(result.status,1); assert.match(result.output,/missing-asset/);
+});
 function audit(markup, extra = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), 'inspection-audit-'));
   try {

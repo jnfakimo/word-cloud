@@ -56,7 +56,7 @@ function auditHtml(file){
     if(!clean)continue;
     let target;
     try{target=resolveAsset(file,raw);}catch{add('error','invalid-asset-url',file,`資源網址編碼錯誤：${raw}`);continue;}
-    if(!fs.existsSync(target))add('error','missing-asset',file,`找不到本機資源：${raw}`);
+    if(!fs.existsSync(target) || (fs.statSync(target).isDirectory() && !fs.existsSync(path.join(target,'index.html'))))add('error','missing-asset',file,`找不到本機資源：${raw}`);
   }
 
   for(const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){
