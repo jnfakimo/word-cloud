@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import { AppShell } from '@/components/AppShell';
 import { getSupabase } from '@/lib/supabase';
 import { invokeAdminApi } from '@/lib/admin-api';
-import { PASSWORD_POLICY, passwordPolicyMessage } from '@/lib/password-policy';
+import { passwordInputProps, passwordPolicyMessage, temporaryPassword } from '@/lib/password-policy';
+import { usePasswordPolicy } from '@/lib/use-password-policy';
 import { AdminHeader, AdminModal, type AdminAction, type AdminProps, errorMessage, fmtTime, PAGE_SIZE, Pager, roleLabel, type Row, StatusPill, userRole } from './shared';
 
 const ACCOUNT_EXPORT_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -29,13 +30,6 @@ function importKey(value: unknown) {
 function accountKey(value: unknown) {
   const text = importText(value).toLowerCase();
   return /^\d+$/.test(text) ? text.replace(/^0+(?=\d)/, '') : text;
-}
-
-function temporaryPassword() {
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    return Array.from(crypto.getRandomValues(new Uint8Array(PASSWORD_POLICY.minLength)), value => String(value % 10)).join('');
-  }
-  return String(Math.floor(Math.random() * 100000000)).padStart(PASSWORD_POLICY.minLength, '0');
 }
 
 async function downloadWorkbook(workbook: any, filename: string) {
@@ -72,6 +66,7 @@ type BatchCreateResult = {
 };
 
 export function UsersAdmin({ profile, module }: AdminProps) {
+  const passwordPolicy = usePasswordPolicy();
   const [users, setUsers] = useState<Row[]>([]), [roles, setRoles] = useState<Row[]>([]), [departments, setDepartments] = useState<Row[]>([]), [applications, setApplications] = useState<Row[]>([]);
   const [busy, setBusy] = useState(true), [note, setNote] = useState(''), [query, setQuery] = useState(''), [status, setStatus] = useState('active'), [page, setPage] = useState(1);
   const [editor, setEditor] = useState<Row | null>(null), [passwordUser, setPasswordUser] = useState<Row | null>(null), [password, setPassword] = useState(''), [password2, setPassword2] = useState('');
@@ -203,7 +198,7 @@ export function UsersAdmin({ profile, module }: AdminProps) {
     if (!String(editor.name || '').trim() || !String(editor.username || '').trim()) { setEditorError('失敗：請填寫姓名與登入帳號'); return; }
     if (creating && !String(editor.email || '').trim()) { setEditorError('失敗：請填寫電子郵件'); return; }
     if (creating) {
-      const passwordError = passwordPolicyMessage(String(editor.password || ''));
+      const passwordError = passwordPolicyMessage(String(editor.password || ''), passwordPolicy);
       if (passwordError) { setEditorError(`失敗：${passwordError}`); return; }
     }
     const selectedRole = String(editor.rbac_role || 'reporter');
@@ -317,7 +312,7 @@ export function UsersAdmin({ profile, module }: AdminProps) {
       sheet.addRow(['姓名', '登入帳號', '電子郵件', '聯絡電話', '部／室', '課／組／隊', '系統角色', '直屬主管帳號', '初始密碼']);
       sheet.addRow(['請修改範例', 'example_user', 'example@example.com', '', root?.name || '', child?.name || '', roleLabel('reporter', roles), supervisor?.username || '', '']);
       sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } }; sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0B6B8A' } }; sheet.getRow(1).alignment = { horizontal: 'center' };
-      sheet.addRow([]); sheet.addRow(['說明：姓名、登入帳號、電子郵件為必填；初始密碼留白時由系統產生 8 位數字臨時密碼。匯入帳號不會匯出密碼。']);
+      sheet.addRow([]); sheet.addRow([`說明：姓名、登入帳號、電子郵件為必填；初始密碼留白時由系統產生臨時密碼。密碼規則：${passwordPolicy.hint}。匯出檔不包含密碼。`]);
       sheet.mergeCells('A4:I4'); sheet.getRow(4).font = { color: { argb: 'FF64748B' }, italic: true }; sheet.getRow(4).alignment = { wrapText: true };
       sheet.columns = [{ width: 16 }, { width: 20 }, { width: 30 }, { width: 16 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 20 }, { width: 14 }];
       await downloadWorkbook(workbook, '帳號匯入範本.xlsx');
@@ -386,7 +381,7 @@ export function UsersAdmin({ profile, module }: AdminProps) {
         if (!['unit_supervisor', 'sysadmin'].includes(selectedRole) && (!supervisor || !supervisorMatchesDepartment(supervisor.dept_id, deptId))) { details.push(`第 ${rowNumber} 列「${username}」：請填寫所屬單位可管理的直屬主管帳號`); failed += 1; continue; }
         const passwordCell = value(passwordIndex);
         const generatedPassword = !passwordCell || passwordCell === '000000000';
-        const password = generatedPassword ? temporaryPassword() : passwordCell; const passwordError = passwordPolicyMessage(password);
+        const password = generatedPassword ? temporaryPassword(passwordPolicy) : passwordCell; const passwordError = passwordPolicyMessage(password, passwordPolicy);
         if (passwordError) { details.push(`第 ${rowNumber} 列「${username}」：${passwordError}`); failed += 1; continue; }
         pendingRows.push({ row_number: rowNumber, name, username, email, phone: value(phoneIndex), dept_id: deptId,
           rbac_role: selectedRole, supervisor_id: supervisor?.user_id || null, password });
@@ -462,13 +457,13 @@ export function UsersAdmin({ profile, module }: AdminProps) {
           <label>系統角色<select value={editor.rbac_role || 'reporter'} disabled={editor.user_id === profile.user_id} onChange={event => setEditor({ ...editor, rbac_role: event.target.value, supervisor_id: ['unit_supervisor', 'sysadmin'].includes(event.target.value) ? '' : editor.supervisor_id, replacement_supervisor_id: '' })}>{roles.map(role => <option key={role.role_id} value={role.role_id}>{role.name}</option>)}</select>{editor.user_id === profile.user_id && <small>為避免中斷管理權限，不可變更自己的角色</small>}</label>
           {!['unit_supervisor', 'sysadmin'].includes(String(editor.rbac_role || 'reporter')) && <label className="wide">直屬主管（必填）<select value={editor.supervisor_id || ''} onChange={event => setEditor({ ...editor, supervisor_id: event.target.value })}><option value="">{editor.dept_id ? '-- 請選擇 --' : '-- 請先選擇部／室 --'}</option>{supervisorOptions(editor.dept_id, String(editor.supervisor_id || '')).map(supervisor => <option key={supervisor.user_id} value={supervisor.user_id}>{supervisor.name}｜{deptName(supervisor.dept_id)}{supervisor.__ineligible ? `（${supervisor.__ineligibleReason || '不符合主管條件'}，請改派）` : ''}</option>)}</select>{!editor.dept_id && <small>請先選擇部／室，才會顯示該單位可管理的主管。</small>}</label>}
           {reportsToReassign.length > 0 && <label className="wide">原直屬人員改派主管（必填）<select value={editor.replacement_supervisor_id || ''} onChange={event => setEditor({ ...editor, replacement_supervisor_id: event.target.value })}><option value="">-- 請選擇接任主管 --</option>{replacementOptions.map(supervisor => <option key={supervisor.user_id} value={supervisor.user_id}>{supervisor.name}｜{deptName(supervisor.dept_id)}</option>)}</select><small>因單位或角色調整，原直屬人員 {reportsToReassign.map(report => report.name).join('、')} 將一併改派，所有變更會同時完成。</small></label>}
-          {!editor.user_id && <label className="wide">初始密碼（{PASSWORD_POLICY.minLength} 位數字）<input type="password" minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} pattern="[0-9]{8}" inputMode="numeric" value={editor.password || ''} onChange={event => setEditor({ ...editor, password: event.target.value })}/></label>}
+          {!editor.user_id && <label className="wide">初始密碼（{passwordPolicy.hint}）<input type="password" {...passwordInputProps(passwordPolicy)} value={editor.password || ''} onChange={event => setEditor({ ...editor, password: event.target.value })}/></label>}
         </div>
         {editorError && <p className="inline-message danger users-editor-error" role="alert" aria-live="assertive">{editorError}</p>}
         <footer><button className="secondary-btn" onClick={closeEditor}>取消</button><button className="primary-btn compact" disabled={busy} onClick={() => void saveUser()}>{busy ? '儲存中…' : '儲存'}</button></footer>
       </AdminModal>;
     })()}
     {applicationReview && <AdminModal title={`審核帳號申請｜${applicationReview.name}`} onClose={() => setApplicationReview(null)}><dl className="detail-grid"><div><dt>登入帳號</dt><dd>{applicationReview.username}</dd></div><div><dt>電子郵件</dt><dd>{applicationReview.email}</dd></div><div><dt>所屬單位</dt><dd>{deptName(applicationReview.dept_id)}</dd></div><div><dt>聯絡電話</dt><dd>{applicationReview.phone || '—'}</dd></div><div><dt>申請說明</dt><dd>{applicationReview.reason || '—'}</dd></div></dl><div className="admin-form-grid"><label>系統角色（管理員核定）<select value={applicationReview.rbac_role} onChange={event => setApplicationReview({ ...applicationReview, rbac_role: event.target.value, supervisor_id: ['unit_supervisor', 'sysadmin'].includes(event.target.value) ? '' : applicationReview.supervisor_id })}>{roles.map(role => <option key={role.role_id} value={role.role_id}>{role.name}</option>)}</select></label>{!['unit_supervisor', 'sysadmin'].includes(String(applicationReview.rbac_role)) && <label>直屬主管（必填）<select value={applicationReview.supervisor_id || ''} onChange={event => setApplicationReview({ ...applicationReview, supervisor_id: event.target.value })}><option value="">{applicationReview.dept_id ? '-- 請選擇 --' : '-- 請先確認所屬單位 --'}</option>{supervisorOptions(applicationReview.dept_id, String(applicationReview.supervisor_id || '')).map(supervisor => <option key={supervisor.user_id} value={supervisor.user_id}>{supervisor.name}｜{deptName(supervisor.dept_id)}</option>)}</select>{!applicationReview.dept_id && <small>此申請尚未指定所屬單位，請先補齊單位後再核准。</small>}</label>}<label className="wide">審核備註（退回時必填）<textarea rows={3} value={applicationReview.decision_note || ''} onChange={event => setApplicationReview({ ...applicationReview, decision_note: event.target.value })}/></label></div><footer><button className="secondary-btn" onClick={() => setApplicationReview(null)}>取消</button><button className="secondary-btn danger" disabled={busy} onClick={() => void run({ action: 'admin_reject_account_application', application_id: applicationReview.application_id, decision_note: applicationReview.decision_note || '' }, '帳號申請已退回')}>退回</button><button className="primary-btn compact" disabled={busy || (!['unit_supervisor', 'sysadmin'].includes(String(applicationReview.rbac_role)) && !applicationReview.supervisor_id)} onClick={() => void run({ action: 'admin_approve_account_application', application_id: applicationReview.application_id, rbac_role: applicationReview.rbac_role, supervisor_id: applicationReview.supervisor_id || null, decision_note: applicationReview.decision_note || '' }, '帳號已核准')}>核准並寄啟用連結</button></footer></AdminModal>}
-    {passwordUser && <AdminModal title={`重設密碼｜${passwordUser.name}`} onClose={() => { setPasswordUser(null); setPassword(''); setPassword2(''); }}><div className="admin-form-grid"><label className="wide">新密碼（{PASSWORD_POLICY.minLength} 位數字）<input type="password" minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} pattern="[0-9]{8}" inputMode="numeric" value={password} onChange={event => setPassword(event.target.value)}/></label><label className="wide">再次輸入新密碼<input type="password" minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} pattern="[0-9]{8}" inputMode="numeric" value={password2} onChange={event => setPassword2(event.target.value)}/></label></div><footer><button className="secondary-btn" onClick={() => { setPasswordUser(null); setPassword(''); setPassword2(''); }}>取消</button><button className="primary-btn compact" disabled={busy} onClick={() => { const passwordError = passwordPolicyMessage(password); if (passwordError) { setNote(`失敗：${passwordError}`); return; } if (password !== password2) { setNote('失敗：兩次密碼不一致'); return; } void run({ action: 'admin_reset_password', user_id: passwordUser.user_id, password }, '密碼已重設'); }}>確認重設</button></footer></AdminModal>}
+    {passwordUser && <AdminModal title={`重設密碼｜${passwordUser.name}`} onClose={() => { setPasswordUser(null); setPassword(''); setPassword2(''); }}><div className="admin-form-grid"><label className="wide">新密碼（{passwordPolicy.hint}）<input type="password" {...passwordInputProps(passwordPolicy)} value={password} onChange={event => setPassword(event.target.value)}/></label><label className="wide">再次輸入新密碼<input type="password" {...passwordInputProps(passwordPolicy)} value={password2} onChange={event => setPassword2(event.target.value)}/></label></div><footer><button className="secondary-btn" onClick={() => { setPasswordUser(null); setPassword(''); setPassword2(''); }}>取消</button><button className="primary-btn compact" disabled={busy} onClick={() => { const passwordError = passwordPolicyMessage(password, passwordPolicy); if (passwordError) { setNote(`失敗：${passwordError}`); return; } if (password !== password2) { setNote('失敗：兩次密碼不一致'); return; } void run({ action: 'admin_reset_password', user_id: passwordUser.user_id, password }, '密碼已重設'); }}>確認重設</button></footer></AdminModal>}
   </AppShell>;
 }

@@ -13,7 +13,8 @@
 import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
-import { PASSWORD_POLICY, passwordPolicyMessage } from '@/lib/password-policy';
+import { passwordInputProps, passwordPolicyMessage } from '@/lib/password-policy';
+import { usePasswordPolicy } from '@/lib/use-password-policy';
 import { clearProfile, saveProfile } from '@/lib/profile-cache';
 import type { Profile } from '@/types/app';
 
@@ -25,11 +26,12 @@ function friendlyError(raw: unknown, fallback: string) {
   if (/invalid.*email|email.*invalid/i.test(text)) return '電子郵件格式不正確';
   if (/user not found|no user/i.test(text)) return '查無此電子郵件對應的帳號';
   if (/expired|invalid.*token|session/i.test(text)) return '重設連結已失效，請重新申請';
-  if (/password.*(short|least|weak)/i.test(text)) return `密碼強度不足，請至少 ${PASSWORD_POLICY.minLength} 個字元並符合複雜度要求`;
+  if (/password.*(short|least|weak)/i.test(text)) return '密碼不符合規則，請依畫面提示重新設定';
   return text || fallback;
 }
 
 export default function LoginPage() {
+  const passwordPolicy = usePasswordPolicy();
   const [captcha, setCaptcha] = useState<{ id: string; image: string } | null>(null);
   const [view, setView] = useState<'login' | 'forgot' | 'reset'>('login');
   const [resetReady, setResetReady] = useState(false);
@@ -126,7 +128,7 @@ export default function LoginPage() {
 
   async function saveNewPassword() {
     setMessage(''); setNotice('');
-    const passwordError = passwordPolicyMessage(password);
+    const passwordError = passwordPolicyMessage(password, passwordPolicy);
     if (passwordError) { setMessage(passwordError); return; }
     if (password !== password2) { setMessage('兩次密碼不一致'); return; }
     setBusy(true);
@@ -151,9 +153,9 @@ export default function LoginPage() {
   if (view === 'reset') return <main className="v1-login-page">
     <div className="login-card v1-login-card">
       {brand}
-      <p className="v1-login-hint">設定新密碼（至少 {PASSWORD_POLICY.minLength} 個字元，需含至少 3 類字元）</p>
-      <label>新密碼<input type="password" value={password} minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} autoComplete="new-password" onChange={e => setPassword(e.target.value)} placeholder="••••••••••••" /></label>
-      <label>再次輸入新密碼<input type="password" value={password2} minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} autoComplete="new-password" onChange={e => setPassword2(e.target.value)} placeholder="••••••••••••" /></label>
+      <p className="v1-login-hint">設定新密碼（{passwordPolicy.hint}）</p>
+      <label>新密碼<input type="password" value={password} {...passwordInputProps(passwordPolicy)} autoComplete="new-password" onChange={e => setPassword(e.target.value)} placeholder="••••••••••••" /></label>
+      <label>再次輸入新密碼<input type="password" value={password2} {...passwordInputProps(passwordPolicy)} autoComplete="new-password" onChange={e => setPassword2(e.target.value)} placeholder="••••••••••••" /></label>
       {message && <p className="form-error">{message}</p>}
       {notice && <p className="inline-message">{notice}</p>}
       <button className="primary-btn" disabled={busy || !resetReady} onClick={() => void saveNewPassword()}>{busy ? '儲存中…' : resetReady ? '設定新密碼' : '驗證連結中…'}</button>

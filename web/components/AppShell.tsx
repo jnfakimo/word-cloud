@@ -8,7 +8,8 @@ import { ResponsiveTableLabels } from '@/components/ResponsiveTableLabels';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { invokeGoogleCalendar, type GoogleCalendarStatus } from '@/lib/google-calendar';
 import type { Profile } from '@/types/app';
-import { PASSWORD_POLICY, passwordPolicyMessage } from '@/lib/password-policy';
+import { passwordInputProps, passwordPolicyMessage } from '@/lib/password-policy';
+import { usePasswordPolicy } from '@/lib/use-password-policy';
 import { clearProfile } from '@/lib/profile-cache';
 import { findModule, findSystem, type ModuleDefinition, type SystemDefinition } from '@/lib/modules';
 import { SystemPageHeader } from '@/components/SystemPageHeader';
@@ -28,6 +29,7 @@ export function AppShell({ profile, title, children, heading }: {
   children: React.ReactNode;
   heading?: { system: SystemDefinition; module: ModuleDefinition; title?: string; metaTitle?: string; description?: string };
 }) {
+  const passwordPolicy = usePasswordPolicy();
   const pathname = usePathname();
   const [clock, setClock] = useState(taipeiClock);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -136,7 +138,7 @@ export function AppShell({ profile, title, children, heading }: {
     const form = new FormData(formElement);
     const password = String(form.get('password') || '');
     const confirm = String(form.get('confirm') || '');
-    const passwordError = passwordPolicyMessage(password);
+    const passwordError = passwordPolicyMessage(password, passwordPolicy);
     if (passwordError) return setPasswordMessage(passwordError);
     if (password !== confirm) return setPasswordMessage('兩次輸入的密碼不一致');
     try {
@@ -259,8 +261,8 @@ export function AppShell({ profile, title, children, heading }: {
           </section>
 
           <form className="profile-section profile-section-security" onSubmit={changePassword}>
-            <div className="profile-section-title"><span>03</span><div><b>登入安全</b><small>{PASSWORD_POLICY.minLength} 位數字</small></div></div>
-            <div className="profile-form-grid"><label>新密碼<input type="password" name="password" minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} pattern="[0-9]{8}" inputMode="numeric" required autoComplete="new-password" /></label><label>確認新密碼<input type="password" name="confirm" minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} pattern="[0-9]{8}" inputMode="numeric" required autoComplete="new-password" /></label></div>
+            <div className="profile-section-title"><span>03</span><div><b>登入安全</b><small>{passwordPolicy.hint}</small></div></div>
+            <div className="profile-form-grid"><label>新密碼<input type="password" name="password" {...passwordInputProps(passwordPolicy)} required autoComplete="new-password" /></label><label>確認新密碼<input type="password" name="confirm" {...passwordInputProps(passwordPolicy)} required autoComplete="new-password" /></label></div>
             {passwordMessage && <p className="profile-message">{passwordMessage}</p>}
             <div className="profile-actions"><button className="primary-btn compact">更新密碼</button></div>
           </form>
