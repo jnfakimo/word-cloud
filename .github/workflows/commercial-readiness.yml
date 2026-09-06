@@ -16,12 +16,18 @@ concurrency:
 jobs:
   static-audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Verify audit failure detection
+        run: node --test tools/commercial-readiness-audit.test.mjs
+      - name: Build audit artifact (never published)
+        run: npm run build:v2 && node tools/build-hardened-pages.mjs --unsigned-audit
       - name: Audit static application
         run: node tools/commercial-readiness-audit.mjs
       - name: Audit V2 security design controls

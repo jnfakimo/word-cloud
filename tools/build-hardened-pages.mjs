@@ -192,9 +192,9 @@ function addHtmlDirectives(html, relativePath) {
   if (!/\bname\s*=\s*["']copyright["']/i.test(html)) {
     directives.push('<meta name="copyright" content="Copyright © 2026 jnfakimo. All rights reserved.">');
   }
-  // V1 每頁已自帶 CSP（含各自的 CDN 白名單），不能被覆蓋；只補 V2。
+  // 保留 V1 自帶的 CDN 白名單；已改成 V2 跳轉的舊入口仍需要 CSP。
   // CSP 必須早於任何受限資源，所以排在最前面。
-  if (relativePath.startsWith('v2/') && !/http-equiv\s*=\s*["']content-security-policy["']/i.test(html)) {
+  if (!/http-equiv\s*=\s*["']content-security-policy["']/i.test(html)) {
     directives.unshift(`<meta http-equiv="Content-Security-Policy" content="${v2ContentSecurityPolicy}">`);
   }
   if (!directives.length) return html;
@@ -306,7 +306,7 @@ async function writeSignedProvenance() {
   entries.sort((left, right) => left.path.localeCompare(right.path, 'en'));
 
   const privateKey = String(process.env.PROVENANCE_PRIVATE_KEY || '').trim();
-  if (process.env.GITHUB_ACTIONS === 'true' && !privateKey) {
+  if (process.env.GITHUB_ACTIONS === 'true' && !privateKey && !process.argv.includes('--unsigned-audit')) {
     throw new Error('正式部署缺少 PROVENANCE_PRIVATE_KEY，拒絕產生未簽章網站。');
   }
   const manifest = {
@@ -369,6 +369,9 @@ async function verifyArtifact() {
     const text = await readFile(file, 'utf8');
     const relative = toPosix(path.relative(outputRoot, file));
     const isSearchConsoleVerificationFile = relative === searchConsoleVerificationFile;
+    if (relative.endsWith('.html') && !isSearchConsoleVerificationFile && !contentSecurityPolicy(text)) {
+      throw new Error(`正式頁面缺少 CSP：${relative}`);
+    }
     if (relative.endsWith('.html') && !isSearchConsoleVerificationFile && !hasCompleteRobotsMeta(text)) {
       throw new Error(`正式頁面缺少完整防索引標記：${relative}`);
     }

@@ -4,7 +4,8 @@ import path from 'node:path';
 import vm from 'node:vm';
 
 const root=path.resolve(process.cwd());
-const systemDir=path.join(root,'system');
+const artifactDir=path.join(root,'_site');
+if (!fs.existsSync(path.join(artifactDir,'v2','index.html'))) throw new Error('請先建置完整網站產物，再執行發布稽核。');
 const findings=[];
 const add=(severity,rule,file,message)=>findings.push({severity,rule,file:path.relative(root,file).replaceAll('\\','/'),message});
 
@@ -13,7 +14,7 @@ function walk(dir,predicate){
   for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
     // removed-edge-functions 是刻意留底的已移除函式原始碼（見 ARCHITECTURE_V2.md），
     // 不會被部署也不該被當成現役程式碼稽核；掃它只會讓已處置的舊版本永遠亮紅燈。
-    if(['.git','plans','vendor','node_modules','removed-edge-functions'].includes(entry.name))continue;
+    if(['.git','plans','vendor','node_modules','removed-edge-functions','.next','out','_site','dist','run'].includes(entry.name))continue;
     const full=path.join(dir,entry.name);
     if(entry.isDirectory())out.push(...walk(full,predicate));
     else if(predicate(full))out.push(full);
@@ -23,6 +24,13 @@ function walk(dir,predicate){
 
 function stripScriptsAndStyles(html){
   return html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,'');
+}
+
+function resolveAsset(file, raw) {
+  const clean=decodeURIComponent(raw.split(/[?#]/,1)[0]);
+  if (!clean) return file;
+  const relative=clean.replace(/^\/(?:Inspection|word-cloud)(?:\/|$)/, '/');
+  return relative.startsWith('/') ? path.resolve(artifactDir, '.'+relative) : path.resolve(path.dirname(file), relative);
 }
 
 function auditHtml(file){
@@ -41,14 +49,13 @@ function auditHtml(file){
     if(!/\brel=["'][^"']*\bnoopener\b/i.test(match[1]))add('error','noopener',file,'target="_blank" 連結缺少 rel="noopener"。');
   }
 
-  for(const match of html.matchAll(/\b(?:src|href)=["']([^"']+)["']/gi)){
+  for(const match of html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').matchAll(/\b(?:src|href)=["']([^"']+)["']/gi)){
     const raw=match[1];
     if(!raw||/^(?:[a-z]+:|\/\/|#|data:|javascript:|mailto:|tel:)/i.test(raw)||/[${}]/.test(raw))continue;
     const clean=raw.split(/[?#]/,1)[0];
     if(!clean)continue;
-    let decoded=clean;
-    try{decoded=decodeURIComponent(clean);}catch{}
-    const target=path.resolve(path.dirname(file),decoded);
+    let target;
+    try{target=resolveAsset(file,raw);}catch{add('error','invalid-asset-url',file,`資源網址編碼錯誤：${raw}`);continue;}
     if(!fs.existsSync(target))add('error','missing-asset',file,`找不到本機資源：${raw}`);
   }
 
@@ -56,7 +63,7 @@ function auditHtml(file){
     const attrs=match[1],code=match[2].trim();
     const external=attrs.match(/\bsrc=["'](https:\/\/[^"']+)["']/i);
     if(external&&!/\bintegrity=["']sha(?:256|384|512)-/i.test(attrs))add('error','script-integrity',file,`外部程式缺少 SRI：${external[1]}`);
-    if(!code||/\bsrc\s*=/i.test(attrs)||/\btype=["']module["']/i.test(attrs))continue;
+    if(!code||/\bsrc\s*=/i.test(attrs)||/\btype=["'](?:module|application\/ld\+json|application\/json)["']/i.test(attrs))continue;
     try{new vm.Script(code,{filename:path.relative(root,file)});}catch(error){add('error','inline-js-syntax',file,String(error.message).split('\n')[0]);}
   }
   for(const match of html.matchAll(/<link\b([^>]*\brel=["']stylesheet["'][^>]*)>/gi)){
@@ -79,14 +86,17 @@ function auditCss(file){
   for(const match of css.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/gi)){
     const raw=match[1];
     if(/^(?:data:|https?:|\/\/)/i.test(raw))continue;
-    const target=path.resolve(path.dirname(file),decodeURIComponent(raw.split(/[?#]/,1)[0]));
+    if(raw.startsWith('#'))continue;
+    let target;
+    try{target=resolveAsset(file,raw);}catch{add('error','invalid-asset-url',file,`資源網址編碼錯誤：${raw}`);continue;}
     if(!fs.existsSync(target))add('error','missing-css-asset',file,`找不到 CSS 資源：${raw}`);
   }
 }
 
-const htmlFiles=walk(systemDir,file=>file.endsWith('.html'));
+// Search Console 的驗證文字檔不是應用程式頁面。
+const htmlFiles=walk(artifactDir,file=>file.endsWith('.html') && path.basename(file)!=='google620de73073c56d88.html');
 htmlFiles.forEach(auditHtml);
-walk(systemDir,file=>file.endsWith('.css')).forEach(auditCss);
+walk(artifactDir,file=>file.endsWith('.css')).forEach(auditCss);
 
 const sourceFiles=walk(root,file=>/\.(?:html|js|mjs|ts|sql|ya?ml|toml|json)$/i.test(file));
 for(const file of sourceFiles){
