@@ -2,12 +2,15 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config';
+import { usesLocalBackendOrigin } from './backend-origin';
 import { reportIfInfrastructureError } from './error-tracker';
 import { emitSecurityDataRead } from './security-audit-sink';
 import { cachedRequest, requestCacheKey } from './request-cache';
 
 let client: SupabaseClient | null = null;
-const nodeAppApiUrl = process.env.NEXT_PUBLIC_APP_API_URL?.trim().replace(/\/$/, '');
+// The formal self-hosted site must keep writes on the same backend as its login.
+const nodeAppApiUrl = usesLocalBackendOrigin(new URL(SUPABASE_URL).hostname)
+  ? undefined : process.env.NEXT_PUBLIC_APP_API_URL?.trim().replace(/\/$/, '');
 // 地端相容 API 不能讓前端無限等待；逾時後改走同源地端 app-api。
 const NODE_API_TIMEOUT_MS = 5000;
 const READ_ACTION_LABELS: Record<string, string> = {
