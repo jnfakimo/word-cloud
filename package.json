@@ -38,11 +38,12 @@
     "test:backup": "node --test tools/backup-request.test.mjs && node tools/database-backup-consistency-check.mjs",
     "backup:db": "node tools/database-backup.mjs",
     "backup:verify": "node tools/database-backup-verify.mjs",
-    "test": "node --check tools/build-hardened-pages.mjs && npm run test:security-audit && npm run test:app-navigation && npm run test:auth-consistency && npm run test:floor-consistency && npm run test:schema-contract && npm run test:patrol-offline && npm run test:page-headings && npm run test:button-standard && npm run test:profile-modal && npm run test:login-layout && npm run test:market-bar-guide && npm run test:market-movement && npm run test:market-dashboard-rotation && npm run test:market-request-cache && npm run test:market-rollup-performance && npm run test:market-stock-signal && npm run test:market-command-center && npm run test:market-interactive-dashboard && npm run test:backup && npm run test:market-file-import && npm run test:admin-api && npm run test:weather-api && npm run test:board-notices",
+    "test": "node --check tools/build-hardened-pages.mjs && npm run test:security-audit && npm run test:app-navigation && npm run test:auth-consistency && npm run test:floor-consistency && npm run test:schema-contract && npm run test:patrol-offline && npm run test:page-headings && npm run test:button-standard && npm run test:profile-modal && npm run test:login-layout && npm run test:market-bar-guide && npm run test:market-movement && npm run test:market-dashboard-rotation && npm run test:market-request-cache && npm run test:market-rollup-performance && npm run test:market-stock-signal && npm run test:market-command-center && npm run test:market-interactive-dashboard && npm run test:backup && npm run test:market-file-import && npm run test:admin-api && npm run test:weather-api && npm run test:board-notices && npm run test:official-timeout-errors",
     "test:market-file-import": "node --experimental-strip-types --test web/lib/market-file-import.test.ts",
     "test:admin-api": "node tools/admin-api-check.mjs",
     "test:weather-api": "node --test web/lib/weather-api.test.ts",
-    "test:board-notices": "node --experimental-strip-types tools/board-notices-check.mjs"
+    "test:board-notices": "node --experimental-strip-types tools/board-notices-check.mjs",
+    "test:official-timeout-errors": "node tools/official-document-timeout-error-check.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.112.2",
@@ -70,6 +71,7 @@
     "@types/three": "0.171.0",
     "esbuild": "0.25.12",
     "html-minifier-terser": "7.2.0",
+    "parse5": "^8.0.1",
     "terser": "5.49.2",
     "typescript": "5.9.3"
   }

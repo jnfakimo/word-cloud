@@ -144,7 +144,9 @@ Deno.serve(async req => {
       results.push({ document_id: document.document_id, step_id: step.step_id, recipients: recipients.size, recorded, due_at: dueAt.toISOString(), dry_run: Boolean(body.dryRun) });
     }
     return reply({ ok: true, checked: (documentsResult.data || []).length, receive_minutes: receiveMinutes, approval_minutes: approvalMinutes, results });
-  } catch (error) {
-    return reply({ ok: false, message: error instanceof Error ? error.message : String(error) }, 500);
+  } catch {
+    const requestId = crypto.randomUUID();
+    console.error('official-document-timeout-check failed', { requestId });
+    return reply({ ok: false, message: '公文逾時檢查暫時無法完成，請稍後再試。', request_id: requestId }, 500);
   }
 });

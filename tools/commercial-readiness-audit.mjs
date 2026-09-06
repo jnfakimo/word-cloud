@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
+import { parse } from 'parse5';
 
 const root=path.resolve(process.cwd());
 const artifactDir=path.join(root,'_site');
@@ -22,8 +23,24 @@ function walk(dir,predicate){
   return out;
 }
 
-function stripScriptsAndStyles(html){
-  return html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,'');
+// This is an audit view, never HTML sanitization. Parse like a browser and mask
+// raw-text content with spaces, preserving actual tags/attributes and offsets.
+function maskRawText(html, names = new Set(['script', 'style'])){
+  const spans=[];
+  const visit=node=>{
+    const loc=node.sourceCodeLocation;
+    if(names.has(node.tagName) && loc?.startTag){
+      spans.push([loc.startTag.endOffset,loc.endTag?.startOffset ?? loc.endOffset]);
+    }
+    for(const child of node.childNodes || [])visit(child);
+    if(node.content)visit(node.content);
+  };
+  visit(parse(html,{sourceCodeLocationInfo:true}));
+  let result='',offset=0;
+  for(const [start,end] of spans.sort((a,b)=>a[0]-b[0])){
+    result+=html.slice(offset,start)+' '.repeat(end-start); offset=end;
+  }
+  return result+html.slice(offset);
 }
 
 function resolveAsset(file, raw) {
@@ -40,7 +57,7 @@ function auditHtml(file){
   if(!/<title>[^<]+<\/title>/i.test(html))add('error','html-title',file,'缺少頁面標題。');
   if(!/http-equiv=["']Content-Security-Policy["']/i.test(html))add('error','content-security-policy',file,'缺少 Content Security Policy。');
 
-  const visibleMarkup=stripScriptsAndStyles(html);
+  const visibleMarkup=maskRawText(html);
   const ids=[...visibleMarkup.matchAll(/\sid=["']([^"']+)["']/gi)].map(m=>m[1]);
   const duplicates=[...new Set(ids.filter((id,index)=>ids.indexOf(id)!==index))];
   duplicates.forEach(id=>add('error','duplicate-id',file,`重複 DOM id：${id}`));
@@ -49,7 +66,7 @@ function auditHtml(file){
     if(!/\brel=["'][^"']*\bnoopener\b/i.test(match[1]))add('error','noopener',file,'target="_blank" 連結缺少 rel="noopener"。');
   }
 
-  for(const match of html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').matchAll(/\b(?:src|href)=["']([^"']+)["']/gi)){
+  for(const match of maskRawText(html,new Set(['script'])).matchAll(/\b(?:src|href)=["']([^"']+)["']/gi)){
     const raw=match[1];
     if(!raw||/^(?:[a-z]+:|\/\/|#|data:|javascript:|mailto:|tel:)/i.test(raw)||/[${}]/.test(raw))continue;
     const clean=raw.split(/[?#]/,1)[0];
@@ -75,7 +92,7 @@ function auditHtml(file){
   if(/@supabase\/supabase-js@2(?:["'\/])/i.test(html))add('error','floating-supabase-version',file,'Supabase 套件不可使用浮動 @2 版本。');
   if(/\.storage\.from\(["'](?:repair-files|handover-attachments|vehicle-dispatch-files)["']\)\.getPublicUrl/i.test(html))add('error','public-business-file',file,'業務附件不可產生永久公開網址。');
   if(/new Date\(\)\.toISOString\(\)\.split\(["']T["']\)/.test(html))add('error','utc-date-only',file,'日期欄位不可用 UTC 截日，請使用 Asia/Taipei。');
-  if(/\bzoom\s*:\s*\d+/i.test(stripScriptsAndStyles(html)))add('error','css-zoom',file,'頁面不可用 CSS zoom 縮放整體介面。');
+  if(/\bzoom\s*:\s*\d+/i.test(visibleMarkup))add('error','css-zoom',file,'頁面不可用 CSS zoom 縮放整體介面。');
   for(const match of html.matchAll(/http:\/\/([A-Za-z0-9.-]+(?::\d+)?)/gi)){
     if(!/^(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(match[1]))add('warning','mixed-content',file,`非本機 HTTP 資源：${match[0]}`);
   }

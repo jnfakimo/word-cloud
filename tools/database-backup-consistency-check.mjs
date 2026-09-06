@@ -37,7 +37,7 @@ globalThis.fetch = async (url, init) => {
   if (body.query.includes('information_schema.tables')) {
     return reply(Object.keys(TABLES).map(table_name => ({ table_name })));
   }
-  if (body.query.includes('information_schema.table_constraints')) {
+  if (body.query.includes('pg_catalog.pg_index')) {
     return reply([
       { table_name: 'exact_200', column_name: 'id' },
       { table_name: 'over_page', column_name: 'id' },

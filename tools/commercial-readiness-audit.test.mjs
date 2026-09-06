@@ -46,6 +46,12 @@ test('不把 hydration 字串中的範例網址當 DOM 資源，仍檢查腳本�
   assert.equal(audit('<script>const example=`href="/missing"`;</script>').status, 0);
   assert.equal(audit('<script>const = ;</script>').status, 1);
 });
+
+test('HTML 解析保留腳本資源、忽略原始文字內容與特殊結束標記', () => {
+  assert.equal(audit('<script type="application/json" data-note=">">{"sample":"href=\"/missing\""}</script ><style>.a::after{content:\'id="duplicate"\'}</style><div id="duplicate"></div>').status,0);
+  const missing = audit('<script src="/Inspection/v2/missing.js"></script>');
+  assert.equal(missing.status,1); assert.match(missing.output,/missing-asset/);
+});
 test('V2 頁面及 CSS 資源納入檢查', () => {
   const result = audit('', { '_site/v2/nested/index.html': head+'<a target="_blank" href="#">連結</a>', '_site/v2/theme.css': 'body{background:url(missing.png)}' });
   assert.equal(result.status, 1); assert.match(result.output, /noopener/); assert.match(result.output, /missing-css-asset/);

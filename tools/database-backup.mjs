@@ -63,12 +63,15 @@ async function listTables() {
     "where table_schema = 'public' and table_type = 'BASE TABLE' order by table_name",
   );
   const keys = await query(
-    'select k.table_name, k.column_name from information_schema.table_constraints c ' +
-    'join information_schema.key_column_usage k on k.constraint_catalog = c.constraint_catalog ' +
-    'and k.constraint_schema = c.constraint_schema and k.constraint_name = c.constraint_name ' +
-    'and k.table_name = c.table_name ' +
-    "where c.table_schema = 'public' and c.constraint_type = 'PRIMARY KEY' " +
-    'order by k.table_name, k.ordinal_position',
+    // information_schema.table_constraints hides PKs from the Management API's
+    // read-only role. Catalog metadata remains readable without write privileges.
+    'select c.relname as table_name, a.attname as column_name from pg_catalog.pg_index i ' +
+    'join pg_catalog.pg_class c on c.oid = i.indrelid ' +
+    'join pg_catalog.pg_namespace n on n.oid = c.relnamespace ' +
+    'join lateral unnest(i.indkey::smallint[]) with ordinality k(attnum, position) on true ' +
+    'join pg_catalog.pg_attribute a on a.attrelid = c.oid and a.attnum = k.attnum ' +
+    "where n.nspname = 'public' and i.indisprimary and k.position <= i.indnkeyatts " +
+    'order by c.relname, k.position',
   );
   return rows.map(r => ({
     name: r.table_name,
