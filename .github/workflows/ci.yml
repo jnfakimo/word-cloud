@@ -33,7 +33,7 @@ jobs:
       # Run unit / integration tests if defined
       - name: Run tests
         run: |
-          if npm test; then echo "Tests passed"; else echo "No tests defined or tests failed"; fi
+          npm test
 
       - name: Build Node.js API
         run: npm run typecheck:api && npm run build:api

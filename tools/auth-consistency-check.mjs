@@ -22,10 +22,12 @@ function assert(condition, message) {
 
 assert(files.v1Config.includes("window.SystemAuth") && files.v1Config.includes("{ action: 'profile' }"),
   'V1 must expose the shared app-api/profile loader');
-assert(files.v1Login.includes('window.SystemAuth.restoreProfile') && files.v1Login.includes('window.SystemAuth.establishSession'),
-  'V1 login must restore and establish sessions through SystemAuth');
-assert(files.handoverLogin.includes("functions.invoke('username-login'") && files.handoverLogin.includes('captcha_id'),
-  'handover login must use username-login with captcha');
+assert(files.v1Login.includes("var v2Target = '/Inspection/v2/login/';") && files.v1Login.includes('window.location.replace(v2Target'),
+  'V1 login must forward to the authoritative V2 login');
+assert(files.handoverLogin.includes('/Inspection/v2/login/?redirect=%2Fsystems%2Fhandover%2F') && files.handoverLogin.includes('window.location.replace(target)'),
+  'handover login must forward to V2 login and preserve its destination');
+assert(files.v2Login.includes("functions.invoke('username-login'") && files.v2Login.includes('captcha_id') && files.v2Login.includes('auth.setSession'),
+  'V2 login must use the shared captcha login and establish its session');
 assert(!/login_lookup_email|signInWithPassword|\.from\(['"]users['"]\)/.test(files.handoverLogin),
   'handover login must not bypass the shared login/profile path');
 assert(

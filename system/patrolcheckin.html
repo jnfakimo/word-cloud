@@ -3,11 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta http-equiv="refresh" content="0; url=/Inspection/v2/systems/guardpatrol/checkins/">
+<noscript><meta http-equiv="refresh" content="0; url=/Inspection/v2/systems/guardpatrol/checkins/"></noscript>
 <title>V2 巡檢打卡 — 臺北農產公司 V2</title>
+<script src="patrol-offline.js?v=20260906"></script>
 <script>
-  (function() {
+  (async function() {
     var target = "/Inspection/v2/systems/guardpatrol/checkins/" + window.location.search + window.location.hash;
+    // 舊版巡檢入口仍須隔離離線佇列，並解除它自己註冊的快取，才前往 V2。
+    try {
+      await window.PatrolOffline?.sync({});
+      if ('serviceWorker' in navigator) {
+        var registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.filter(function(registration) {
+          return [registration.active, registration.waiting, registration.installing].some(function(worker) {
+            return worker && new URL(worker.scriptURL).pathname === '/Inspection/system/patrol-service-worker.js';
+          });
+        }).map(function(registration) { return registration.unregister(); }));
+      }
+      if ('caches' in window) {
+        var keys = await caches.keys();
+        await Promise.all(keys.filter(function(key) { return key.startsWith('patrol-checkin-'); })
+          .map(function(key) { return caches.delete(key); }));
+      }
+    } catch (error) { console.warn('舊版巡檢離線資料隔離或快取清理失敗', error); }
     window.location.replace(target);
   })();
   </script>

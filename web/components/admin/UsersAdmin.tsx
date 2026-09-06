@@ -76,21 +76,31 @@ export function UsersAdmin({ profile, module }: AdminProps) {
   const [busy, setBusy] = useState(true), [note, setNote] = useState(''), [query, setQuery] = useState(''), [status, setStatus] = useState('active'), [page, setPage] = useState(1);
   const [editor, setEditor] = useState<Row | null>(null), [passwordUser, setPasswordUser] = useState<Row | null>(null), [password, setPassword] = useState(''), [password2, setPassword2] = useState('');
   const [applicationReview, setApplicationReview] = useState<Row | null>(null);
+  const [applicationsLoaded, setApplicationsLoaded] = useState(false);
+  const [usersLoaded, setUsersLoaded] = useState(false);
   const [editorError, setEditorError] = useState('');
   const [batchBusy, setBatchBusy] = useState(false), [batchMessage, setBatchMessage] = useState(''), [batchDetails, setBatchDetails] = useState<string[]>([]), [temporaryPasswords, setTemporaryPasswords] = useState<TemporaryPassword[]>([]);
   const importFileRef = useRef<HTMLInputElement>(null);
   const load = useCallback(async () => {
-    setBusy(true); setNote('');
+    setBusy(true); setNote(''); setApplicationsLoaded(false); setUsersLoaded(false);
     try {
       const client = getSupabase();
-      const [u, r, d, a] = await Promise.all([
+      const [u, r, d, a] = await Promise.allSettled([
         client.from('users').select('user_id,auth_id,username,email,name,phone,department,dept_id,role,rbac_role,supervisor_id,status,created_at').order('name').limit(1000),
         client.from('roles').select('role_id,name,sort_order').order('sort_order'),
         client.from('departments').select('dept_id,parent_id,name,code,level,status,sort_order').order('sort_order'),
         invokeAdminApi<{ data?: Row[] }>('admin_list_account_applications'),
       ]);
-      if (u.error || r.error || d.error) setNote(`失敗：${errorMessage(u.error || r.error || d.error, '人員主檔載入失敗')}`);
-      setUsers(u.data || []); setRoles((r.data || []).filter(row => row.role_id !== 'mgmt_supervisor')); setDepartments(d.data || []); setApplications(a.data || []);
+      const failures: string[] = [];
+      if (u.status === 'fulfilled' && !u.value.error) { setUsers(u.value.data || []); setUsersLoaded(true); }
+      else failures.push(`人員：${errorMessage(u.status === 'rejected' ? u.reason : u.value.error, '載入失敗')}`);
+      if (r.status === 'fulfilled' && !r.value.error) setRoles((r.value.data || []).filter(row => row.role_id !== 'mgmt_supervisor'));
+      else failures.push(`角色：${errorMessage(r.status === 'rejected' ? r.reason : r.value.error, '載入失敗')}`);
+      if (d.status === 'fulfilled' && !d.value.error) setDepartments(d.value.data || []);
+      else failures.push(`單位：${errorMessage(d.status === 'rejected' ? d.reason : d.value.error, '載入失敗')}`);
+      if (a.status === 'fulfilled') { setApplications(a.value.data || []); setApplicationsLoaded(true); }
+      else { setApplications([]); failures.push(`待審申請：${errorMessage(a.reason, '載入失敗')}`); }
+      if (failures.length) setNote(`部分資料載入失敗：${failures.join('；')}`);
     } catch (error) { setNote(`失敗：${errorMessage(error, '人員主檔載入失敗')}`); }
     finally { setBusy(false); }
   }, []);
@@ -412,7 +422,7 @@ export function UsersAdmin({ profile, module }: AdminProps) {
     if (file) void importUsers(file);
   };
   return <AppShell profile={profile} title={module.title}>
-    <AdminHeader module={module} busy={busy} note={note} onReload={load} action={<><span>待審申請 {pendingApplications.length} 筆</span><button className="primary-btn compact" onClick={() => openEditor({ rbac_role: 'reporter', status: 'active', department_root_id: '' })}>＋ 新增帳號</button></>}/>
+    <AdminHeader module={module} busy={busy} note={note} onReload={load} action={<><span>{applicationsLoaded ? `待審申請 ${pendingApplications.length} 筆` : busy ? '待審申請載入中…' : '待審申請未載入'}</span><button className="primary-btn compact" onClick={() => openEditor({ rbac_role: 'reporter', status: 'active', department_root_id: '' })}>＋ 新增帳號</button></>}/>
     <section className="panel admin-panel users-batch-panel">
       <div className="users-batch-toolbar"><div><h2>帳號批次管理</h2><p>可下載範本、匯入 XLSX 或匯出目前帳號；匯出檔不包含密碼。</p></div><div className="users-batch-actions">
         <button className="secondary-btn compact" disabled={batchBusy} onClick={() => void downloadImportTemplate()}>下載匯入範本</button>
@@ -434,7 +444,7 @@ export function UsersAdmin({ profile, module }: AdminProps) {
     </section>}
     <section className="panel admin-panel"><div className="admin-toolbar"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋姓名、帳號、電子郵件、單位或角色"/><select value={status} onChange={event => setStatus(event.target.value)}><option value="">全部狀態</option><option value="active">啟用</option><option value="inactive">停用</option></select><span>啟用 {users.filter(user => user.status === 'active').length}／停用 {users.filter(user => user.status === 'inactive').length}</span></div>
       <div className="responsive-table"><table><thead><tr><th>姓名</th><th>登入帳號</th><th>單位</th><th>角色</th><th>直屬主管</th><th>狀態</th><th>建立時間</th><th>操作</th></tr></thead><tbody>{rows.map(user => <tr key={user.user_id}><td><strong>{user.name}</strong><small>{user.email || '—'}</small></td><td>{user.username || '—'}</td><td>{deptName(user.dept_id) !== '—' ? deptName(user.dept_id) : user.department || '—'}</td><td>{roleLabel(userRole(user), roles)}</td><td>{['unit_supervisor', 'sysadmin'].includes(userRole(user)) ? '—' : supervisorName(user.supervisor_id)}</td><td><StatusPill value={user.status}/></td><td>{fmtTime(user.created_at)}</td><td><div className="admin-row-actions"><button onClick={() => openEditor({ ...user, rbac_role: userRole(user) })}>編輯</button><button onClick={() => setPasswordUser(user)}>重設密碼</button>{user.user_id !== profile.user_id && <button className={user.status === 'active' ? 'warn' : ''} onClick={() => window.confirm(`確定${user.status === 'active' ? '停用' : '啟用'}「${user.name}」？`) && void run({ action: 'admin_toggle_user', user_id: user.user_id, status: user.status === 'active' ? 'inactive' : 'active' }, user.status === 'active' ? '帳號已停用' : '帳號已啟用')}>{user.status === 'active' ? '停用' : '啟用'}</button>}{user.status === 'inactive' && !String(user.username || '').startsWith('deidentified-') && <button className="danger" onClick={() => window.confirm(`確定將「${user.name}」個資去識別化？此操作無法復原。`) && void run({ action: 'admin_deidentify_user', user_id: user.user_id }, '個資已去識別化')}>去識別化</button>}</div></td></tr>)}</tbody></table></div>
-      {!busy && rows.length === 0 && <p className="empty">查無符合條件的人員</p>}<Pager page={page} total={filtered.length} onPage={setPage}/>
+      {!busy && usersLoaded && rows.length === 0 && <p className="empty">查無符合條件的人員</p>}<Pager page={page} total={filtered.length} onPage={setPage}/>
     </section>
     {editor && (() => {
       const selectedRootId = String(editor.department_root_id || rootDepartmentId(editor.dept_id));

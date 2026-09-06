@@ -28,13 +28,15 @@ assert.match(command, /XLSX|K 線|累積占比|收盤高於開盤/,
   '戰情儀表板必須提供初學者可讀的 K 線與統計圖例');
 assert.match(command, /行情方向圖例[\s\S]*?▲[\s\S]*?上漲（紅）[\s\S]*?▼[\s\S]*?下跌（綠）/,
   '戰情儀表板必須明示紅色上漲三角形與綠色下跌三角形');
-assert.match(workspace, /parseXlsxFile[\s\S]*?workbook\.worksheets\[0\][\s\S]*?accept=.*xlsx/,
-  '資料介接中心必須可讀取 XLSX 第一個工作表');
+assert.match(workspace, /parseMarketExcelFile\(file\)[\s\S]*?accept=.*xlsx/,
+  '資料介接中心必須使用共用 Excel 解析器');
+assert.match(read('web/lib/market-file-import.ts'), /workbook\.xlsx\.load[\s\S]*?workbook\.worksheets\[0\]/,
+  '共用解析器必須可讀取 XLSX 第一個工作表');
 assert.match(workspace, /IMPORT_HEADER_ALIASES[\s\S]*?品名代號[\s\S]*?平均價[\s\S]*?inferImportHeader/,
   '行情匯入必須能辨識北農歷史檔的中文欄位名稱');
 assert.match(workspace, /total_value[\s\S]*?average_price[\s\S]*?quantity[\s\S]*?averagePrice \* quantity/,
   '行情匯入缺少成交金額欄位時必須可推估交易金額');
-assert.match(workspace, /匯入 CSV／JSON／XLSX 行情資料/,
+assert.match(workspace, /匯入 XLS／XLSX／CSV／JSON 行情資料/,
   '資料介接中心的介接說明必須明示支援 XLSX');
 assert.match(css, /market-command-page[\s\S]*?market-command-chart-switch[\s\S]*?market-kline/,
   '戰情儀表板必須有獨立的響應式視覺樣式');

@@ -5,7 +5,8 @@ const movement = readFileSync('web/lib/market-movement.ts', 'utf8');
 const badge = readFileSync('web/components/MarketMovementBadge.tsx', 'utf8');
 const workspace = readFileSync('web/app/systems/[system]/[module]/market-analytics-workspace.tsx', 'utf8');
 const marketCss = readFileSync('web/app/systems/[system]/[module]/market-analytics.css', 'utf8');
-const dashboard = readFileSync('web/app/dashboard-client.tsx', 'utf8');
+const dashboard = readFileSync('web/components/MarketExecutiveBoard.tsx', 'utf8');
+const boardPage = readFileSync('web/app/board/page.tsx', 'utf8');
 const dashboardCss = readFileSync('web/app/dashboard.css', 'utf8');
 
 assert.match(movement, /numeric === null \|\| !Number\.isFinite\(numeric\)[\s\S]*?tone: 'neutral'[\s\S]*?label: '無比較基準'/,
@@ -19,8 +20,10 @@ assert.match(badge, /marketMovementPresentation\(value\)[\s\S]*?market-movement-
 
 assert.match(workspace, /market-stock-legend market-stock-legend-compact[\s\S]*?data-direction="rise"[\s\S]*?▲[\s\S]*?上漲（紅）[\s\S]*?data-direction="fall"[\s\S]*?▼[\s\S]*?下跌（綠）/,
   '市場分析頁必須有可見的臺股式紅 ▲ 上漲／綠 ▼ 下跌圖例');
-assert.match(dashboard, /dash-market-stock-legend[\s\S]*?▲[\s\S]*?上漲（紅）[\s\S]*?▼[\s\S]*?下跌（綠）[\s\S]*?非漲停／跌停/,
-  '中央戰情儀表板必須有可見的紅 ▲ 上漲／綠 ▼ 下跌圖例及非漲跌停說明');
+assert.match(boardPage, /<MarketExecutiveBoard/,
+  '市場公開看板必須載入共用行情看板');
+assert.match(dashboard, /market-board-legend[\s\S]*?▲[\s\S]*?上漲（紅）[\s\S]*?▼[\s\S]*?下跌（綠）[\s\S]*?非漲停／跌停/,
+  '現行行情看板必須有可見的紅 ▲ 上漲／綠 ▼ 下跌圖例及非漲跌停說明');
 
 assert.match(workspace, /label: '本期每日行情（實線）'/,
   '每日行情趨勢必須明示本期使用實線');

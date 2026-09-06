@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { systems } from '../web/lib/modules.ts';
 
 const moduleCount = systems.reduce((total, system) => total + system.modules.length, 0);
-assert.equal(systems.length, 9, '按鈕規格稽核必須涵蓋 9 大系統');
-assert.equal(moduleCount, 50, '按鈕規格稽核必須涵蓋 50 個已登錄路由（49 個業務子系統加上共用報修 3D 圖臺）');
+assert.equal(systems.length, 12, '按鈕規格稽核必須涵蓋 12 大系統');
+assert.equal(moduleCount, 58, '按鈕規格稽核必須涵蓋 58 個已登錄路由');
 
 const globals = readFileSync('web/app/globals.css', 'utf8');
 const layout = readFileSync('web/app/layout.tsx', 'utf8');
