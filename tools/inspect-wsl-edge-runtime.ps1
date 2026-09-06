@@ -45,7 +45,7 @@ for container in $containers; do
       printf "Standard functions path is absent; inspect the mounts above.\n"
       exit 0
     fi
-    for file in admin-api/index.ts admin-api/board-notices.ts app-api/index.ts app-api/market-board-notices.ts; do
+    for file in admin-api/index.ts admin-api/board-notices.ts app-api/index.ts app-api/market-board-notices.ts official-document-timeout-check/index.ts; do
       if [ -f "$root/$file" ]; then
         sha256sum "$root/$file"
       else
@@ -58,7 +58,7 @@ printf '\nRead-only inspection complete. No deployment performed.\n'
 '@
 
 # Explicit root is needed to inspect Docker; the fixed shell program above only
-# reads container metadata and hashes four known application source files.
+# reads container metadata and hashes five known application source files.
 # Pass the program on stdin so Windows PowerShell 5.1 cannot strip its embedded
 # quotes while serializing native command arguments. Normalize pipe CRLF in WSL.
 $diagnostic | & $wslCommand.Source --distribution $Distribution --user root --exec sh -c "tr -d '\r' | sh"
