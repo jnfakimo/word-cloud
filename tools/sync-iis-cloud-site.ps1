@@ -2,6 +2,7 @@
 param(
     [string]$SiteRoot = 'C:\InspectionRuntime\site\Inspection',
     [string]$StateRoot = 'C:\InspectionRuntime\site-sync',
+    [string]$ExpectedCommit = '',
     [switch]$Apply
 )
 
@@ -25,6 +26,9 @@ try {
     $runs = @($runsText | ConvertFrom-Json)
     if ($runs.Count -ne 1) { throw '找不到成功的正式部署。' }
     $run = $runs[0]
+    if ($ExpectedCommit -and $run.headSha -ne $ExpectedCommit) {
+        throw 'The latest successful release differs from the reviewed commit. No site files changed.'
+    }
     $stateFile = Join-Path $statePath 'last-success.json'
     if (Test-Path -LiteralPath $stateFile) {
         $previous = Get-Content -LiteralPath $stateFile -Raw -Encoding UTF8 | ConvertFrom-Json

@@ -56,11 +56,18 @@ function gh {
   }
   throw 'Unexpected GitHub command'
 }
-& (Join-Path $env:IIS_TEST_PROJECT 'tools\sync-iis-cloud-site.ps1') -SiteRoot $env:IIS_TEST_SITE -StateRoot $env:IIS_TEST_STATE -Apply
+& (Join-Path $env:IIS_TEST_PROJECT 'tools\sync-iis-cloud-site.ps1') -SiteRoot $env:IIS_TEST_SITE -StateRoot $env:IIS_TEST_STATE -ExpectedCommit $env:IIS_TEST_COMMIT -Apply
 `;
-    const childEnv = { ...process.env, IIS_TEST_ARCHIVE: archive, IIS_TEST_PROJECT: project, IIS_TEST_SITE: site, IIS_TEST_STATE: state };
+    const childEnv = { ...process.env, IIS_TEST_ARCHIVE: archive, IIS_TEST_PROJECT: project, IIS_TEST_SITE: site, IIS_TEST_STATE: state, IIS_TEST_COMMIT: 'test-commit' };
     // Do not pass a PowerShell 7 module search path into Windows PowerShell 5.1.
     for (const key of Object.keys(childEnv)) if (key.toLowerCase() === 'psmodulepath') delete childEnv[key];
+    const rejected = spawnSync(path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe'),
+      ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(harness, 'utf16le').toString('base64')],
+      { encoding: 'utf8', timeout: 60000, env: { ...childEnv, IIS_TEST_COMMIT: 'different-release' } });
+    assert.notEqual(rejected.status, 0);
+    assert.match(rejected.stderr, /differs from the reviewed commit/);
+    assert.equal(fs.readFileSync(path.join(site, 'v2/login/index.html'), 'utf8'), 'old page');
+    assert.equal(fs.existsSync(path.join(state, 'last-success.json')), false);
     const output = run(path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe'),
       ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(harness, 'utf16le').toString('base64')],
       { env: childEnv });
@@ -71,7 +78,7 @@ function gh {
     assert.equal(completed.commit, 'test-commit');
     assert.equal(fs.readFileSync(path.join(completed.backup, 'v2/login/index.html'), 'utf8'), 'old page');
     assert.ok(output.includes('test-commit'));
-    console.log('Windows PowerShell 5.1 signed-artifact sync passed: UTF-8 paths, backup, hashes, old chunks and IIS config preserved.');
+    console.log('Windows PowerShell 5.1 signed-artifact sync passed: wrong release refused, UTF-8 paths, backup, hashes, old chunks and IIS config preserved.');
   } finally {
     assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
     assert.ok(path.basename(root).startsWith('inspection-iis-sync-test-'));
