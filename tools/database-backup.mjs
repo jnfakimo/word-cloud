@@ -18,6 +18,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, writeFile, appendFile, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { backupRequest } from './backup-request.mjs';
 
 const PROJECT_REF = process.env.SUPABASE_PROJECT_REF || 'qztffronusdhgxhjjubt';
 const MANAGEMENT_TOKEN = process.env.SUPABASE_ACCESS_TOKEN || '';
@@ -40,19 +41,14 @@ function fail(message) {
 
 /** 對 Management API 送唯讀查詢。備份流程絕不寫入正式庫。 */
 async function query(sql) {
-  const response = await fetch(QUERY_URL, {
+  return backupRequest(QUERY_URL, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${MANAGEMENT_TOKEN}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ query: sql, read_only: true }),
-  });
-  if (!response.ok) {
-    // 回應內容可能夾帶查詢本身，不整段外流，只留狀態碼。
-    throw new Error(`Management API 回應 HTTP ${response.status}`);
-  }
-  return response.json();
+  }, response => response.json(), 'Management API');
 }
 
 /** 識別碼一律走這裡，避免表名被當成 SQL 片段拼進查詢。 */
@@ -90,6 +86,7 @@ async function dumpTable(table, tablesDir) {
     hash.update(chunk);
     await appendFile(file, chunk);
     rows += batch.length;
+    if (rows % (PAGE_SIZE * 10) === 0) console.log(`資料表 ${table}：已匯出 ${rows} 列`);
     offset += batch.length;
     if (batch.length < PAGE_SIZE) break;
   }
@@ -98,11 +95,9 @@ async function dumpTable(table, tablesDir) {
 
 /** service_role key 只在記憶體中停留，不寫檔也不列印。 */
 async function serviceRoleKey() {
-  const response = await fetch(KEYS_URL, {
+  const keys = await backupRequest(KEYS_URL, {
     headers: { Authorization: `Bearer ${MANAGEMENT_TOKEN}` },
-  });
-  if (!response.ok) throw new Error(`取得 API 金鑰失敗，HTTP ${response.status}`);
-  const keys = await response.json();
+  }, response => response.json(), '取得 Storage 備份權限');
   const found = (Array.isArray(keys) ? keys : []).find(k => k.name === 'service_role');
   if (!found?.api_key) throw new Error('回應中找不到 service_role 金鑰');
   return found.api_key;
@@ -123,13 +118,11 @@ async function dumpStorage(storageDir) {
     for (const object of objects) {
       const url = `https://${PROJECT_REF}.supabase.co/storage/v1/object/` +
         `${encodeURIComponent(bucket.name)}/${object.name.split('/').map(encodeURIComponent).join('/')}`;
-      const response = await fetch(url, {
+      const body = await backupRequest(url, {
         headers: { Authorization: `Bearer ${key}`, apikey: key },
-      });
-      if (!response.ok) throw new Error(`下載 ${bucket.name} 的物件失敗，HTTP ${response.status}`);
+      }, async response => Buffer.from(await response.arrayBuffer()), 'Storage 物件下載');
       const target = path.join(storageDir, bucket.name, object.name);
       await mkdir(path.dirname(target), { recursive: true });
-      const body = Buffer.from(await response.arrayBuffer());
       await writeFile(target, body);
       bytes += body.byteLength;
       saved += 1;
@@ -154,7 +147,9 @@ export async function main() {
 
   const dumped = [];
   for (const table of tables) {
+    console.log(`開始匯出資料表 ${table}`);
     dumped.push(await dumpTable(table, tablesDir));
+    console.log(`完成資料表 ${table}：${dumped.at(-1).rows} 列`);
   }
 
   const storage = INCLUDE_STORAGE ? await dumpStorage(storageDir) : [];

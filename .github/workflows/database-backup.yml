@@ -56,7 +56,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           BACKUP_OUT_DIR: ${{ runner.temp }}/backup
-          BACKUP_INCLUDE_STORAGE: ${{ inputs.include_storage == false && 'false' || 'true' }}
+          BACKUP_INCLUDE_STORAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.include_storage == false && 'false' || 'true' }}
         run: node tools/database-backup.mjs
 
       - name: Verify backup integrity
