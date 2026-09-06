@@ -1,6 +1,13 @@
 param([string]$Distribution = '', [switch]$Apply)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+# The desktop shortcut may be synced by OneDrive. Never apply on another PC.
+if ($Apply) {
+    $isTargetHost = @([Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() |
+        ForEach-Object { $_.GetIPProperties().UnicastAddresses } |
+        Where-Object { $_.Address.ToString() -eq '192.168.50.192' }).Count -gt 0
+    if (-not $isTargetHost) { throw 'Run this repair on the server with local IP 192.168.50.192. No changes made.' }
+}
 $wsl = Get-Command wsl.exe -ErrorAction Stop
 $names = @(& $wsl.Source --list --quiet | ForEach-Object { ($_ -replace "`0", '').Trim() } | Where-Object { $_ })
 if ($LASTEXITCODE -ne 0) { throw 'Cannot list WSL distributions.' }
