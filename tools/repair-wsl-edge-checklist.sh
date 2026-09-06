@@ -7,6 +7,7 @@ root=/opt/inspection/supabase/volumes/functions
 source=/mnt/c/Users/jnfa/Inspection-checklist-release-43136ca/supabase/functions
 backup_root=/opt/inspection/maintenance/edge-repair
 diagnostics=/mnt/c/Users/jnfa/Inspection-maintenance/edge-dependency-snapshots
+anon_config=/mnt/c/Users/jnfa/Inspection-local/web/lib/config.ts
 container=supabase-edge-functions
 for command in docker sha256sum curl python3 flock realpath; do command -v "$command" >/dev/null; done
 [ "$(realpath "$root")" = "$root" ] || { echo 'Unexpected target path.' >&2; exit 2; }
@@ -38,6 +39,8 @@ import hashlib,json,sys,tempfile
 root=Path(sys.argv[1])
 destination=Path(sys.argv[2])
 expected=[line.split() for line in sys.argv[3].splitlines()]
+# Reviewed host snapshot: existing eight-digit policy; preserve, never deploy it elsewhere.
+host_variants={'_shared/password-policy.ts': {'03e6ded839a04f3916eb8b2811a92fdb1920103203302eba62aadb9eef0b73ce'}}
 records=[]
 failed=False
 for raw_expected,lf_expected,relative in expected:
@@ -49,7 +52,7 @@ for raw_expected,lf_expected,relative in expected:
     data=file.read_bytes()
     raw=hashlib.sha256(data).hexdigest()
     canonical=hashlib.sha256(data.replace(b'\r\n',b'\n')).hexdigest()
-    state='exact' if raw==raw_expected else 'line-endings-only' if canonical==lf_expected else 'content-mismatch'
+    state='exact' if raw==raw_expected else 'line-endings-only' if canonical==lf_expected else 'reviewed-host-variant' if canonical in host_variants.get(relative,set()) else 'content-mismatch'
     print('DEPENDENCY|'+relative+'|'+state+'|raw='+raw+'|lf='+canonical)
     records.append({'path':relative,'state':state,'sha256':raw,'lf_sha256':canonical})
     failed=failed or state=='content-mismatch'
@@ -88,13 +91,31 @@ printf '%s\n' "$entries" | while read -r file expected previous; do
     [ "$previous" = missing ] || { echo "Required target absent: $file" >&2; exit 2; }
   fi
 done
+# Use only the already-public local anon credential for the runtime JWT gate.
+# Do not read container secrets or disable VERIFY_JWT.
+anon=$(python3 - "$anon_config" <<'PY'
+from pathlib import Path
+import base64,json,re,sys
+matches=re.findall(r"LOCAL_SUPABASE_ANON_KEY\s*=\s*'([^']+)'",Path(sys.argv[1]).read_text(encoding='utf-8-sig'))
+if len(matches)!=1:
+    raise SystemExit('Cannot identify the public local anon key; no deployment.')
+key=matches[0]
+parts=key.split('.')
+if len(parts)!=3:
+    raise SystemExit('Invalid public anon JWT format; no deployment.')
+payload=json.loads(base64.urlsafe_b64decode(parts[1]+'='*(-len(parts[1])%4)))
+if payload.get('role')!='anon':
+    raise SystemExit('Only an anon-role JWT may be used for API checks; no deployment.')
+print(key)
+PY
+)
 health() {
   # Container-local HTTP is the existing Edge listener; external TLS is untouched.
   ip=$(docker inspect --format '{{range .NetworkSettings.Networks}}{{println .IPAddress}}{{end}}' "$container" | sed '/^$/d')
   printf '%s\n' "$ip" | python3 -c 'import ipaddress,sys; a=ipaddress.ip_address(sys.stdin.read().strip()); assert a.version==4 and a.is_private' || return 1
-  curl --silent --show-error --fail --max-time 30 -H 'Content-Type: application/json' -d '{"action":"market_board_public"}' "http://$ip:9000/app-api" |
+  curl --silent --show-error --fail --max-time 30 -H "apikey: $anon" -H "Authorization: Bearer $anon" -H 'Content-Type: application/json' -d '{"action":"market_board_public"}' "http://$ip:9000/app-api" |
     python3 -c 'import json,sys; p=json.load(sys.stdin); assert p.get("ok") is True; assert isinstance(p["data"]["table"]["rows"],list)' || return 1
-  code=$(curl --silent --show-error --max-time 15 -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"action":"users"}' "http://$ip:9000/admin-api") || return 1
+  code=$(curl --silent --show-error --max-time 15 -o /dev/null -w '%{http_code}' -H "apikey: $anon" -H "Authorization: Bearer $anon" -H 'Content-Type: application/json' -d '{"action":"users"}' "http://$ip:9000/admin-api") || return 1
   [ "$code" = 401 ] || return 1
 }
 health || { echo 'Pre-deployment API check failed; no application files changed.' >&2; exit 2; }

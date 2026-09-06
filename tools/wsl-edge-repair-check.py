@@ -1,4 +1,6 @@
 """Exercise actual repair file operations with synthetic files and mocked Docker/HTTP."""
+import base64
+import json
 import hashlib
 import os
 from pathlib import Path
@@ -18,13 +20,17 @@ deps = [line.split() for line in re.search(r"dependencies='(.*?)'", SCRIPT, re.S
 def digest(value):
     return hashlib.sha256(value).hexdigest()
 
-def run_case(name, apply, mode='', corrupt=False, drift=False, dependency_lf=False, dependency_drift=False):
+def run_case(name, apply, mode='', corrupt=False, drift=False, dependency_lf=False, dependency_drift=False, local_password=False, misplaced_variant=False, privileged_key=False):
     with tempfile.TemporaryDirectory(prefix='inspection-repair-test-') as temp:
         # Windows hosted runners may provide RUNNER~1 in TEMP; resolve the fixture
         # before crossing into Git Bash so realpath checks see the same path.
         fixture = Path(temp).resolve()
         root, source, backup, diagnostics = [fixture/p for p in ('target', 'source', 'backup', 'diagnostics')]
         root.mkdir(); source.mkdir(); backup.mkdir(); diagnostics.mkdir()
+        config=fixture/'config.ts'
+        payload=base64.urlsafe_b64encode(json.dumps({'role':'service_role' if privileged_key else 'anon'}).encode()).decode().rstrip('=')
+        anon='e30.'+payload+'.synthetic'
+        config.write_text("const LOCAL_SUPABASE_ANON_KEY = '"+anon+"';",encoding='utf-8')
         script = SCRIPT
         before = {}
         for relative, new_hash, old_hash in entries:
@@ -47,6 +53,12 @@ def run_case(name, apply, mode='', corrupt=False, drift=False, dependency_lf=Fal
             canonical = content.replace(b'\r\n', b'\n')
             target.write_bytes(canonical if dependency_lf else content)
             script = script.replace(old_hash, digest(content)).replace(lf_hash, digest(canonical))
+        reviewed=b'reviewed host password policy\r\n'
+        script=script.replace('03e6ded839a04f3916eb8b2811a92fdb1920103203302eba62aadb9eef0b73ce',digest(reviewed.replace(b'\r\n',b'\n')))
+        if local_password:
+            (root/'_shared/password-policy.ts').write_bytes(reviewed)
+        if misplaced_variant:
+            (root/deps[0][2]).write_bytes(reviewed)
         if dependency_drift:
             (root/deps[0][2]).write_bytes(b'unreviewed shared function')
         dependency_before = {relative: (root/relative).read_bytes() for _, _, relative in deps}
@@ -60,6 +72,7 @@ def run_case(name, apply, mode='', corrupt=False, drift=False, dependency_lf=Fal
             ('source=/mnt/c/Users/jnfa/Inspection-checklist-release-43136ca/supabase/functions', source),
             ('backup_root=/opt/inspection/maintenance/edge-repair', backup),
             ('diagnostics=/mnt/c/Users/jnfa/Inspection-maintenance/edge-dependency-snapshots', diagnostics),
+            ('anon_config=/mnt/c/Users/jnfa/Inspection-local/web/lib/config.ts', config),
         ):
             script = script.replace(literal, literal.split('=')[0] + '=$(realpath ' + shlex.quote(value.as_posix()) + ')')
         script = script.replace('sleep 2', 'sleep 0')
@@ -77,6 +90,11 @@ docker() {
   esac
 }
 curl() {
+  authorized=0
+  for value in "$@"; do
+    case "$value" in 'Authorization: Bearer '*) authorized=1;; esac
+  done
+  [ "$authorized" = 1 ] || return 22
   if [ "$mode" = fail-after-restart ] && [ -f "$fixture/restarts" ]; then return 22; fi
   for value in "$@"; do
     case "$value" in
@@ -87,7 +105,7 @@ curl() {
 }
 '''
         result = subprocess.run([SHELL, '-s', '--', str(int(apply))], input=header+script, text=True, capture_output=True, timeout=40)
-        expected_success = not (corrupt or drift or mode or dependency_drift)
+        expected_success = not (corrupt or drift or mode or dependency_drift or misplaced_variant or privileged_key)
         assert (result.returncode == 0) == expected_success, (name, result.stdout, result.stderr)
         for relative, *_ in entries:
             target = root/relative
@@ -95,7 +113,7 @@ curl() {
                 assert target.read_bytes() == (source/relative).read_bytes(), name
             elif relative in before:
                 assert target.read_bytes() == before[relative], name
-            elif not apply or corrupt or drift or dependency_drift:
+            elif not apply or corrupt or drift or dependency_drift or misplaced_variant or privileged_key:
                 assert not target.exists(), name
         restarts = (fixture/'restarts').read_text().splitlines() if (fixture/'restarts').exists() else []
         assert len(restarts) == (2 if mode else 1 if apply and expected_success else 0), (name, restarts)
@@ -121,4 +139,7 @@ run_case('unreviewed local change stops before writes', True, drift=True)
 run_case('post-deploy failure restores previous entry files', True, mode='fail-after-restart')
 run_case('reviewed dependency LF line endings are accepted without rewriting', True, dependency_lf=True)
 run_case('unknown dependency stops and saves source for review', True, dependency_drift=True)
+run_case('reviewed local password policy is retained', True, local_password=True)
+run_case('reviewed password hash is rejected for other dependencies', True, misplaced_variant=True)
+run_case('privileged token is rejected before deployment', True, privileged_key=True)
 print('Synthetic filesystem checks passed; Docker, HTTP and flock are mocked. Live host validation remains required.')
