@@ -26,6 +26,15 @@ jobs:
         run: node tools/iis-sync-compatibility-check.mjs
       - name: Verify scoped WSL repair backups and rollback
         run: python tools/wsl-edge-repair-check.py
+      - name: Verify read-only cutover collector and secret redaction
+        run: python tools/local-cutover-check.test.py
+      - name: Parse cutover collector with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $parseErrors = $null
+          $parseTokens = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'tools/inspect-local-cutover.ps1'), [ref]$parseTokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count -gt 0) { throw 'Cutover collector PowerShell syntax failed.' }
 
   build:
     runs-on: ubuntu-latest
@@ -47,6 +56,9 @@ jobs:
       - name: Run tests
         run: |
           npm test
+
+      - name: Verify cutover SQL with isolated PostgreSQL engine
+        run: node tools/local-cutover-sql-check.mjs
 
       - name: Build Node.js API
         run: npm run typecheck:api && npm run build:api
