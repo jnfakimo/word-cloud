@@ -14,6 +14,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  gmail-repair-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify Gmail repair with Linux file permissions
+        run: python3 tools/gmail-repair.test.py
+
   iis-powershell-compatibility:
     runs-on: windows-latest
     timeout-minutes: 5
@@ -28,6 +36,8 @@ jobs:
         run: python tools/wsl-edge-repair-check.py
       - name: Verify read-only cutover collector and secret redaction
         run: python tools/local-cutover-check.test.py
+      - name: Verify scoped Gmail repair and rollback
+        run: python tools/gmail-repair.test.py
       - name: Parse cutover collector with Windows PowerShell 5.1
         shell: powershell
         run: |
