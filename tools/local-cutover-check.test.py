@@ -69,11 +69,41 @@ class CollectorTests(unittest.TestCase):
         with (patch.object(cutover, 'container_report', side_effect=RuntimeError('PRIVATE')),
              patch.object(cutover, 'database_report', return_value=[]),
              patch.object(cutover, 'scheduler_report', return_value={}),
+             patch.object(cutover, 'mail_report', return_value={}),
              contextlib.redirect_stdout(output)):
             exit_code = cutover.main()
         self.assertEqual(exit_code, 2)
         self.assertNotIn('PRIVATE', output.getvalue())
         self.assertFalse(json.loads(output.getvalue())['cutoverComplete'])
+
+    def test_auth_mail_diagnostics_never_return_addresses_or_credentials(self):
+        def execute(args, **kwargs):
+            if args[1] == 'inspect':
+                return json.dumps([{'Config':{'Image':'supabase/gotrue:test', 'Env':[
+                    'GOTRUE_SMTP_HOST=smtp.private.example', 'GOTRUE_SMTP_PASS=PRIVATE',
+                    'GOTRUE_SMTP_USER=PRIVATE@example.com', 'GOTRUE_SMTP_PORT=587']}}])
+            self.assertEqual(args, ['docker','logs','--since','2h','--tail','300','supabase-auth'])
+            self.assertTrue(kwargs['include_stderr'])
+            return 'Error sending recovery email: SMTP 535 authentication failed PRIVATE@example.com PRIVATE\n'
+        result = cutover.mail_report(execute)
+        self.assertEqual(result['settings']['GOTRUE_SMTP_PASS'], 'set')
+        self.assertEqual(result['settings']['GOTRUE_SMTP_ADMIN_EMAIL'], 'missing')
+        self.assertEqual(result['recentLogSignals']['authenticationRejected'], 1)
+        self.assertNotIn('PRIVATE', json.dumps(result))
+        self.assertNotIn('smtp.private.example', json.dumps(result))
+        self.assertFalse(result['deliveryTestPerformed'])
+
+    def test_mail_signal_categories_and_empty_logs(self):
+        cases = {'connectionRefused':'smtp dial tcp: connection refused',
+                 'tlsFailure':'/recover x509 unknown authority',
+                 'dnsFailure':'smtp lookup: no such host',
+                 'connectionTimeout':'smtp: i/o timeout',
+                 'templateFailure':'email template parse error',
+                 'senderOrRecipientRejected':'smtp 550 recipient rejected',
+                 'rateLimited':'/recover email rate limit exceeded'}
+        for key, line in cases.items():
+            self.assertEqual(cutover.mail_log_summary(line)[key], 1)
+        self.assertFalse(any(cutover.mail_log_summary('').values()))
 
     @unittest.skipUnless(os.name == 'nt', 'Windows PowerShell integration')
     def test_windows_task_actions_and_private_report(self):

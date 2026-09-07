@@ -11,24 +11,59 @@ SETTINGS = ('CWA_API_KEY', 'CRON_SECRET', 'LINE_CHANNEL_SECRET',
             'GOOGLE_CALENDAR_CLIENT_SECRET', 'GOOGLE_CALENDAR_REDIRECT_URI',
             'GOOGLE_TOKEN_ENCRYPTION_KEY', 'FIREBASE_SERVICE_ACCOUNT_B64',
             'FIREBASE_PROJECT_ID')
+MAIL_SETTINGS = ('GOTRUE_SMTP_HOST', 'GOTRUE_SMTP_PORT', 'GOTRUE_SMTP_USER',
+                 'GOTRUE_SMTP_PASS', 'GOTRUE_SMTP_ADMIN_EMAIL',
+                 'GOTRUE_SMTP_SENDER_NAME', 'GOTRUE_SITE_URL',
+                 'GOTRUE_URI_ALLOW_LIST', 'GOTRUE_MAILER_TEMPLATES_RECOVERY')
 JOBS = ('patrol-timeout-check', 'meeting-booking-check',
         'official-document-timeout-check', 'google-calendar',
         'market', 'backup', 'monitor', 'synthetic')
 
 
-def run(args, data=None, timeout=45):
+def run(args, data=None, timeout=45, include_stderr=False):
     result = subprocess.run(args, input=data, capture_output=True,
                             text=True, timeout=timeout, check=False)
     if result.returncode:
         # stderr may contain connection credentials or SQL data: never relay it.
         raise RuntimeError('command-exit-' + str(result.returncode))
-    return result.stdout
+    return result.stdout + (result.stderr if include_stderr else '')
 
 
-def presence(entries):
+def presence(entries, names=SETTINGS):
     values = dict(item.split('=', 1) for item in entries if '=' in item)
     return {key: ('set' if values[key] else 'empty') if key in values
-            else 'missing' for key in SETTINGS}
+            else 'missing' for key in names}
+
+
+def mail_log_summary(logs):
+    # Only fixed counters leave memory: auth logs can include addresses/tokens.
+    candidates = [line for line in logs.splitlines()
+                  if re.search(r'smtp|mail|/recover|recovery', line, re.I)]
+    patterns = {
+        'recoveryMailFailure': r'error sending recovery email|error sending.*email',
+        'authenticationRejected': r'\b535\b|\b534\b|authentication failed|invalid.*credentials',
+        'connectionRefused': r'connection refused',
+        'dnsFailure': r'no such host|name resolution|server misbehaving',
+        'connectionTimeout': r'i/o timeout|connection timed out|deadline exceeded',
+        'tlsFailure': r'x509|certificate|tls handshake|starttls.*(fail|required)',
+        'senderOrRecipientRejected': r'\b550\b|\b553\b|sender.*rejected|recipient.*rejected',
+        'templateFailure': r'template.*(error|fail)|failed.*template',
+        'rateLimited': r'rate limit|too many requests',
+    }
+    return {name: sum(bool(re.search(pattern, line, re.I)) for line in candidates)
+            for name, pattern in patterns.items()}
+
+
+def mail_report(execute=run):
+    info = json.loads(execute(['docker', 'inspect', 'supabase-auth']))[0]
+    if not info['Config']['Image'].startswith('supabase/gotrue:'):
+        raise RuntimeError('formal-auth-image-mismatch')
+    logs = execute(['docker', 'logs', '--since', '2h', '--tail', '300', 'supabase-auth'],
+                   include_stderr=True)
+    return {'settings': presence(info['Config'].get('Env', []), MAIL_SETTINGS),
+            'recentLogSignals': mail_log_summary(logs),
+            'logWindow': 'last-2-hours-max-300-lines',
+            'deliveryTestPerformed': False}
 
 
 def command_summary(command):
@@ -135,7 +170,7 @@ def main():
     report = {'collectedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(),
               'mode': 'read-only', 'cutoverComplete': False, 'sections': {}}
     for name, collect in [('containers', container_report), ('database', database_report),
-                          ('schedulers', scheduler_report)]:
+                          ('schedulers', scheduler_report), ('authMail', mail_report)]:
         try:
             report['sections'][name] = {'status': 'collected', 'evidence': collect()}
         except Exception as error:
