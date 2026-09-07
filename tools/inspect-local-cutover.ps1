@@ -34,9 +34,16 @@ try {
         $sha = [Security.Cryptography.SHA256]::Create()
         try { $actionHash = ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($actionText)))).Replace('-','').ToLowerInvariant() }
         finally { $sha.Dispose() }
+        # Boot/event/on-demand tasks may have no next run; never-run tasks may
+        # have no last run. Null is evidence, not a collection failure.
+        $taskStage = 'last-run-time'
+        $lastRun = if ($null -eq $info.LastRunTime) { $null } else { $info.LastRunTime.ToString('o') }
+        $taskStage = 'next-run-time'
+        $nextRun = if ($null -eq $info.NextRunTime) { $null } else { $info.NextRunTime.ToString('o') }
+        $taskStage = 'metadata'
         $tasks += [ordered]@{ name=$task.TaskName; state=[string]$task.State; enabled=$task.Settings.Enabled;
             triggerTypes=$triggerTypes; logonType=[string]$task.Principal.LogonType;
-            lastRun=$info.LastRunTime.ToString('o'); nextRun=$info.NextRunTime.ToString('o');
+            lastRun=$lastRun; nextRun=$nextRun;
             lastResult=$info.LastTaskResult; actionSha256=$actionHash;
             referencesCloud=($actionText -match '\.supabase\.co');
             rebootExecutionVerified=$false }
@@ -77,5 +84,7 @@ $encoding = New-Object System.Text.UTF8Encoding($false)
 Write-Output ('Read-only report saved: ' + $reportFile)
 Write-Output 'This report does not perform deployment, migration, restore or notification delivery.'
 if ($report.wslExit -ne 0 -or $report.windowsTasks.status -ne 'collected') {
-    throw 'One or more evidence sections are unavailable. Review the saved report.'
+    Write-Output ('Evidence incomplete: Windows tasks=' + $report.windowsTasks.status + '; WSL exit=' + $report.wslExit + '.')
+    Write-Output 'See the saved JSON for individual section errors. No production changes were made.'
+    exit 1
 }

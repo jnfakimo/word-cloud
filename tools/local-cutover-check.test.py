@@ -154,6 +154,10 @@ function Get-ScheduledTask {
 function Get-ScheduledTaskInfo {
   param($TaskName, $TaskPath)
   if ($TaskName -eq 'Inspection denied') { throw 'PRIVATE denied task details' }
+  if ($TaskName -eq 'Inspection on-demand') {
+    [pscustomobject]@{LastRunTime=$null;NextRunTime=$null;LastTaskResult=267011}
+    return
+  }
   [pscustomobject]@{LastRunTime=[datetime]'2026-09-07';NextRunTime=[datetime]'2026-09-08';LastTaskResult=0}
 }
 function wsl.exe {
@@ -162,6 +166,7 @@ function wsl.exe {
   else { '{"mode":"read-only","cutoverComplete":false,"sections":{}}' }
 }
 & '__COLLECTOR__'
+exit $LASTEXITCODE
 '''.replace('__COLLECTOR__', str(collector).replace("'", "''"))
             wrapper = fixture / 'run.ps1'
             wrapper.write_text(script, encoding='ascii')
@@ -174,6 +179,8 @@ function wsl.exe {
             self.assertEqual(len(report['windowsTasks']['evidence']), 2)
             self.assertIn('MSFT_TaskBootTrigger', report['windowsTasks']['evidence'][0]['triggerTypes'])
             self.assertEqual(report['windowsTasks']['evidence'][1]['triggerTypes'], [])
+            self.assertIsNone(report['windowsTasks']['evidence'][1]['lastRun'])
+            self.assertIsNone(report['windowsTasks']['evidence'][1]['nextRun'])
             self.assertNotIn('PRIVATE', json.dumps(report))
             self.assertFalse(report['cutoverComplete'])
             result = subprocess.run(['powershell.exe','-NoProfile','-File',str(wrapper)],
