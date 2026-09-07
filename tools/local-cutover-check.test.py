@@ -3,7 +3,10 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
+import subprocess
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -71,6 +74,46 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(exit_code, 2)
         self.assertNotIn('PRIVATE', output.getvalue())
         self.assertFalse(json.loads(output.getvalue())['cutoverComplete'])
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows PowerShell integration')
+    def test_windows_task_actions_and_private_report(self):
+        with tempfile.TemporaryDirectory(prefix='cutover-ps-test-') as temp:
+            fixture = Path(temp).resolve()
+            collector = Path(__file__).with_name('inspect-local-cutover.ps1').resolve()
+            script = r'''
+function Get-NetIPAddress { [pscustomobject]@{IPAddress='192.168.50.192'} }
+function Get-ScheduledTask {
+  [pscustomobject]@{TaskName='Windows COM task';Actions=@([pscustomobject]@{ClassId='PRIVATE'})}
+  [pscustomobject]@{
+    TaskName='Inspection backup';TaskPath='\';State='Ready'
+    Actions=@([pscustomobject]@{Execute='powershell.exe';Arguments='-File backup.ps1 -Secret PRIVATE'})
+    Triggers=@([pscustomobject]@{CimClass=[pscustomobject]@{CimClassName='MSFT_TaskBootTrigger'}})
+    Settings=[pscustomobject]@{Enabled=$true}
+    Principal=[pscustomobject]@{LogonType='Password'}
+  }
+}
+function Get-ScheduledTaskInfo {
+  [pscustomobject]@{LastRunTime=[datetime]'2026-09-07';NextRunTime=[datetime]'2026-09-08';LastTaskResult=0}
+}
+function wsl.exe {
+  $global:LASTEXITCODE=0
+  if ($args -contains '--list') { 'Ubuntu' }
+  else { '{"mode":"read-only","cutoverComplete":false,"sections":{}}' }
+}
+& '__COLLECTOR__'
+'''.replace('__COLLECTOR__', str(collector).replace("'", "''"))
+            wrapper = fixture / 'run.ps1'
+            wrapper.write_text(script, encoding='ascii')
+            env = {**os.environ, 'USERPROFILE':str(fixture)}
+            result = subprocess.run(['powershell.exe','-NoProfile','-File',str(wrapper)],
+                                    capture_output=True, text=True, env=env, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            report = json.loads((fixture/'Inspection-maintenance/local-cutover-latest.json').read_text(encoding='utf-8'))
+            self.assertEqual(report['windowsTasks']['status'], 'collected')
+            self.assertEqual(len(report['windowsTasks']['evidence']), 1)
+            self.assertIn('MSFT_TaskBootTrigger', report['windowsTasks']['evidence'][0]['triggerTypes'])
+            self.assertNotIn('PRIVATE', json.dumps(report))
+            self.assertFalse(report['cutoverComplete'])
 
 
 if __name__ == '__main__':

@@ -13,7 +13,13 @@ $report = [ordered]@{ collectedAt=(Get-Date).ToString('o'); mode='read-only'; cu
 $tasks = @()
 try {
     foreach ($task in @(Get-ScheduledTask)) {
-        $actionText = ($task.Actions | ForEach-Object { $_.Execute + ' ' + $_.Arguments }) -join ' '
+        $actionText = ($task.Actions | ForEach-Object {
+            # Windows also has COM-handler tasks; their action has no Execute.
+            if ($_.PSObject.Properties['Execute']) {
+                $arguments = if ($_.PSObject.Properties['Arguments']) { [string]$_.Arguments } else { '' }
+                [string]$_.Execute + ' ' + $arguments
+            }
+        }) -join ' '
         if (($task.TaskName + ' ' + $actionText) -notmatch '(?i)inspection|supabase|/opt/inspection|run-local-market') { continue }
         $info = Get-ScheduledTaskInfo -TaskName $task.TaskName -TaskPath $task.TaskPath
         $triggerTypes = @($task.Triggers | ForEach-Object { $_.CimClass.CimClassName })
