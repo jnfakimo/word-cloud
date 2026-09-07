@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import sys
 
 SETTINGS = ('CWA_API_KEY', 'CRON_SECRET', 'LINE_CHANNEL_SECRET',
             'LINE_NOTIFY_WEBHOOK_SECRET', 'GOOGLE_CALENDAR_CLIENT_ID',
@@ -54,6 +55,38 @@ def mail_log_summary(logs):
             for name, pattern in patterns.items()}
 
 
+def mail_dns_report(entries, execute=run):
+    values = dict(item.split('=', 1) for item in entries if '=' in item)
+    host = values.get('GOTRUE_SMTP_HOST', '')
+    normalized = host.lower().rstrip('.')
+    result = {'hostIsPlaceholder': any(normalized == domain or normalized.endswith('.' + domain)
+              for domain in ('example.com', 'example.net', 'example.org', 'invalid', 'test')),
+              'hostHasWhitespaceOrScheme': bool(re.search(r'\s|://', host)),
+              'wslLookup': 'not-attempted', 'authContainerLookup': 'not-attempted'}
+    if not host:
+        return result
+    # Resolve only the configured mail host. No SMTP login or delivery is attempted.
+    probes = {
+        'wslLookup': [sys.executable, '-c',
+                      'import socket,sys; socket.getaddrinfo(sys.argv[1], None); print("resolved")', host],
+        'authContainerLookup': ['docker', 'exec', 'supabase-auth', 'sh', '-c',
+            'if command -v getent >/dev/null 2>&1; then '
+            'getent hosts "$GOTRUE_SMTP_HOST" >/dev/null 2>&1; r=$?; '
+            'elif command -v nslookup >/dev/null 2>&1; then '
+            'nslookup "$GOTRUE_SMTP_HOST" >/dev/null 2>&1; r=$?; '
+            'else printf "tool-unavailable"; exit 0; fi; '
+            'if [ "$r" -eq 0 ]; then printf "resolved"; else printf "lookup-failed"; fi']}
+    for name, args in probes.items():
+        try:
+            output = execute(args, timeout=15).strip()
+            result[name] = output if output in ('resolved', 'lookup-failed', 'tool-unavailable') else 'unavailable'
+        except subprocess.TimeoutExpired:
+            result[name] = 'timeout'
+        except RuntimeError:
+            result[name] = 'lookup-command-failed'
+    return result
+
+
 def mail_report(execute=run):
     info = json.loads(execute(['docker', 'inspect', 'supabase-auth']))[0]
     if not info['Config']['Image'].startswith('supabase/gotrue:'):
@@ -61,6 +94,7 @@ def mail_report(execute=run):
     logs = execute(['docker', 'logs', '--since', '2h', '--tail', '300', 'supabase-auth'],
                    include_stderr=True)
     return {'settings': presence(info['Config'].get('Env', []), MAIL_SETTINGS),
+            'dnsDiagnostics': mail_dns_report(info['Config'].get('Env', []), execute),
             'recentLogSignals': mail_log_summary(logs),
             'logWindow': 'last-2-hours-max-300-lines',
             'deliveryTestPerformed': False}

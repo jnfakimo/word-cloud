@@ -78,6 +78,8 @@ class CollectorTests(unittest.TestCase):
 
     def test_auth_mail_diagnostics_never_return_addresses_or_credentials(self):
         def execute(args, **kwargs):
+            if args[0] == cutover.sys.executable or args[1] == 'exec':
+                return 'resolved'
             if args[1] == 'inspect':
                 return json.dumps([{'Config':{'Image':'supabase/gotrue:test', 'Env':[
                     'GOTRUE_SMTP_HOST=smtp.private.example', 'GOTRUE_SMTP_PASS=PRIVATE',
@@ -92,6 +94,23 @@ class CollectorTests(unittest.TestCase):
         self.assertNotIn('PRIVATE', json.dumps(result))
         self.assertNotIn('smtp.private.example', json.dumps(result))
         self.assertFalse(result['deliveryTestPerformed'])
+
+    def test_dns_checks_are_bounded_and_redacted(self):
+        def execute(args, **kwargs):
+            self.assertEqual(kwargs['timeout'], 15)
+            if args[0] == cutover.sys.executable:
+                raise RuntimeError('PRIVATE host detail')
+            self.assertNotIn('PRIVATE.example.com', args)
+            return 'lookup-failed'
+        result = cutover.mail_dns_report(['GOTRUE_SMTP_HOST=PRIVATE.example.com'], execute)
+        self.assertTrue(result['hostIsPlaceholder'])
+        self.assertEqual(result['wslLookup'], 'lookup-command-failed')
+        self.assertEqual(result['authContainerLookup'], 'lookup-failed')
+        self.assertNotIn('PRIVATE', json.dumps(result))
+        self.assertFalse(cutover.mail_dns_report(['GOTRUE_SMTP_HOST=smtp.example.com.real.tld'],
+                         lambda *args, **kwargs: 'resolved')['hostIsPlaceholder'])
+        self.assertTrue(cutover.mail_dns_report(['GOTRUE_SMTP_HOST=https://private.tld'],
+                        lambda *args, **kwargs: 'resolved')['hostHasWhitespaceOrScheme'])
 
     def test_mail_signal_categories_and_empty_logs(self):
         cases = {'connectionRefused':'smtp dial tcp: connection refused',
@@ -114,6 +133,7 @@ class CollectorTests(unittest.TestCase):
 function Get-NetIPAddress { [pscustomobject]@{IPAddress='192.168.50.192'} }
 function Get-ScheduledTask {
   [pscustomobject]@{TaskName='Windows COM task';Actions=@([pscustomobject]@{ClassId='PRIVATE'})}
+  [pscustomobject]@{TaskName='Windows empty action';Actions=$null}
   [pscustomobject]@{
     TaskName='Inspection backup';TaskPath='\';State='Ready'
     Actions=@([pscustomobject]@{Execute='powershell.exe';Arguments='-File backup.ps1 -Secret PRIVATE'})
@@ -121,8 +141,19 @@ function Get-ScheduledTask {
     Settings=[pscustomobject]@{Enabled=$true}
     Principal=[pscustomobject]@{LogonType='Password'}
   }
+  [pscustomobject]@{
+    TaskName='Inspection on-demand';TaskPath='\';State='Ready'
+    Actions=@([pscustomobject]@{Execute='check.exe';Arguments=''})
+    Triggers=$null;Settings=[pscustomobject]@{Enabled=$true}
+    Principal=[pscustomobject]@{LogonType='Interactive'}
+  }
+  if ($env:INSPECTION_TEST_PARTIAL -eq '1') {
+    [pscustomobject]@{TaskName='Inspection denied';TaskPath='\';Actions=@([pscustomobject]@{Execute='check.exe'})}
+  }
 }
 function Get-ScheduledTaskInfo {
+  param($TaskName, $TaskPath)
+  if ($TaskName -eq 'Inspection denied') { throw 'PRIVATE denied task details' }
   [pscustomobject]@{LastRunTime=[datetime]'2026-09-07';NextRunTime=[datetime]'2026-09-08';LastTaskResult=0}
 }
 function wsl.exe {
@@ -140,10 +171,20 @@ function wsl.exe {
             self.assertEqual(result.returncode, 0, result.stderr)
             report = json.loads((fixture/'Inspection-maintenance/local-cutover-latest.json').read_text(encoding='utf-8'))
             self.assertEqual(report['windowsTasks']['status'], 'collected')
-            self.assertEqual(len(report['windowsTasks']['evidence']), 1)
+            self.assertEqual(len(report['windowsTasks']['evidence']), 2)
             self.assertIn('MSFT_TaskBootTrigger', report['windowsTasks']['evidence'][0]['triggerTypes'])
+            self.assertEqual(report['windowsTasks']['evidence'][1]['triggerTypes'], [])
             self.assertNotIn('PRIVATE', json.dumps(report))
             self.assertFalse(report['cutoverComplete'])
+            result = subprocess.run(['powershell.exe','-NoProfile','-File',str(wrapper)],
+                                    capture_output=True, text=True,
+                                    env={**env, 'INSPECTION_TEST_PARTIAL':'1'}, timeout=30)
+            self.assertNotEqual(result.returncode, 0)
+            report = json.loads((fixture/'Inspection-maintenance/local-cutover-latest.json').read_text(encoding='utf-8'))
+            self.assertEqual(report['windowsTasks']['status'], 'partial')
+            self.assertEqual(len(report['windowsTasks']['evidence']), 2)
+            self.assertEqual(report['windowsTasks']['errors'][0]['stage'], 'runtime-info')
+            self.assertNotIn('PRIVATE', json.dumps(report))
 
 
 if __name__ == '__main__':

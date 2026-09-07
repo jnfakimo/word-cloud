@@ -11,9 +11,13 @@ $reportRoot = Join-Path $env:USERPROFILE 'Inspection-maintenance'
 [IO.Directory]::CreateDirectory($reportRoot) | Out-Null
 $report = [ordered]@{ collectedAt=(Get-Date).ToString('o'); mode='read-only'; cutoverComplete=$false }
 $tasks = @()
+$taskErrors = @()
+$taskStage = 'enumerate'
 try {
     foreach ($task in @(Get-ScheduledTask)) {
-        $actionText = ($task.Actions | ForEach-Object {
+      try {
+        $taskStage = 'actions'
+        $actionText = ($task.Actions | Where-Object { $null -ne $_ } | ForEach-Object {
             # Windows also has COM-handler tasks; their action has no Execute.
             if ($_.PSObject.Properties['Execute']) {
                 $arguments = if ($_.PSObject.Properties['Arguments']) { [string]$_.Arguments } else { '' }
@@ -21,8 +25,12 @@ try {
             }
         }) -join ' '
         if (($task.TaskName + ' ' + $actionText) -notmatch '(?i)inspection|supabase|/opt/inspection|run-local-market') { continue }
+        $taskStage = 'runtime-info'
         $info = Get-ScheduledTaskInfo -TaskName $task.TaskName -TaskPath $task.TaskPath
-        $triggerTypes = @($task.Triggers | ForEach-Object { $_.CimClass.CimClassName })
+        $taskStage = 'triggers'
+        # On-demand tasks legitimately have null/empty triggers under StrictMode.
+        $triggerTypes = @($task.Triggers | Where-Object { $null -ne $_ } | ForEach-Object { $_.CimClass.CimClassName })
+        $taskStage = 'metadata'
         $sha = [Security.Cryptography.SHA256]::Create()
         try { $actionHash = ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($actionText)))).Replace('-','').ToLowerInvariant() }
         finally { $sha.Dispose() }
@@ -32,9 +40,16 @@ try {
             lastResult=$info.LastTaskResult; actionSha256=$actionHash;
             referencesCloud=($actionText -match '\.supabase\.co');
             rebootExecutionVerified=$false }
+      } catch {
+        # Keep successful tasks. Do not emit exception messages or action text.
+        $taskErrors += @{stage=$taskStage;errorType=$_.Exception.GetType().Name;
+            scriptLine=$_.InvocationInfo.ScriptLineNumber;hresult=$_.Exception.HResult}
+      }
     }
-    $report.windowsTasks = @{status='collected';evidence=$tasks}
-} catch { $report.windowsTasks = @{status='unavailable';errorType=$_.Exception.GetType().Name} }
+    $taskStatus = if ($taskErrors.Count) { 'partial' } else { 'collected' }
+    $report.windowsTasks = @{status=$taskStatus;evidence=$tasks;errors=$taskErrors}
+} catch { $report.windowsTasks = @{status='unavailable';evidence=$tasks;stage=$taskStage;
+    errorType=$_.Exception.GetType().Name;scriptLine=$_.InvocationInfo.ScriptLineNumber;hresult=$_.Exception.HResult} }
 
 try {
     $distributions = @(& wsl.exe --list --quiet | ForEach-Object { ($_ -replace "`0", '').Trim() } | Where-Object { $_ -and $_ -notmatch '^docker-desktop' })
